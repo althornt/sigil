@@ -4,9 +4,6 @@
 nextflow.enable.dsl = 2
 
 // import modules
-include { RNASEQ } from './modules/rnaseq'
-include { STAR } from './modules/star'
-
 include { QUANT } from './modules/quant'
 include { STAR_ALIGN } from './modules/star_align'
 include { MESA } from './modules/mesa'
