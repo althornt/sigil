@@ -4,7 +4,6 @@ process MESA {
   echo true
 
   input:
-  path "STAR_${pair_id}"
   path srafile
 
 
@@ -20,7 +19,8 @@ process MESA {
     cat mesa_manifest.txt
 
     mesa quant -m mesa_manifest.txt -o mesa --drim
-
+    mkdir ${params.outdir}/mesa_out
+    mv mesa* ${params.outdir}/mesa_out
 
     """
 }
