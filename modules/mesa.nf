@@ -5,7 +5,7 @@ process MESA {
 
   input:
   path srafile
-
+  file bam
 
     """
 

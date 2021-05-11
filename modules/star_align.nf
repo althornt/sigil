@@ -5,6 +5,7 @@ process STAR_ALIGN {
     tag "$pair_id"
     publishDir "${params.outdir}/star_out"
 
+    cpus 5
 
     input:
     path star_index
@@ -12,6 +13,7 @@ process STAR_ALIGN {
 
     output:
     path "STAR_${pair_id}"
+    file "STAR_${pair_id}/${pair_id}Aligned.sortedByCoord.out.bam"
 
     script:
 
@@ -22,7 +24,7 @@ process STAR_ALIGN {
     STAR --genomeDir $star_index \
      --readFilesIn $reads \
      --outSAMtype BAM SortedByCoordinate \
-     --runThreadN 5 \
+     --runThreadN $task.cpus \
      --outWigType bedGraph \
      --outFileNamePrefix $pair_id \
      --readFilesCommand zcat \

@@ -3,6 +3,8 @@ process QUANT {
     tag "$pair_id"
     publishDir "${params.outdir}/kallisto_out"
 
+    cpus 5
+
     input:
     path index
     tuple val(pair_id), path(reads)
