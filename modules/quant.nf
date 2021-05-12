@@ -17,6 +17,6 @@ process QUANT {
 
     script:
     """
-    kallisto quant -i $index --threads $task.cpus -o $pair_id ${reads}
+    kallisto quant -i $index --threads $task.cpus -o $pair_id ${reads} 
     """
 }

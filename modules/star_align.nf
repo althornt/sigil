@@ -17,8 +17,6 @@ process STAR_ALIGN {
 
     script:
 
-    // --twopassMode Basic \
-
     """
 
     STAR --genomeDir $star_index \
@@ -28,7 +26,7 @@ process STAR_ALIGN {
      --outWigType bedGraph \
      --outFileNamePrefix $pair_id \
      --readFilesCommand zcat \
-
+     --twopassMode Basic \
 
      mkdir STAR_${pair_id}
      mv ${pair_id}Aligned* STAR_${pair_id}/.
@@ -36,12 +34,7 @@ process STAR_ALIGN {
      mv ${pair_id}SJ* STAR_${pair_id}/.
      mv ${pair_id}Log* STAR_${pair_id}/.
 
-     ls STAR_${pair_id}
      mesa star_junc_to_bed -s STAR_${pair_id}/${pair_id}SJ.out.tab
-     ls STAR_${pair_id}
-
-     head STAR_${pair_id}/${pair_id}SJ.out.tab.bed
-
 
     """
 }

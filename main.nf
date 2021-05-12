@@ -32,12 +32,14 @@ transcriptome_index  = file(params.kallisto_idx)
 
 workflow {
   main:
+
   if (params.star_index)
   if (params.kallisto_idx)
   //align()
   read_pairs_ch = channel.fromFilePairs( params.reads, checkIfExists: true ).view()
   QUANT(params.kallisto_idx, read_pairs_ch)
   STAR_ALIGN(params.star_index, read_pairs_ch)
+
   if (params.sraruntable)
   MESA(params.sraruntable,
     STAR_ALIGN.out[1].collect())
