@@ -1,5 +1,5 @@
 
-process STAR_ALIGN {
+process STAR_ALIGN_PE {
     echo true
 
     tag "$pair_id"
