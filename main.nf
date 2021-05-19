@@ -12,41 +12,46 @@ include { FASTQC } from './modules/fastqc'
 include { MULTIQC } from './modules/multiqc'
 
 
-// //building indices
-// //kallisto
+// params for building indices
 // params.transcriptome = "/mnt/files/Homo_sapiens.GRCh38.cdna.all.fa.gz"
-// //STAR
 // params.genome = "/mnt/files/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
 // params.annotation    = "/mnt/files/homo_sapiens/Homo_sapiens.GRCh38.96.gtf"
 // params.overhang      = '99'
 
-
-// SRP125125
+// SRP125125 (Monaco et al)
 // params.outdir = "/mnt/sigil/sigil_results_20210511"
 // params.reads = "/mnt/sra-fastq/*{1,2}.fastq.gz"
 // params.sraruntable  = '/mnt/sra-manifest/SRP125125_SraRunTable_noblanks.csv'
 
+// SRP253519 (Song et al)
+// params.outdir = "/mnt/sigil/sigil_results_SRP253519_20210520"
+// params.reads = "/mnt/sra-fastq-SRP253519/*.fastq.gz"
+// params.sraruntable  = "/mnt/sra-manifest/SRP125125_SraRunTable.csv"
 
 // pair end test files
-params.outdir = "/mnt/sigil/sigil_results_test_PE"
+params.outdir = "/mnt/sigil/sigil_results_test_PE_4"
 params.sraruntable  = '/mnt/sra-manifest/SRP125125_SraRunTable_mini3.csv'
 params.reads = "/mnt/sra-fastq-test-small/*{1,2}_short.fastq.gz"
 // params.reads = "/mnt/sra-fastq-test/*{1,2}.fastq.gz"
 
-
 // single end test files
-// params.outdir = "/mnt/sigil/sigil_results_test_SE"
+// params.outdir = "/mnt/sigil/sigil_results_test_SE_3"
 // params.sraruntable  = "/mnt/sigil/sra-manifest/SRP253519_SraRunTable_mini3.csv"
 // params.reads = "/mnt/sra-fastq-SRP253519-mini/*.fastq.gz"
 
-params.PAIRED_END = true
-params.SINGLE_END = false
 
 // not building indices
 params.star_index = "/mnt/files/STARgenome"
 genome_index = file(params.star_index)
 params.kallisto_idx  = '/mnt/files/homo_sapiens/transcriptome.idx'
 transcriptome_index  = file(params.kallisto_idx)
+
+println "\n"
+println "Input fastq directory: $params.reads "
+println "Output directory: $params.outdir"
+println "params.PAIRED_END : $params.PAIRED_END"
+println "params.SINGLE_END : $params.SINGLE_END \n"
+
 
 workflow {
   main:
@@ -77,14 +82,6 @@ workflow {
 
   //fastQC
   FASTQC(read_ch)
-  MULTIQC(FASTQC.out)
-
+  MULTIQC(FASTQC.out.collect())
 
   }
-
-
-
-
-workflow.onComplete {
-	log.info ( workflow.success ? "\nDone! Open the following report in your browser --> $params.outdir/fastqcmultiqc_report.html\n" : "Oops .. something went wrong" )
-}

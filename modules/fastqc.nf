@@ -1,14 +1,11 @@
-
 process FASTQC {
-
-  tag "$id"
   publishDir "${params.outdir}/fastqc_out"
 
   input:
-  tuple val(name), file(reads)
+  tuple val(name), path(reads)
 
   output:
-  file "*_fastqc.{zip,html}" 
+  file "*_fastqc.{zip,html}"
 
   script:
   """
