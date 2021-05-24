@@ -4,7 +4,8 @@ library(EnsDb.Hsapiens.v86)
 library(tximport)
 library(uwot)
 library(ggplot2)
-library(qualpalr)
+library(RColorBrewer)
+
 
 set.seed(1234)
 
@@ -65,8 +66,10 @@ prcomp.out.merge = merge(prcomp.out, y = metadata)
 
 #UMAP function
 make_umap <- function(num_neighbor,meta_col) {
-  #palette based on
-  pal = qualpal(length(unique(metadata[[meta_col]])), colorspace = "rainbow")
+  #make palette
+  n <- length(unique(metadata[[meta_col]]))
+  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
   #umap
   umap.out <- umap(prcomp.out, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
@@ -81,7 +84,7 @@ make_umap <- function(num_neighbor,meta_col) {
           geom_point(size = 2) +
           theme_classic() +
           theme(legend.position="bottom",legend.title = element_blank()) +
-          scale_color_manual(values=pal$hex) +
+          scale_color_manual(values=pal) +
           labs(title= paste("UMAP Kallisto: Cell types, n_neighbors =",num_neighbor, sep = ' '))
 
   #save
