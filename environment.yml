@@ -3,6 +3,9 @@ channels:
   - defaults
   - conda-forge
   - bioconda
+  - r
+  - cran
+
 dependencies:
   - sra-tools=2.9.1
   - star=2.6.1a
@@ -10,3 +13,14 @@ dependencies:
   - fastqc
   - multiqc
   - kallisto
+  - R
+  - bioconductor-deseq2
+  - bioconductor-tximportData
+  - bioconductor-tximport
+  - bioconductor-ensembldb
+  - bioconductor-EnsDb.Hsapiens.v86
+  - bioconductor-rhdf5
+  - r-optparse
+  - r-uwot
+  - r-ggplot2
+  - r-RColorBrewer

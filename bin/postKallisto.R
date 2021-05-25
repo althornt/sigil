@@ -1,3 +1,4 @@
+#!/usr/bin/env Rscript
 
 library(optparse)
 library(EnsDb.Hsapiens.v86)
@@ -40,6 +41,8 @@ dir.create(opt$out_dir)
 #open files
 metadata = read.csv(file = opt$metadata)
 files <- file.path(opt$kallisto_dir, metadata$Run, "abundance.h5")
+
+print(files)
 
 #transcripts to gene, used in tximport
 edb <- EnsDb.Hsapiens.v86
@@ -97,5 +100,5 @@ make_umap <- function(num_neighbor,meta_col) {
 }
 
 #making variations of UMAPs
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="general")
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="Cell_type")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_cell_type")
