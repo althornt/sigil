@@ -95,27 +95,29 @@ sudo nextflow run main.nf     \
 ### [Song et al](https://www.sciencedirect.com/science/article/pii/S2211124719300592?via%3Dihub)
 
 **Running Song et al (full)**
+
 ```
 sudo nextflow run main.nf \
-  --outdir /mnt/sigil/sigil_results_SRP253519_20210519 \
-  --metadata  /mnt/sigil/sra-manifest/SRP253519_SraRunTable.csv \
+  --outdir /mnt/results/sigil_results_SRP253519_20210527 \
+  --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
   --reads /mnt/fastq/sra-fastq-SRP253519/ \
   --single_end
 ```
 
 **Running Song et al (MESA only)**
+
 ```
-sudo nextflow run main.nf
-  --outdir /mnt/sigil/sigil_results_SRP253519_20210519 \
-  --metadata  /mnt/sigil/sra-manifest/SRP253519_SraRunTable.csv \
-  --star_bed_dir /mnt/sigil/sigil_results_SRP253519_20210519/star_out \
+sudo nextflow run main.nf \
+  --outdir /mnt/results/sigil_results_SRP253519_20210527 \
+  --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
+  --star_bed_dir /mnt/results/sigil_results_SRP253519_20210527/star_out \
   --skip_QC
 ```
 
   **Running Song et al (cluster only)**
 ```
 sudo nextflow run main.nf  \
-    --outdir /mnt/sigil/sigil_results_SRP253519_20210519 \
-    --metadata  /mnt/sra-manifest/SRP253519_SraRunTable.csv \
+    --outdir /mnt/results/sigil_results_SRP253519_20210527 \
+    --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
     --cluster
 ```

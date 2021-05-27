@@ -1,9 +1,9 @@
+#!/usr/bin/env Rscript
+
 library(optparse)
 library(uwot)
 library(ggplot2)
 library(RColorBrewer)
-
-set.seed(1234)
 
 #arguments
 option_list <- list(
@@ -55,6 +55,9 @@ dat <- mesa_ps_clean[getVar > param & !is.na(getVar), ]
 #UMAP function
 make_umap <- function( num_neighbor,meta_col, df, tag) {
 
+  set.seed(123)
+
+
   #PCA
   prcomp.out = as.data.frame(prcomp(as.data.frame(t(df)), scale = F)$x)
   prcomp.out$Run = rownames(prcomp.out)
@@ -93,6 +96,6 @@ make_umap <- function( num_neighbor,meta_col, df, tag) {
 
 #making variations of UMAPs
 lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="general", df = dat, tag="nan_adjusted")
-lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="Cell_type", df = dat, tag="nan_adjusted")
+lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="cell_type", df = dat, tag="nan_adjusted")
 lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="general", df = na.omit(mesa_ps), tag="nan_dropped")
-lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="Cell_type", df = na.omit(mesa_ps), tag="nan_dropped")
+lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="cell_type", df = na.omit(mesa_ps), tag="nan_dropped")

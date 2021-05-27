@@ -7,6 +7,9 @@ process MESA {
   path srafile
   file bam
 
+  output:
+  path "${params.outdir}/mesa_out"
+
     """
     sed 's/\r//' $srafile  |
     awk -F, '{print \$1",${params.outdir}/star_out/STAR_"\$1"/"\$1"SJ.out.tab.bed,"\$NF","\$NF}' OFS=  |     #rearrange columns, add file path

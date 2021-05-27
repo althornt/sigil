@@ -17,7 +17,6 @@ process STAR_ALIGN {
 
     script:
 
-
     """
 
     STAR --genomeDir $star_index \

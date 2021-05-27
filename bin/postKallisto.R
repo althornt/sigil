@@ -7,9 +7,6 @@ library(uwot)
 library(ggplot2)
 library(RColorBrewer)
 
-
-set.seed(1234)
-
 #arguments
 option_list <- list(
   optparse::make_option(
@@ -69,6 +66,10 @@ prcomp.out.merge = merge(prcomp.out, y = metadata)
 
 #UMAP function
 make_umap <- function(num_neighbor,meta_col) {
+
+  set.seed(123)
+
+
   #make palette
   n <- length(unique(metadata[[meta_col]]))
   qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]

@@ -5,7 +5,7 @@ process MESA_ONLY {
 
   input:
   path metadata
-  val star_bed_dir
+  path star_bed_dir
 
     """
     sed 's/\r//' $metadata  |
