@@ -1,11 +1,12 @@
 process MESA_ONLY {
-  publishDir "${params.outdir}/mesa_out"
-
   echo true
 
   input:
   path metadata
   path star_bed_dir
+
+  output:
+  publishDir "${params.outdir}/mesa_out"
 
     """
     sed 's/\r//' $metadata  |

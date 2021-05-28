@@ -1,6 +1,4 @@
 process MESA {
-  publishDir "${params.outdir}/mesa_out"
-
   echo true
 
   input:
@@ -8,7 +6,7 @@ process MESA {
   file bam
 
   output:
-  path "${params.outdir}/mesa_out"
+  publishDir "${params.outdir}/mesa_out"
 
     """
     sed 's/\r//' $srafile  |
