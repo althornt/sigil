@@ -103,3 +103,9 @@ make_umap <- function(num_neighbor,meta_col) {
 #making variations of UMAPs
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_cell_type")
+
+
+if("sigil_cell_type_treatment" %in% colnames(metadata))
+{
+  lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_cell_type_treatment");
+}
