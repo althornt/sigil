@@ -13,7 +13,14 @@ dependencies:
   - fastqc
   - multiqc
   - kallisto
+  - python=3.6.5
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - seaborn
   - R
+  - bioconductor-DRIMSeq
   - bioconductor-deseq2
   - bioconductor-tximportData
   - bioconductor-tximport
