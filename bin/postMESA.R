@@ -68,7 +68,6 @@ make_umap <- function( num_neighbor,meta_col, df, tag) {
 
   #make palette
   n <- length(unique(metadata[[meta_col]]))
-  print(n)
   qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
   pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
@@ -107,7 +106,7 @@ lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_cell_type", df = na.omit
 if("sigil_cell_type_treatment" %in% colnames(metadata))
 {
   lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_cell_type_treatment", df = na.omit(mesa_ps), tag="nan_dropped")
-  lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_cell_type_treatment", df = na.omit(mesa_ps), tag="nan_dropped");
+  lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_cell_type_treatment", df = dat, tag="nan_adjusted");
 }
 
 
@@ -146,7 +145,7 @@ make_umap_qc <- function( num_neighbor,meta_col, df, tag) {
 
   #make palette
   n <- length(unique(metadata[[meta_col]]))
-  print(n)
+  # print(n)
   qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
   pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
@@ -164,7 +163,7 @@ make_umap_qc <- function( num_neighbor,meta_col, df, tag) {
           theme_classic() +
           theme(legend.position="bottom",legend.title = element_blank()) +
           scale_color_manual(values=pal) +
-          labs(title= paste("UMAP MESA: Cell types, n_neighbors =",num_neighbor,tag, sep = ' '))
+          labs(title= paste("UMAP MESA: Cell types, n_neighbors =",num_neighbor,tag, sep = ' '))+
           geom_text(aes(x, y, label = "NAN"), data = umap.out.merge[umap.out.merge$Run %in% high_nan_samples,],vjust = 0, nudge_y = 0.25)
 
   #save
@@ -177,6 +176,9 @@ make_umap_qc <- function( num_neighbor,meta_col, df, tag) {
   }
 
 #make UMAPS if there are samples with over half NAN
+print("high_nan_samples:")
+print(high_nan_samples)
+
 if(length(high_nan_samples)>0)
 {
 lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = dat, tag="nan_adjusted")
@@ -184,9 +186,9 @@ lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type", df = dat,
 lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = na.omit(mesa_ps), tag="nan_dropped")
 lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type", df = na.omit(mesa_ps), tag="nan_dropped")
 
-if("sigil_cell_type_treatment" %in% colnames(metadata))
-{
-  lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type_treatment", df = na.omit(mesa_ps), tag="nan_dropped")
-  lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type_treatment", df = na.omit(mesa_ps), tag="nan_dropped");
-}
+  if("sigil_cell_type_treatment" %in% colnames(metadata))
+  {
+    lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type_treatment", df = na.omit(mesa_ps), tag="nan_dropped")
+    lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type_treatment", df = dat, tag="nan_adjusted")
+  }
 }
