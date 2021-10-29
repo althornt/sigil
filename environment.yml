@@ -14,20 +14,22 @@ dependencies:
   - multiqc
   - kallisto
   - python=3.6.5
-  - numpy
+  - numpy==1.18.1
   - pandas
-  - scipy
+  - scipy==1.4.1
+  - pysam==0.15.4
   - matplotlib
   - seaborn
   - R
   - bioconductor-DRIMSeq
   - bioconductor-deseq2
-  - bioconductor-tximportData
   - bioconductor-tximport
   - bioconductor-ensembldb
   - bioconductor-EnsDb.Hsapiens.v86
-  - bioconductor-rhdf5
   - r-optparse
   - r-uwot
   - r-ggplot2
   - r-RColorBrewer
+  - r-magrittr
+  - r-dplyr
+  - r-pheatmap

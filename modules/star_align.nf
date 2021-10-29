@@ -3,7 +3,7 @@ process STAR_ALIGN {
     echo true
 
     tag "$file_id"
-    publishDir "${params.outdir}/star_out"
+    publishDir "${params.outdir}/star_out" , mode: 'copy'
 
     cpus 5
 
@@ -36,13 +36,19 @@ process STAR_ALIGN {
 
 
 
-     mesa star_junc_to_bed -s STAR_${file_id}/${file_id}SJ.out.tab
+#     mesa star_junc_to_bed -s STAR_${file_id}/${file_id}SJ.out.tab
+
+     # check if tab file is empty
+#     if ! [ -s "STAR_${file_id}/${file_id}SJ.out.tab" ];then
+#      echo "Exiting due to empty STAR .tab file"
+#      exit
+#     fi
 
      # check if bed file is empty
-     if ! [ -s "STAR_${file_id}/${file_id}SJ.out.tab.bed" ];then
-      echo "Exiting due to empty bed file from MESA star_junc_to_bed"
-      exit
-     fi
+#     if ! [ -s "STAR_${file_id}/${file_id}SJ.out.tab.bed" ];then
+#      echo "Exiting due to empty bed file from MESA star_junc_to_bed"
+#      # exit
+#     fi
 
     """
 }

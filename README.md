@@ -78,7 +78,11 @@ sudo nextflow run main.nf     \
 ### [Monaco et al](https://www.cell.com/cell-reports/pdf/S2211-1247(19)30059-2.pdf)
 **Running Monaco et al (full)**
 ```
-
+sudo nextflow run main.nf \
+  --outdir /mnt/results/sigil_results_SRP125125_20211028 \
+  --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
+  --reads /mnt/fastq/sra-fastq-SRP125125/ \
+  --paired_end
 ```
 
 **Running Monaco et al (MESA only)**
@@ -102,6 +106,13 @@ sudo nextflow run main.nf \
   --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
   --reads /mnt/fastq/sra-fastq-SRP253519/ \
   --single_end
+
+sudo nextflow run main.nf \
+    --outdir /mnt/results/sigil_results_SRP253519_20211028 \
+    --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
+    --reads /mnt/fastq/sra-fastq-SRP253519/ \
+    --single_end
+
 ```
 
 **Running Song et al (MESA only)**

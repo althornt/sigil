@@ -71,10 +71,7 @@ def helpMessage() {
 // params.reads = "/mnt/sra-fastq-SRP253519-mini/"
 
 
-
-
 // params.star_bed_dir = "/mnt/sigil/sigil_results_test_SE/star_out"
-
 
 // params for building indices
 // params.transcriptome = "/mnt/files/Homo_sapiens.GRCh38.cdna.all.fa.gz"
@@ -101,11 +98,10 @@ workflow {
 
   //kallisto PAIRED END
   if (params.paired_end && params.kallisto_idx){
-    dir =  params.reads +"*{1,2}_short.fastq.gz"
+    dir =  params.reads +"*{1,2}.fastq.gz"
     read_ch = channel.fromFilePairs(dir, checkIfExists: true ).view()
     KALLISTO_PE(params.kallisto_idx, read_ch)
-    POST_KALLISTO(params.metadata, KALLISTO_PE.out.collect())
-
+    //POST_KALLISTO(params.metadata, KALLISTO_PE.out.collect())
   }
 
   //kallisto SINGLE END
@@ -113,36 +109,37 @@ workflow {
     dir =  params.reads +"*.fastq.gz"
     read_ch = channel.fromPath( dir, checkIfExists: true ).map { it -> [it.name.replace(".fastq.gz", ""), file(it)]}.view()
     KALLISTO_SE(params.kallisto_idx, read_ch)
-    POST_KALLISTO(params.metadata, KALLISTO_SE.out.collect())
+    //POST_KALLISTO(params.metadata, KALLISTO_SE.out.collect())
   }
 
-  //STAR
-  if (params.star_index && !params.star_bed_dir && !params.cluster ){
-  STAR_ALIGN(params.star_index, read_ch)
-  }
+  //STAR and MESA
+  //if (params.star_index && !params.star_bed_dir && !params.cluster ){
+  //  STAR_ALIGN(params.star_index, read_ch)
+  //  MESA(params.metadata, STAR_ALIGN.out[1].collect())
+    //POST_MESA(params.metadata, MESA.out.collect())
+  //}
 
   //MESA
-  if (params.metadata && !params.star_bed_dir && !params.cluster){
-  MESA(params.metadata, STAR_ALIGN.out[1].collect())
-  POST_MESA(params.metadata, MESA.out.collect())
-
-  }
+  //if (params.metadata && !params.star_bed_dir && !params.cluster){
+  //MESA(params.metadata, STAR_ALIGN.out[1].collect())
+  //POST_MESA(params.metadata, MESA.out.collect())
+  //}
 
   //Just MESA from STAR beds
-  if (params.metadata && params.star_bed_dir && !params.cluster){
-  MESA_ONLY(params.metadata, params.star_bed_dir)
-  }
+  //if (params.metadata && params.star_bed_dir && !params.cluster){
+  //MESA_ONLY(params.metadata, params.star_bed_dir)
+  //}
 
   //fastQC
-  if(!params.skip_QC && params.reads && !params.cluster){
-  FASTQC(read_ch)
-  MULTIQC(FASTQC.out.collect())
-  }
+  //if(!params.skip_QC && params.reads && !params.cluster){
+  //FASTQC(read_ch)
+  //MULTIQC(FASTQC.out.collect())
+  //}
 
   // cluster only from MESA PS and kallisto outputs
-  if(params.cluster && params.metadata){
-    POST_KALLISTO_ONLY(params.metadata)
-    POST_MESA_ONLY(params.metadata)
-  }
+  //if(params.cluster && params.metadata){
+    // POST_KALLISTO_ONLY(params.metadata)
+  //  POST_MESA_ONLY(params.metadata)
+  //}
 
   }
