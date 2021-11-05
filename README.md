@@ -132,3 +132,10 @@ sudo nextflow run main.nf  \
     --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
     --cluster
 ```
+
+```
+sudo nextflow run main.nf  \
+    --outdir /mnt/results/sigil_results_SRP253519_20211028/ \
+    --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
+    --cluster
+```
