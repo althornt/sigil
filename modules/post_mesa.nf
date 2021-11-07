@@ -22,6 +22,8 @@ process POST_MESA_ONLY {
 
 
   """
-  postMESA.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata
+  #postMESA.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata
+  runMESAcompare.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata
+
   """
 }

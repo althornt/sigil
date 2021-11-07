@@ -36,23 +36,25 @@ make_umap <- function(num_neighbor,meta_col) {
 
   # Plot UMAP
   ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
-          geom_point(size = 2) +
-          theme_classic() +
-          theme(legend.position="bottom",legend.title = element_blank()) +
-          scale_color_manual(values=pal) +
-          labs(title= paste("UMAP Kallisto: Cell types, n_neighbors =",num_neighbor, sep = ' '))
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="bottom",legend.title = element_blank()) +
+    scale_color_manual(values=pal) +
+    labs(title= paste("UMAP Kallisto: Cell types, n_neighbors =",num_neighbor, sep = ' '))
 
   # Save UMAP plot
   ggsave(file.path(opt$out_dir,
-          paste("UMAPs/kallisto_PCA_UMAP",meta_col,num_neighbor,"png", sep = '.')),
-          device = "png",
-          width = 12,
-          dpi = 300)
+                   paste("UMAPs/kallisto_PCA_UMAP",meta_col,num_neighbor,"png", sep = '.')),
+         device = "png",
+         width = 12,
+         dpi = 300)
 
 }
 
 # Run Deseq2 for one cell type vs all other samples
 runDE_1_vs_all <- function(meta_col_to_use, cell_type_val) {
+
+  print(cell_type_val)
 
   # Make sample table to compare given cell type vs all other cell types
   sampleTable <- metadata %>%
@@ -67,22 +69,24 @@ runDE_1_vs_all <- function(meta_col_to_use, cell_type_val) {
   res<-res[order(res$padj),]
 
   #Write output to file
-  write.csv(as.data.frame(res),paste0(opt$out_dir,"/deseq2_outputs/",cell_type_val,".csv"))
+  write.csv(as.data.frame(res),file.path(opt$out_dir,"deseq2_outputs",paste0(cell_type_val,".csv")))
+  print("wrote DE output")
 
   df_res <- as.data.frame(res) %>%
     tibble::rownames_to_column(var = "gene")
 
   # Get top DEG with positive and negative log2FC
   DEG_up <- df_res %>%
-    dplyr::filter(padj < .00001) %>%
-    dplyr::filter(log2FoldChange > 4) %>%
+    dplyr::filter(padj < .001) %>%
+    dplyr::filter(log2FoldChange > 2) %>%
     dplyr::pull("gene")
 
   DEG_down <- df_res %>%
-    dplyr::filter(padj < .00001) %>%
-    dplyr::filter(log2FoldChange < -4 ) %>%
+    dplyr::filter(padj < .001) %>%
+    dplyr::filter(log2FoldChange < -2 ) %>%
     dplyr::pull("gene")
 
+  print("DE func done")
   return(list("DEG_down"= DEG_down, "DEG_up"= DEG_up))
 }
 
@@ -108,6 +112,10 @@ list2heatmap <- function(cell_type, meta_col_to_use, results){
     dplyr::filter(gene %in% unlist(results["DEG_up",cell_type])) %>%
     tibble::column_to_rownames("gene")
 
+  print("in list2heatmap")
+  print(head(up_cell_type))
+  print(dim(up_cell_type))
+
   # # DOWN DEG
   # down_cell_type <- log2trans_dat %>%
   #   dplyr::filter(row.names(log2trans_dat) %in% unlist(results["DEG_down",cell_type]))
@@ -120,22 +128,22 @@ list2heatmap <- function(cell_type, meta_col_to_use, results){
   # If at least 2 DEG in the condition , make heatmap
   if (nrow(up_cell_type) >= 2){
 
-      up_deg_heatmap <- pheatmap(
-        main = paste0("UP DEG in ", cell_type),
-        up_cell_type,
-        scale = "row",
-        show_rownames=F,
-        show_colnames=F,
-        annotation_col=df_sample_annotations)
+    up_deg_heatmap <- pheatmap(
+      main = paste0(" UP DEG in ", cell_type),
+      up_cell_type,
+      scale = "row",
+      show_rownames=F,
+      show_colnames=F,
+      annotation_col=df_sample_annotations)
 
-      save_pheatmap_pdf(
-        up_deg_heatmap,
-        paste0(opt$out_dir,"/deseq2_outputs/",meta_col_to_use,"_", cell_type,"_UP_DEG_heatmap.pdf"))
-    }
+    save_pheatmap_pdf(
+      up_deg_heatmap,
+      paste0(opt$out_dir,"/deseq2_outputs/",meta_col_to_use,"_", cell_type,"_UP_DEG_heatmap.pdf"))
+  }
 
   return(list("DEG"=row.names(up_cell_type)))
 
-  }
+}
 
 # Arguments
 option_list <- list(
@@ -194,36 +202,36 @@ write.csv(log2trans_dat,
 #################
 # UMAP
 #################
-# Make output directory
-if (!dir.exists(paste0(opt$out_dir,"/UMAPs/"))){
-  dir.create(paste0(opt$out_dir,"/UMAPs/"))
-}
-# Drop genes with low variance.
-getVar <- apply(log2trans_dat[, -1], 1, var)
-param <- median(getVar)
-log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
-
-# PCA.
-prcomp.out = as.data.frame(prcomp(as.data.frame(t(log2trans_dat_filt)), scale = F)$x)
-prcomp.out$Run = rownames(prcomp.out)
-prcomp.out.merge = merge(prcomp.out, y = metadata)
-
-# Making variations of UMAPs with different numbers of neighbors
-# only make UMAPs if enough samples
-if(ncol(dat)> 4){
-  lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
-  lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_cell_type")
-}
-
-# Color by cell type
-if(("sigil_cell_type_treatment" %in% colnames(metadata)) & (ncol(dat)> 4))
-{
-  lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_cell_type_treatment");
-}
+# # Make output directory
+# if (!dir.exists(paste0(opt$out_dir,"/UMAPs/"))){
+#   dir.create(paste0(opt$out_dir,"/UMAPs/"))
+# }
+# # Drop genes with low variance.
+# getVar <- apply(log2trans_dat[, -1], 1, var)
+# param <- median(getVar)
+# log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
+#
+# # PCA.
+# prcomp.out = as.data.frame(prcomp(as.data.frame(t(log2trans_dat_filt)), scale = F)$x)
+# prcomp.out$Run = rownames(prcomp.out)
+# prcomp.out.merge = merge(prcomp.out, y = metadata)
+#
+# # Making variations of UMAPs with different numbers of neighbors
+# # only make UMAPs if enough samples
+# if(("sigil_general" %in% colnames(metadata)) & (ncol(dat)> 4)){
+#   lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
+# }
+#
+# # Color by cell type
+# if(("sigil_cell_type_treatment" %in% colnames(metadata)) & (ncol(dat)> 4))
+# {
+#   lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_cell_type_treatment");
+# }
 
 ########################
 # DESEQ2 sigil_general
 ########################
+
 
 # Make output directory
 if (!dir.exists(paste0(opt$out_dir,"/deseq2_outputs/"))){
@@ -232,31 +240,41 @@ if (!dir.exists(paste0(opt$out_dir,"/deseq2_outputs/"))){
 
 # Run deseq2 on each cell type vs all others
 if("sigil_general" %in% colnames(metadata)){
-sigil_general_results <- sapply(
-  unique(metadata[["sigil_general"]]),
-  runDE_1_vs_all,
-  meta_col_to_use="sigil_general")
-}
 
-# DF to label samples(columns) with general and more specific labels
-df_sample_annotations <- metadata %>%
-  dplyr::select(Run,sigil_general, sigil_cell_type_treatment) %>%
-  tibble::column_to_rownames("Run")
+  # DF to label samples(columns) with general and more specific labels if they exist
+  if("sigil_cell_type_treatment" %in% colnames(metadata)){
+    df_sample_annotations <- metadata %>%
+      dplyr::select(Run,sigil_general, sigil_cell_type_treatment) %>%
+      tibble::column_to_rownames("Run")
+  }
+  else {
+    df_sample_annotations <- metadata %>%
+      dplyr::select(Run,sigil_general) %>%
+      tibble::column_to_rownames("Run")
+  }
 
-# Run heatmap function on all cell_types and unnest the list of DEG
-all_DEG_res_sigil_general <- unlist(lapply(
-  unique(metadata[["sigil_general"]]), list2heatmap,
-  meta_col_to_use="sigil_general",results=sigil_general_results ),
-  recursive = TRUE, use.names = FALSE)
+  # Run DE 1 cell type vs all others
+  sigil_general_results <- sapply(
+    unique(metadata[["sigil_general"]]),
+    runDE_1_vs_all,
+    meta_col_to_use="sigil_general")
 
-# Combine data from individual comparisons
-all_DEG_data_sigil_general <- log2trans_dat %>%
-  dplyr::filter(row.names(log2trans_dat) %in% all_DEG_res_sigil_general)
-write.csv(all_DEG_data_sigil_general,
-  paste0(opt$out_dir,"/deseq2_outputs/sigil_general_all_DEG.csv"))
+  print(sigil_general_results)
 
-# Make heatmap with all DEG from sigil_general
-pheatmap_combined_all_deg_sigil_general <- pheatmap(
+  # Run heatmap function on all cell_types and unnest the list of DEG
+  all_DEG_res_sigil_general <- unlist(lapply(
+    unique(metadata[["sigil_general"]]), list2heatmap,
+    meta_col_to_use="sigil_general",results=sigil_general_results),
+    recursive = TRUE, use.names = FALSE)
+
+  # Combine data from individual comparisons
+  all_DEG_data_sigil_general <- log2trans_dat %>%
+    dplyr::filter(row.names(log2trans_dat) %in% all_DEG_res_sigil_general)
+  write.csv(all_DEG_data_sigil_general,
+            paste0(opt$out_dir,"/deseq2_outputs/sigil_general_all_DEG.csv"))
+
+  # Make heatmap with all DEG from sigil_general
+  pheatmap_combined_all_deg_sigil_general <- pheatmap(
     all_DEG_data_sigil_general,
     main = paste0("All DEG"),
     scale = "row",
@@ -264,38 +282,43 @@ pheatmap_combined_all_deg_sigil_general <- pheatmap(
     show_colnames = F,
     annotation_col = df_sample_annotations)
 
-save_pheatmap_pdf(pheatmap_combined_all_deg_sigil_general,
-                  paste0(opt$out_dir,"/deseq2_outputs/sigil_general_all_DEG_heatmap.pdf"))
-
+  save_pheatmap_pdf(pheatmap_combined_all_deg_sigil_general,
+                    paste0(opt$out_dir,"/deseq2_outputs/sigil_general_all_DEG_heatmap.pdf"))
+}
 ######################################
 # DESEQ2 sigil_cell_type_treatment
 ######################################
 
 # Run deseq2 on each cell type (treatment specific) vs all others
 if("sigil_cell_type_treatment" %in% colnames(metadata)){
-sigil_cell_type_treatment_results <- sapply(
-  unique(metadata[["sigil_cell_type_treatment"]]),
-  runDE_1_vs_all,
-  meta_col_to_use="sigil_cell_type_treatment")
-}
 
-# Run heatmap function on all cell_types and unnest the list of DEG
-all_DEG_res_cell_type_treatment <- unlist(lapply(
-  unique(metadata[["sigil_cell_type_treatment"]]), list2heatmap,
-  meta_col_to_use="sigil_cell_type_treatment",results=sigil_cell_type_treatment_results ),
-  recursive = TRUE, use.names = FALSE)
+  # DF to label samples(columns) with general and more specific labels
+  df_sample_annotations <- metadata %>%
+    dplyr::select(Run,sigil_general, sigil_cell_type_treatment) %>%
+    tibble::column_to_rownames("Run")
 
-# Above all works takes 51 just treatment
-# Combine data from individual comparisons
-all_DEG_cell_type_treatment <- log2trans_dat %>%
-  tibble::rownames_to_column("gene") %>%
-  dplyr::filter(gene %in% all_DEG_res_cell_type_treatment) %>%
-  tibble::column_to_rownames("gene")
-write.csv(all_DEG_cell_type_treatment,
-  paste0(opt$out_dir,"/deseq2_outputs/sigil_cell_type_treatment_all_DEG.csv"))
+  # Run DE 1 cell type vs all others
+  sigil_cell_type_treatment_results <- sapply(
+    unique(metadata[["sigil_cell_type_treatment"]]),
+    runDE_1_vs_all,
+    meta_col_to_use="sigil_cell_type_treatment")
 
-# Make heatmap with all DEG from sigil_general
-pheatmap_combined_all_deg_sigil_cell_type_treatment <- pheatmap(
+  # Run heatmap function on all cell_types and unnest the list of DEG
+  all_DEG_res_cell_type_treatment <- unlist(lapply(
+    unique(metadata[["sigil_cell_type_treatment"]]), list2heatmap,
+    meta_col_to_use="sigil_cell_type_treatment",results=sigil_cell_type_treatment_results),
+    recursive = TRUE, use.names = FALSE)
+
+  # Combine data from individual comparisons
+  all_DEG_cell_type_treatment <- log2trans_dat %>%
+    tibble::rownames_to_column("gene") %>%
+    dplyr::filter(gene %in% all_DEG_res_cell_type_treatment) %>%
+    tibble::column_to_rownames("gene")
+  write.csv(all_DEG_cell_type_treatment,
+            paste0(opt$out_dir,"/deseq2_outputs/sigil_cell_type_treatment_all_DEG.csv"))
+
+  # Make heatmap with all DEG from sigil_general
+  pheatmap_combined_all_deg_sigil_cell_type_treatment <- pheatmap(
     all_DEG_cell_type_treatment,
     main = paste0("All DEG using treatment"),
     scale = "row",
@@ -303,5 +326,6 @@ pheatmap_combined_all_deg_sigil_cell_type_treatment <- pheatmap(
     show_colnames = F,
     annotation_col = df_sample_annotations)
 
-save_pheatmap_pdf(pheatmap_combined_all_deg_sigil_general,
-                  paste0(opt$out_dir,"/deseq2_outputs/sigil_cell_type_treatment_all_DEG_heatmap.pdf"))
+  save_pheatmap_pdf(pheatmap_combined_all_deg_sigil_general,
+                    paste0(opt$out_dir,"/deseq2_outputs/sigil_cell_type_treatment_all_DEG_heatmap.pdf"))
+}
