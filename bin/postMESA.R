@@ -30,11 +30,9 @@ option_list <- list(
 opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
-#make output directory and qc subdirectory
+#make output directories
 dir.create(file.path(opt$out_dir, "qc"), recursive = TRUE, showWarnings = FALSE)
-
-
-
+dir.create(file.path(opt$out_dir, "UMAPs"), recursive = TRUE, showWarnings = FALSE)
 
 #open files
 metadata = read.csv(file = opt$metadata)
@@ -54,12 +52,10 @@ param <- median(getVar)
 dat <- mesa_ps_clean[getVar > param & !is.na(getVar), ]
 
 
-
 #UMAP function
 make_umap <- function( num_neighbor,meta_col, df, tag) {
 
   set.seed(123)
-
 
   #PCA
   prcomp.out = as.data.frame(prcomp(as.data.frame(t(df)), scale = F)$x)
@@ -89,11 +85,10 @@ make_umap <- function( num_neighbor,meta_col, df, tag) {
 
   #save
   ggsave(file.path(opt$out_dir,
-          paste("MESA_PCA_UMAP",meta_col,num_neighbor,tag,"png", sep = '.')),
+          paste("/UMAPs/MESA_PCA_UMAP",meta_col,num_neighbor,tag,"png", sep = '.')),
           device = "png",
           width = 12,
           dpi = 300)
-
 }
 
 #making variations of UMAPs
