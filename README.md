@@ -95,6 +95,15 @@ sudo nextflow run main.nf \
   --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
   --star_bed_dir /mnt/results/sigil_results_SRP125125_Monaco_20211109/star_out
   --skip_QC
+
+# new
+sudo nextflow run main.nf \
+  --outdir /mnt/results/sigil_results_SRP125125_Monaco_20211109 \
+  --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
+  --star_bed_dir /mnt/results/sigil_results_SRP125125_Monaco_20211109/star_out  \
+  --skip_QC
+
+
 `
 
 **Running Monaco et al (cluster only)**
