@@ -11,9 +11,6 @@ sigil clustering expects sra metadata file to have a columns "general" (more gen
 `bash bin/fastqDumpFromMeta.sh sra_manifest.csv`
 
 
-
-
-
 # Test Data
 
 _**Paired end**_
@@ -27,7 +24,6 @@ sudo nextflow run main.nf  \
     --reads /mnt/fastq/sra-fastq-test-small/  \
     --paired_end
 ```
-
 
 **Testing paired end data (MESA only)**
 
@@ -49,7 +45,7 @@ _**Single end**_
 **Testing single end data small files (full)**
 ```
 sudo nextflow run main.nf \
-    --outdir /mnt/results/sigil_results_test_SE  \
+    --outdir /mnt/results/sigil_results_test_SE_new  \
     --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_mini3.csv \
     --reads /mnt/fastq/sra-fastq-SRP253519-mini/   \
     --single_end
@@ -59,10 +55,10 @@ sudo nextflow run main.nf \
 
 ```
 sudo nextflow run main.nf \
-    --outdir /mnt/results/sigil_results_test_SE  \
+    --outdir /mnt/results/sigil_results_test_SE_newmesa  \
     --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_mini3.csv \
-    --star_bed_dir /mnt/results/sigil_results_test_SE/star_out \
-    --skip_QC `
+    --star_bed_dir /mnt/results/sigil_results_test_SE_new/star_out \
+    --skip_QC
 ```
 
 **Testing single end data (cluster only)**
@@ -83,16 +79,30 @@ sudo nextflow run main.nf \
   --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
   --reads /mnt/fastq/sra-fastq-SRP125125/ \
   --paired_end
+
+# New
+sudo nextflow run main.nf \
+  --outdir /mnt/results/sigil_results_SRP125125_Monaco_20211109 \
+  --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
+  --reads /mnt/fastq/sra-fastq-SRP125125/ \
+  --paired_end
+
 ```
 
 **Running Monaco et al (MESA only)**
-```
-
-```
+`sudo nextflow run main.nf \
+  --outdir /mnt/results/sigil_results_SRP125125_Monaco_20211109 \
+  --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
+  --star_bed_dir /mnt/results/sigil_results_SRP125125_Monaco_20211109/star_out
+  --skip_QC
+`
 
 **Running Monaco et al (cluster only)**
 ```
-
+sudo nextflow run main.nf \
+  --outdir /mnt/results/sigil_results_SRP125125_20211028 \
+  --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
+  --cluster
 ```
 
 
@@ -107,11 +117,13 @@ sudo nextflow run main.nf \
   --reads /mnt/fastq/sra-fastq-SRP253519/ \
   --single_end
 
+
+# new
 sudo nextflow run main.nf \
-    --outdir /mnt/results/sigil_results_SRP253519_20211028 \
-    --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
-    --reads /mnt/fastq/sra-fastq-SRP253519/ \
-    --single_end
+  --outdir /mnt/results/sigil_results_SRP253519_Song_20211114 \
+  --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
+  --reads /mnt/fastq/sra-fastq-SRP253519/ \
+  --single_end
 
 ```
 
@@ -123,6 +135,14 @@ sudo nextflow run main.nf \
   --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
   --star_bed_dir /mnt/results/sigil_results_SRP253519_20210527/star_out \
   --skip_QC
+
+# new
+sudo nextflow run main.nf \
+  --outdir /mnt/results/sigil_results_SRP253519_Song_20211114 \
+  --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
+  --star_bed_dir /mnt/results/sigil_results_SRP253519_Song_20211114/star_out \
+  --skip_QC
+
 ```
 
   **Running Song et al (cluster only)**
@@ -138,4 +158,12 @@ sudo nextflow run main.nf  \
     --outdir /mnt/results/sigil_results_SRP253519_20211028/ \
     --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
     --cluster
+```
+
+
+# sigil combine
+```
+sudo nextflow run sigil_combine.nf \
+  --manifest /mnt/files/sigil_res_manifest.txt \
+  --outdir /mnt/results_sigil_combine/test
 ```

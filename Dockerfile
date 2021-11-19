@@ -12,7 +12,7 @@ RUN apt-get update && apt-get install -y \
   python3-dev \
   zlib1g-dev
 
-#clone and install mesa git repo
+#clone and install current MESA git repo
 RUN cd /mnt/bin \
            && git clone https://github.com/BrooksLabUCSC/mesa.git \
            && cd mesa/ \

@@ -28,6 +28,7 @@ def helpMessage() {
         --paired_end                   Indicate reads are paired end for kallis
         --kallisto_idx                 Kallisto index
         --star_index                   STAR index
+        --gtf                          gtf file needed for MESA
         --metadata                     csv file needed for MESA (usually SRA run table)
         --skip_QC                      Dont run fastQC or multiQC
         --star_bed_dir                 Provide the directory with .bed files to run MESA
@@ -75,15 +76,18 @@ def helpMessage() {
 
 // params for building indices
 // params.transcriptome = "/mnt/files/Homo_sapiens.GRCh38.cdna.all.fa.gz"
-// params.genome = "/mnt/files/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+params.genome = "/mnt/files/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
 // params.annotation    = "/mnt/files/homo_sapiens/Homo_sapiens.GRCh38.96.gtf"
 // params.overhang      = '99'
 
 // using built indices
 params.star_index = "/mnt/files/STARgenome"
-genome_index = file(params.star_index)
+// genome_index = file(params.star_index)
 params.kallisto_idx  = '/mnt/files/homo_sapiens/transcriptome.idx'
-transcriptome_index  = file(params.kallisto_idx)
+// transcriptome_index  = file(params.kallisto_idx)
+
+// needed for post mesa - mesa runCompareSampleSets_1_vs_all
+params.gtf  = '/mnt/files/homo_sapiens/Homo_sapiens.GRCh38.96.gtf'
 
 println "\n"
 println "Input fastq directory: $params.reads "
@@ -101,7 +105,7 @@ workflow {
     dir =  params.reads +"*{1,2}.fastq.gz"
     read_ch = channel.fromFilePairs(dir, checkIfExists: true ).view()
     KALLISTO_PE(params.kallisto_idx, read_ch)
-    //POST_KALLISTO(params.metadata, KALLISTO_PE.out.collect())
+    POST_KALLISTO(params.metadata, KALLISTO_PE.out.collect())
   }
 
   //kallisto SINGLE END
@@ -109,37 +113,37 @@ workflow {
     dir =  params.reads +"*.fastq.gz"
     read_ch = channel.fromPath( dir, checkIfExists: true ).map { it -> [it.name.replace(".fastq.gz", ""), file(it)]}.view()
     KALLISTO_SE(params.kallisto_idx, read_ch)
-    //POST_KALLISTO(params.metadata, KALLISTO_SE.out.collect())
+    POST_KALLISTO(params.metadata, KALLISTO_SE.out.collect())
   }
 
-  //STAR and MESA
-  //if (params.star_index && !params.star_bed_dir && !params.cluster ){
-  //  STAR_ALIGN(params.star_index, read_ch)
-  //  MESA(params.metadata, STAR_ALIGN.out[1].collect())
-    //POST_MESA(params.metadata, MESA.out.collect())
-  //}
+  // STAR and MESA
+  if (params.star_index && !params.star_bed_dir && !params.cluster ){
+    STAR_ALIGN(params.star_index, read_ch)
+    MESA(params.metadata, STAR_ALIGN.out[1].collect(), params.gtf, params.genome)
+    POST_MESA(params.metadata, MESA.out.collect(), params.gtf)
+  }
 
-  //MESA
-  //if (params.metadata && !params.star_bed_dir && !params.cluster){
-  //MESA(params.metadata, STAR_ALIGN.out[1].collect())
-  //POST_MESA(params.metadata, MESA.out.collect())
-  //}
+  // MESA
+  // if (params.metadata && !params.star_bed_dir && !params.cluster){
+  //   MESA(params.metadata, STAR_ALIGN.out[1].collect())
+  //   POST_MESA(params.metadata, MESA.out.collect())
+  // }
 
   //Just MESA from STAR beds
-  //if (params.metadata && params.star_bed_dir && !params.cluster){
-  //MESA_ONLY(params.metadata, params.star_bed_dir)
-  //}
+  if (params.metadata && params.star_bed_dir && !params.cluster){
+    MESA_ONLY(params.metadata, params.star_bed_dir ,params.gtf, params.genome)
+  }
 
   //fastQC
-  //if(!params.skip_QC && params.reads && !params.cluster){
-  //FASTQC(read_ch)
-  //MULTIQC(FASTQC.out.collect())
-  //}
+  if(!params.skip_QC && params.reads && !params.cluster){
+    FASTQC(read_ch)
+    MULTIQC(FASTQC.out.collect())
+  }
 
   // cluster only from MESA PS and kallisto outputs
-  //if(params.cluster && params.metadata){
-    // POST_KALLISTO_ONLY(params.metadata)
-  //  POST_MESA_ONLY(params.metadata)
-  //}
+  if(params.cluster && params.metadata){
+    POST_KALLISTO_ONLY(params.metadata)
+    POST_MESA_ONLY(params.metadata, params.gtf)
+  }
 
   }

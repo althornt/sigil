@@ -5,10 +5,11 @@ process POST_MESA {
   input:
   path metadata
   file mesa
-
+  path gtf
 
   """
   postMESA.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata
+  runMESAcompare.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata --gtf $gtf
   """
 }
 
@@ -19,11 +20,10 @@ process POST_MESA_ONLY {
 
   input:
   path metadata
-
+  path gtf
 
   """
-  #postMESA.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata
-  runMESAcompare.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata
-
+  postMESA.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata
+  runMESAcompare.R -i ${params.outdir}/mesa_out/mesa_allPS.tsv -o ${params.outdir}/post_mesa_out -m $metadata --gtf $gtf
   """
 }
