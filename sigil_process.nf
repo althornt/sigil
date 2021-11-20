@@ -6,7 +6,7 @@ nextflow.enable.dsl = 2
 // import modules
 include { KALLISTO_SE; KALLISTO_PE } from './modules/kallisto'
 include { STAR_ALIGN } from './modules/star_align'
-include { MESA; MESA_ONLY } from './modules/mesa'
+include { MESA; MESA_QUANT_ONLY } from './modules/mesa'
 include { FASTQC; MULTIQC } from './modules/qc'
 include { POST_KALLISTO; POST_KALLISTO_ONLY } from './modules/post_kallisto'
 include { POST_MESA; POST_MESA_ONLY } from './modules/post_mesa'
@@ -27,7 +27,7 @@ def helpMessage() {
         --gtf                          gtf file needed for MESA
         --metadata                     csv file needed for MESA (usually SRA run table)
         --skip_QC                      Dont run fastQC or multiQC
-        --star_bed_dir                 Provide the directory with .bed files to run MESA
+        --bed_manifest                 manifest with .bed files to run MESA quant
         --cluster                      Just run kallisto cluster step, requires kallisto directory and MESA PS
 
         """
@@ -58,9 +58,7 @@ params.gtf  = '/mnt/files/homo_sapiens/Homo_sapiens.GRCh38.96.gtf'
 
 println "\n"
 println "Input fastq directory: $params.reads "
-println "Output directory: $params.outdir"
-println "params.paired_end : $params.paired_end"
-println "params.single_end : $params.single_end \n"
+println "Output directory: $params.outdir \n"
 
 
 workflow {
@@ -83,21 +81,15 @@ workflow {
   }
 
   // STAR and MESA
-  if (params.star_index && !params.star_bed_dir && !params.cluster ){
+  if (params.star_index && !params.bed_manifest && !params.cluster ){
     STAR_ALIGN(params.star_index, read_ch)
     MESA(params.metadata, STAR_ALIGN.out[1].collect(), params.gtf, params.genome)
     POST_MESA(params.metadata, MESA.out.collect(), params.gtf)
   }
 
-  // MESA
-  // if (params.metadata && !params.star_bed_dir && !params.cluster){
-  //   MESA(params.metadata, STAR_ALIGN.out[1].collect())
-  //   POST_MESA(params.metadata, MESA.out.collect())
-  // }
-
-  // Just MESA from STAR beds
-  if (params.metadata && params.star_bed_dir && !params.cluster){
-    MESA_ONLY(params.metadata, params.star_bed_dir ,params.gtf, params.genome)
+  // Just MESA QUANT from MESA generated beds
+  if (params.metadata && params.bed_manifest && !params.cluster){
+    MESA_QUANT_ONLY(params.bed_manifest)
   }
 
   // fastQC
