@@ -4,12 +4,24 @@
 nextflow.enable.dsl = 2
 
 // import modules
+// include { KALLISTO_SE } from './modules/kallisto_se'
+// include { KALLISTO_PE } from './modules/kallisto_pe'
 include { KALLISTO_SE; KALLISTO_PE } from './modules/kallisto'
 include { STAR_ALIGN } from './modules/star_align'
 include { MESA; MESA_ONLY } from './modules/mesa'
+// include { MESA_ONLY } from './modules/mesa_only'
+// include { FASTQC } from './modules/fastqc'
+// include { MULTIQC } from './modules/multiqc'
 include { FASTQC; MULTIQC } from './modules/qc'
 include { POST_KALLISTO; POST_KALLISTO_ONLY } from './modules/post_kallisto'
 include { POST_MESA; POST_MESA_ONLY } from './modules/post_mesa'
+
+// kallisto
+// star
+// mesa
+//  QC
+// post
+
 
 def helpMessage() {
   log.info """
@@ -28,7 +40,7 @@ def helpMessage() {
         --metadata                     csv file needed for MESA (usually SRA run table)
         --skip_QC                      Dont run fastQC or multiQC
         --star_bed_dir                 Provide the directory with .bed files to run MESA
-        --cluster                      Just run kallisto and mesa cluster step, requires kallisto directory and MESA PS
+        --cluster                      Just run kallisto cluster step, requires kallisto directory and MESA PS
 
         """
 }

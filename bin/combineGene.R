@@ -91,23 +91,16 @@ write.csv(df_merged_kallisto_res,
           file.path(opt$out_dir,"combined_kallisto_log2tpm.csv"),
           row.names = TRUE)
 
-# Make df for only samples with LM22 labels
+# Make dfs for only samples with LM22 labels
 ls_smpls_lm22 <- df_merged_metadata %>%
   dplyr::filter(LM22 != "") %>%
   dplyr::pull(Run)
-
 df_merged_metadata_lm22 <- df_merged_metadata %>%
   dplyr::filter(LM22 != "")
-
 df_merged_kallisto_res_lm22 <- df_merged_kallisto_res[ls_smpls_lm22]
 write.csv(df_merged_kallisto_res_lm22,
           file.path(opt$out_dir,"combined_kallisto_log2tpm_lm22.csv"),
           row.names = TRUE)
-
-print(dim(df_merged_kallisto_res_lm22))
-print(dim(df_merged_kallisto_res))
-
-
 
 # UMAP function
 make_umap <- function(num_neighbor,meta_col) {
@@ -160,9 +153,6 @@ prcomp.out$Run = rownames(log2trans_dat_filt_t)
 prcomp.out.merge = merge(prcomp.out, y = df_merged_metadata_lm22)
 
 # Making variations of UMAPs with different numbers of neighbors
-lapply(c(10), make_umap, meta_col="LM22")
-lapply(c(10), make_umap, meta_col="data_source")
-lapply(c(10), make_umap, meta_col="sigil_general")
-
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source")

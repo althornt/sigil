@@ -1,25 +1,31 @@
 # sigil
-
-`nextflow run main.nf`
-
 The sigil nextflow workflow uses the Docker container:  [althornt/sigl_prep](https://hub.docker.com/r/althornt/sigl_prep)
 
-sigil clustering expects sra metadata file to have a columns "general" (more general cell type groups) and "cell_type" (specific, treatment info)
+Sigil expects the metadata file to have a columns:
+- "sigil_general" (more general cell type groups)
+- "cell_type" (specific, treatment info)
+- "LM22" (cibersort LM22 mapping)
+
+sigil_process.nf is run per dataset
+
+sigil_combine.nf merges all data sets
 
 # SRA download
 
 `bash bin/fastqDumpFromMeta.sh sra_manifest.csv`
 
+# sigil_process.nf
+`nextflow run sigil_process.nf`
 
-# Test Data
+## sigil process test data
 
 _**Paired end**_
 
 
 **Testing paired end data (full)**
 ```
-sudo nextflow run main.nf  \
-    --outdir /mnt/results/sigil_results_test_PE  \
+sudo nextflow run sigil_process.nf  \
+    --outdir /mnt/results/sigil_results_test_PE_new  \
     --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_mini3.csv  \
     --reads /mnt/fastq/sra-fastq-test-small/  \
     --paired_end
@@ -33,7 +39,7 @@ sudo nextflow run main.nf  \
 
 **Testing paired end data (cluster only)**
 ```
-sudo nextflow run main.nf \
+sudo nextflow run sigil_process.nf \
     --outdir /mnt/results/sigil_results_test_PE  \
     --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_mini3.csv \
     --cluster
@@ -44,7 +50,7 @@ _**Single end**_
 
 **Testing single end data small files (full)**
 ```
-sudo nextflow run main.nf \
+sudo nextflow run sigil_process.nf \
     --outdir /mnt/results/sigil_results_test_SE_new  \
     --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_mini3.csv \
     --reads /mnt/fastq/sra-fastq-SRP253519-mini/   \
@@ -54,7 +60,7 @@ sudo nextflow run main.nf \
 **Testing single end data (MESA only)**
 
 ```
-sudo nextflow run main.nf \
+sudo nextflow run sigil_process.nf \
     --outdir /mnt/results/sigil_results_test_SE_newmesa  \
     --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_mini3.csv \
     --star_bed_dir /mnt/results/sigil_results_test_SE_new/star_out \
@@ -63,90 +69,87 @@ sudo nextflow run main.nf \
 
 **Testing single end data (cluster only)**
 ```
-sudo nextflow run main.nf     \
+sudo nextflow run sigil_process.nf     \
   --outdir /mnt/results/sigil_results_test_SE      \
   --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_mini3.csv     \
   --cluster`
 ```
 
-# Real Data
+## sigil process real data
 
 ### [Monaco et al](https://www.cell.com/cell-reports/pdf/S2211-1247(19)30059-2.pdf)
 **Running Monaco et al (full)**
 ```
-sudo nextflow run main.nf \
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP125125_20211028 \
   --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
   --reads /mnt/fastq/sra-fastq-SRP125125/ \
   --paired_end
+```
 
-# New
-sudo nextflow run main.nf \
+```
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP125125_Monaco_20211109 \
   --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
   --reads /mnt/fastq/sra-fastq-SRP125125/ \
   --paired_end
-
 ```
 
 **Running Monaco et al (MESA only)**
-`sudo nextflow run main.nf \
+```
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP125125_Monaco_20211109 \
   --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
   --star_bed_dir /mnt/results/sigil_results_SRP125125_Monaco_20211109/star_out
   --skip_QC
-
-# new
-sudo nextflow run main.nf \
+```
+```# new
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP125125_Monaco_20211109 \
   --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
   --star_bed_dir /mnt/results/sigil_results_SRP125125_Monaco_20211109/star_out  \
   --skip_QC
-
-
-`
+```
 
 **Running Monaco et al (cluster only)**
 ```
-sudo nextflow run main.nf \
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP125125_20211028 \
   --metadata  /mnt/sra-manifest/SRP125125_SraRunTable_sigil.csv \
   --cluster
 ```
-
 
 ### [Song et al](https://www.sciencedirect.com/science/article/pii/S2211124719300592?via%3Dihub)
 
 **Running Song et al (full)**
 
 ```
-sudo nextflow run main.nf \
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP253519_20210527 \
   --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
   --reads /mnt/fastq/sra-fastq-SRP253519/ \
   --single_end
+```
 
-
-# new
-sudo nextflow run main.nf \
+```
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP253519_Song_20211114 \
   --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
   --reads /mnt/fastq/sra-fastq-SRP253519/ \
   --single_end
-
 ```
 
 **Running Song et al (MESA only)**
 
 ```
-sudo nextflow run main.nf \
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP253519_20210527 \
   --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
   --star_bed_dir /mnt/results/sigil_results_SRP253519_20210527/star_out \
   --skip_QC
-
-# new
-sudo nextflow run main.nf \
+```
+```
+sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP253519_Song_20211114 \
   --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
   --star_bed_dir /mnt/results/sigil_results_SRP253519_Song_20211114/star_out \
@@ -154,25 +157,25 @@ sudo nextflow run main.nf \
 
 ```
 
-  **Running Song et al (cluster only)**
+**Running Song et al (cluster only)**
 ```
-sudo nextflow run main.nf  \
+sudo nextflow run sigil_process.nf  \
     --outdir /mnt/results/sigil_results_SRP253519_20210527 \
     --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
     --cluster
 ```
 
 ```
-sudo nextflow run main.nf  \
+sudo nextflow run sigil_process.nf  \
     --outdir /mnt/results/sigil_results_SRP253519_20211028/ \
     --metadata  /mnt/sra-manifest/SRP253519_SraRunTable_sigil.csv \
     --cluster
 ```
 
 
-# sigil combine
+## sigil_combine.nf
 ```
 sudo nextflow run sigil_combine.nf \
   --manifest /mnt/files/sigil_res_manifest.txt \
-  --outdir /mnt/results_sigil_combine/test
+  --outdir /mnt/results_sigil_combine/sigil_results_tes
 ```
