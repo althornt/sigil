@@ -173,9 +173,42 @@ sudo nextflow run sigil_process.nf  \
 ```
 
 
+### [Choi et al](https://login.ezproxy.u-pec.fr/login?qurl=https://pubmed.ncbi.nlm.nih.gov%2f30395284%2f)
+**Running Choi et al (full)**
+```
+sudo nextflow run sigil_process.nf \
+  --outdir /mnt/results/sigil_results_SRP150419_Choi_20211124 \
+  --metadata  /mnt/sra-manifest/SRP150419_SraRunTable_sigil.csv \
+  --reads /mnt/fastq/sra-fastq-SRP150419/ \
+  --single_end
+```
+
+
+**Running Choi et al (MESA only)**
+
+sudo nextflow run sigil_process.nf \
+  --outdir /mnt/results/sigil_results_SRP150419_Choi_20211124 \
+  --metadata  /mnt/sra-manifest/SRP150419_SraRunTable_sigil.csv \
+  --mesa_only
+  --skip_QC
+
+
+### [Calderon et al](link)
+
+SRP156452/GSE118165 - Calderon
+
+```
+bash bin/fasterqDumpFromMeta.sh \
+  /mnt/sra-manifest/SRP156452_SraRunTable.csv \
+  /mnt/fastq/sra-fastq-SRP156452 \
+  15
+```
+
+_____________________________________________________________________________________________
+
 ## sigil_combine.nf
 ```
 sudo nextflow run sigil_combine.nf \
   --manifest /mnt/files/sigil_res_manifest.txt \
-  --outdir /mnt/results_sigil_combine/sigil_results_tes
+  --outdir /mnt/results_sigil_combine/sigil_results_test2
 ```

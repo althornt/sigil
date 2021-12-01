@@ -6,7 +6,7 @@ nextflow.enable.dsl = 2
 // import modules
 include { KALLISTO_SE; KALLISTO_PE } from './modules/kallisto'
 include { STAR_ALIGN } from './modules/star_align'
-include { MESA; MESA_QUANT_ONLY } from './modules/mesa'
+include { MESA; MESA_ONLY; MESA_QUANT_ONLY } from './modules/mesa'
 include { FASTQC; MULTIQC } from './modules/qc'
 include { POST_KALLISTO; POST_KALLISTO_ONLY } from './modules/post_kallisto'
 include { POST_MESA; POST_MESA_ONLY } from './modules/post_mesa'
@@ -15,9 +15,8 @@ def helpMessage() {
   log.info """
         Usage:
         The typical command for running the pipeline is as follows:
-        nextflow run main.nf
+        nextflow run sigil_process.nf
 
-        --help                         This usage statement.
         --outdir                       Output directory to place outputs
         --reads                        Input directory of fastq.gz files
         --single_end                   Indicate reads are single end for kallisto
@@ -81,14 +80,19 @@ workflow {
   }
 
   // STAR and MESA
-  if (params.star_index && !params.bed_manifest && !params.cluster ){
+  if (params.star_index && !params.bed_manifest && !params.cluster && !params.mesa_only ){
     STAR_ALIGN(params.star_index, read_ch)
     MESA(params.metadata, STAR_ALIGN.out[1].collect(), params.gtf, params.genome)
     POST_MESA(params.metadata, MESA.out.collect(), params.gtf)
   }
 
+  // Just MESA to generate beds from bams and quantify
+  if (params.mesa_only && params.metadata && !params.cluster){
+    MESA_ONLY(params.metadata, params.gtf, params.genome)
+  }
+
   // Just MESA QUANT from MESA generated beds
-  if (params.metadata && params.bed_manifest && !params.cluster){
+  if (params.metadata && params.bed_manifest  && !params.mesa_only && !params.cluster){
     MESA_QUANT_ONLY(params.bed_manifest)
   }
 
