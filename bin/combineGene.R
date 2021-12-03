@@ -21,13 +21,17 @@ importMetaKallisto <- function(row){
   df_metadata <- read.csv(file.path(row[3])) %>%
     dplyr::select(Run, sigil_general, LM22)
 
-  # Add source name to column
-  df_metadata$data_source <- row[1]
+  # Add metadata to column
+  df_metadata$data_source <- row[1] # add name of data source
+  df_metadata$type <- row[4] # add rna-seq type (paired vs single)
 
   # Get paths to kallisto files
   res_path <- file.path(row[2], "kallisto_out",df_metadata$Run, "abundance.h5")
 
-  return(list( "ls_kallsto_paths"=res_path, "metadata"=df_metadata,"ls_samples_run"=df_metadata$Run))
+  return(list(
+      "ls_kallsto_paths"=res_path,
+      "metadata"=df_metadata,
+      "ls_samples_run"=df_metadata$Run))
 }
 
 make_umap <- function(num_neighbor,meta_col) {
@@ -75,7 +79,7 @@ runDE_1_vs_all <- function(meta_col_to_use, cell_type_val) {
     dplyr::mutate(condition = ifelse(get(meta_col_to_use) == cell_type_val, "main", "other"))
 
   # Run DESEQ2
-  dds <- DESeqDataSetFromTximport(txi.df_merged_kallisto_res, sampleTable, ~condition)
+  dds <- DESeqDataSetFromTximport(txi.kallisto, sampleTable, ~condition)
   colData(dds)$condition<-factor(colData(dds)$condition, levels=c("other", "main"))
   dds_<-DESeq(dds)
   res<-results(dds_)
@@ -175,7 +179,7 @@ option_list <- list(
     c("-m", "--manifest"),
     type = "character",
     default = NULL,
-    help = "path to tsv manifest file with 3 columns: data_source, res_path, metadata_path")
+    help = "path to tsv manifest file with 3 columns: data_source, res_path, metadata_path, type")
 
   )
 
@@ -186,14 +190,12 @@ opt <- optparse::parse_args(opt_parser)
 # Make output directories
 if (!dir.exists(file.path(opt$out_dir,"/UMAPs/"))){
   dir.create(file.path(opt$out_dir,"/UMAPs/"), recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(file.path(opt$out_dir,"/deseq2_outputs/"))){
+  dir.create(file.path(opt$out_dir,"/deseq2_outputs/"), recursive = TRUE, showWarnings = TRUE)}
 
 # Open files
 df_manifest <- read.csv(file = opt$manifest, sep = "\t", header=TRUE)
 print(head(df_manifest))
-
-# Transcripts to gene, used in tximport
-edb <- EnsDb.Hsapiens.v86
-tx2gene = transcripts(edb, columns=c("tx_id", "gene_name"),return.type="DataFrame")
 
 # Import and combine source metadata files
 ls_kallisto_meta = apply(df_manifest, 1, importMetaKallisto)
@@ -206,14 +208,37 @@ for (item in ls_kallisto_meta) {
      ls_sample_names <- append(ls_sample_names, item[3])
    }
 
+# Merge metadata from each data source by rows
+df_merged_metadata <- do.call("rbind", ls_mesa)
+rownames(df_merged_metadata) <- c()
+
+# List of samples with LM22 labels
+ls_smpls_lm22 <- df_merged_metadata %>%
+   dplyr::filter(LM22 != "") %>%
+   dplyr::pull(Run)
+
+# Remove samples without LM22 labels
+df_merged_metadata_lm22 <- df_merged_metadata %>%
+   dplyr::filter(LM22 != "")
+
+# Make list of kallisto paths from each data source
 ls_kallisto_paths <- unlist(ls_kallisto,use.names = FALSE,recursive = FALSE)
 names(ls_kallisto_paths) <- unlist(ls_sample_names)
 
+# Remove kallisto paths without LM22 labels
+ls_kallisto_paths_lm22 <- ls_kallisto_paths[ls_smpls_lm22]
+
+print(length(ls_kallisto_paths_lm22))
+
 # Import counts with tximport
-if(all(file.exists(ls_kallisto_paths)) != TRUE)
+if(all(file.exists(ls_kallisto_paths_lm22)) != TRUE)
   stop("Error: missing kallisto h5 files.")
 
-txi.kallisto <- tximport(ls_kallisto_paths, type = "kallisto",tx2gene = tx2gene,
+# Transcripts to gene, used in tximport
+edb <- EnsDb.Hsapiens.v86
+tx2gene = transcripts(edb, columns=c("tx_id", "gene_name"),return.type="DataFrame")
+
+txi.kallisto <- tximport(ls_kallisto_paths_lm22, type = "kallisto",tx2gene = tx2gene,
                          txOut = FALSE,ignoreTxVersion=TRUE,
                          countsFromAbundance = "scaledTPM")
 dat = txi.kallisto$counts
@@ -227,48 +252,30 @@ write.csv(log2trans_dat,
          file.path(file.path(opt$out_dir,"combined_kallisto_log2tpm.csv")),
          row.names = TRUE)
 
-# Merge metadata by rows
-df_merged_metadata <- do.call("rbind", ls_mesa)
-rownames(df_merged_metadata) <- c()
-
-# Make dfs for only samples with LM22 labels
-ls_smpls_lm22 <- df_merged_metadata %>%
-  dplyr::filter(LM22 != "") %>%
-  dplyr::pull(Run)
-
-df_merged_metadata_lm22 <- df_merged_metadata %>%
-  dplyr::filter(LM22 != "")
-
-log2trans_dat_lm22<- log2trans_dat[ls_smpls_lm22]
-
-write.csv(log2trans_dat_lm22,
-          file.path(opt$out_dir,"combined_kallisto_log2tpm_lm22.csv"),
-          row.names = TRUE)
 
 ##################
 # UMAPs
 ##################
 
-# Drop genes with low variance.
-getVar <- apply(log2trans_dat_lm22[, -1], 1, var)
-param <- median(getVar)
-log2trans_dat_filt <- log2trans_dat_lm22[getVar > param & !is.na(getVar), ]
-
-# Transpose and format
-log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt)) %>%
-  dplyr::filter(!row.names(.) %in% c("gene"))
-rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)
-# rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)[-1] # skip gene
-
-# PCA.
-prcomp.out = as.data.frame(prcomp(log2trans_dat_filt_t, scale = F)$x)
-prcomp.out$Run = rownames(log2trans_dat_filt_t)
-prcomp.out.merge = merge(prcomp.out, y = log2trans_dat_lm22)
-
-# Making variations of UMAPs with different numbers of neighbors
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22")
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source")
+# # Drop genes with low variance.
+# getVar <- apply(log2trans_dat_lm22[, -1], 1, var)
+# param <- median(getVar)
+# log2trans_dat_filt <- log2trans_dat_lm22[getVar > param & !is.na(getVar), ]
+#
+# # Transpose and format
+# log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt)) %>%
+#   dplyr::filter(!row.names(.) %in% c("gene"))
+# rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)
+#
+# # PCA.
+# prcomp.out = as.data.frame(prcomp(log2trans_dat_filt_t, scale = F)$x)
+# prcomp.out$Run = rownames(log2trans_dat_filt_t)
+# prcomp.out.merge = merge(prcomp.out, y = log2trans_dat_lm22)
+#
+# # Making variations of UMAPs with different numbers of neighbors
+# lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22")
+# lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
+# lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source")
 
 
 ##################
@@ -276,22 +283,22 @@ lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source")
 ##################
 
 # Run deseq2 on each LM22 cell type vs all others
-# if("LM22" %in% colnames(df_merged_metadata_lm22)){
-#   print("Running...")
-#
-#   # DF to label samples(columns) with general and more specific labels
-#   df_sample_annotations <- df_merged_metadata_lm22 %>%
-#     dplyr::select(Run,sigil_general,data_source,  LM22) %>%
-#     tibble::column_to_rownames("Run")
-#
-#   print(df_sample_annotations)
+if("LM22" %in% colnames(df_merged_metadata_lm22)){
+  print("Running...")
 
-  # # Run DE 1 cell type vs all others
-  # DE_results <- sapply(
-  #   unique(df_merged_metadata_lm22[["LM22"]]),
-  #   runDE_1_vs_all,
-  #   meta_col_to_use="LM22")
-  #
+  # Format DF to label samples(columns) with general and more specific labels
+  df_sample_annotations <- df_merged_metadata_lm22 %>%
+    dplyr::select(Run,sigil_general,data_source,LM22,type) %>%
+    tibble::column_to_rownames("Run")
+
+  print(head(df_sample_annotations))
+
+  # Run DE 1 cell type vs all others
+  DE_results <- sapply(
+    unique(df_merged_metadata_lm22[["LM22"]])[2],
+    runDE_1_vs_all,
+    meta_col_to_use="LM22")
+
   # print("Run DE done____________________ ")
   #
   # # Run heatmap function on all cell_types and unnest the list of DEG
@@ -319,4 +326,4 @@ lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source")
   #
   # save_pheatmap_pdf(pheatmap_combined_all_deg,
   #                   paste0(opt$out_dir,"/deseq2_outputs/LM22_all_DEG_heatmap.pdf"))
-# }
+}
