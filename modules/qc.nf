@@ -1,5 +1,5 @@
 process FASTQC {
-  publishDir "${params.outdir}/fastqc_out"
+  publishDir "${params.outdir}/fastqc_out", mode: 'copy'
 
   input:
   tuple val(name), path(reads)
