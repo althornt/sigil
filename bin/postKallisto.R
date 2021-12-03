@@ -202,31 +202,31 @@ write.csv(log2trans_dat,
 #################
 # UMAP
 #################
-# # Make output directory
-# if (!dir.exists(paste0(opt$out_dir,"/UMAPs/"))){
-#   dir.create(paste0(opt$out_dir,"/UMAPs/"))
-# }
-# # Drop genes with low variance.
-# getVar <- apply(log2trans_dat[, -1], 1, var)
-# param <- median(getVar)
-# log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
-#
-# # PCA.
-# prcomp.out = as.data.frame(prcomp(as.data.frame(t(log2trans_dat_filt)), scale = F)$x)
-# prcomp.out$Run = rownames(prcomp.out)
-# prcomp.out.merge = merge(prcomp.out, y = metadata)
-#
-# # Making variations of UMAPs with different numbers of neighbors
-# # only make UMAPs if enough samples
-# if(("sigil_general" %in% colnames(metadata)) & (ncol(dat)> 4)){
-#   lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
-# }
-#
-# # Color by cell type
-# if(("sigil_cell_type_treatment" %in% colnames(metadata)) & (ncol(dat)> 4))
-# {
-#   lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_cell_type_treatment");
-# }
+# Make output directory
+if (!dir.exists(paste0(opt$out_dir,"/UMAPs/"))){
+  dir.create(paste0(opt$out_dir,"/UMAPs/"))
+}
+# Drop genes with low variance.
+getVar <- apply(log2trans_dat[, -1], 1, var)
+param <- median(getVar)
+log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
+
+# PCA.
+prcomp.out = as.data.frame(prcomp(as.data.frame(t(log2trans_dat_filt)), scale = F)$x)
+prcomp.out$Run = rownames(prcomp.out)
+prcomp.out.merge = merge(prcomp.out, y = metadata)
+
+# Making variations of UMAPs with different numbers of neighbors
+# only make UMAPs if enough samples
+if(("sigil_general" %in% colnames(metadata)) & (ncol(dat)> 4)){
+  lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general")
+}
+
+# Color by cell type
+if(("sigil_cell_type_treatment" %in% colnames(metadata)) & (ncol(dat)> 4))
+{
+  lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_cell_type_treatment");
+}
 
 ########################
 # DESEQ2 sigil_general

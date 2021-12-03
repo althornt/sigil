@@ -92,11 +92,17 @@ make_umap <- function( num_neighbor,meta_col, df, tag) {
 }
 
 #making variations of UMAPs
-lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_general", df = dat, tag="nan_adjusted")
-lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_cell_type", df = dat, tag="nan_adjusted")
-lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_general", df = na.omit(mesa_ps), tag="nan_dropped")
-lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_cell_type", df = na.omit(mesa_ps), tag="nan_dropped")
+if("sigil_general" %in% colnames(metadata))
+{
+  lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_general", df = dat, tag="nan_adjusted")
+  lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_general", df = na.omit(mesa_ps), tag="nan_dropped")
+}
 
+if("sigil_cell_type" %in% colnames(metadata))
+{
+  lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_cell_type", df = na.omit(mesa_ps), tag="nan_dropped")
+  lapply(c(3,5,8,10,15,20,25), make_umap, meta_col="sigil_cell_type", df = dat, tag="nan_adjusted")
+}
 
 if("sigil_cell_type_treatment" %in% colnames(metadata))
 {
@@ -176,10 +182,18 @@ print(high_nan_samples)
 
 if(length(high_nan_samples)>0)
 {
-lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = dat, tag="nan_adjusted")
-lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type", df = dat, tag="nan_adjusted")
-lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = na.omit(mesa_ps), tag="nan_dropped")
-lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type", df = na.omit(mesa_ps), tag="nan_dropped")
+
+  if("sigil_general" %in% colnames(metadata))
+  {
+    lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = na.omit(mesa_ps), tag="nan_dropped")
+    lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = dat, tag="nan_adjusted")
+  }
+
+  if("sigil_cell_type" %in% colnames(metadata))
+  {
+    lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type", df = na.omit(mesa_ps), tag="nan_dropped")
+    lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_cell_type", df = dat, tag="nan_adjusted")
+  }
 
   if("sigil_cell_type_treatment" %in% colnames(metadata))
   {

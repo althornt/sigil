@@ -27,10 +27,10 @@ dependencies:
   - bioconductor-ensembldb
   - bioconductor-EnsDb.Hsapiens.v86
   - bioconductor-rhdf5
+  - bioconductor-limma
   - r-optparse
   - r-uwot
   - r-ggplot2
   - r-RColorBrewer
-  - r-dplyr
-  - r-magrittr
   - r-pheatmap
+  - r-tidyverse
