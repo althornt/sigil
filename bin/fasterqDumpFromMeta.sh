@@ -4,7 +4,6 @@ metadata_run_csv="$1"
 out_dir="$2"
 threads="$3"
 
-
 # Make output directory
 mkdir -p "$out_dir"
 cd "$out_dir"
@@ -23,8 +22,8 @@ for sra in $(cut -d, -f1 "$metadata_run_csv" | tail -n +2); do
   echo "$cmd"
   $cmd
 
-done
+  # gzip downloaded fastq with pigz (faster than gzip)
+  # it will not gzip .gz files
+  pigz $sra*
 
-# gzip all downloaded fastq (automatically will not gzip .gz files); pigz is faster than gzip
-echo "Compressing files..."
-pigz *
+done
