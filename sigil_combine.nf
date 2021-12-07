@@ -31,8 +31,11 @@ println "Output directory: $params.outdir \n"
 workflow {
   main:
 
-  //kallisto gene expression
+  //kallisto gene expression , DE, batch correction
   COMBINE_GENE(params.manifest)
+
+  // build expression reference matrix
+
 
   //MESA splicing
 

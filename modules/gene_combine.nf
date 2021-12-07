@@ -6,6 +6,11 @@ process COMBINE_GENE {
   path metadata
 
   """
-  combineGene.R -m ${params.manifest} -o ${params.outdir}/combine_gene_out
+  # Import all kallisto run deseq2, make UMAPS before and after batch correction
+  combineGeneDE.R -m ${params.manifest} -o ${params.outdir}/combine_gene_out
+
+  # Import combined deseq2 results and make reference matrix
+  makeGeneRefMatrix.R -m ${params.manifest} -o ${params.outdir}/combine_gene_out
+
   """
 }
