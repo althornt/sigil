@@ -7,10 +7,10 @@ process COMBINE_GENE {
 
   """
   # Import all kallisto run deseq2, make UMAPS before and after batch correction
-  combineGeneDE.R -m ${params.manifest} -o ${params.outdir}/combine_gene_out
+  #combineGeneDE.R -m ${params.manifest} -o ${params.outdir}/combine_gene_out
 
   # Import combined deseq2 results and make reference matrix
-  makeGeneRefMatrix.R -m ${params.manifest} -o ${params.outdir}/combine_gene_out
+  makeGeneRefMatrix.R -i ${params.outdir}/combine_gene_out  -o ${params.outdir}/combine_gene_out
 
   """
 }
