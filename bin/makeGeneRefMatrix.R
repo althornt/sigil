@@ -70,18 +70,18 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   dev.off()
 }
 
-list2heatmap <- function(ls_genes, tag ){
+list2heatmap <- function(ls_genes, title, output_name ){
   df_DEG_log2tpm_batch_corrrected <- df_log2tpm_batch_corrrected %>%
     dplyr::filter(X %in% ls_genes) %>%
     tibble::column_to_rownames(var  = "X")
 
   df_sample_annotations <- df_metadata %>%
   # dplyr::select(Run,sigil_general, LM22) %>%
-    dplyr::select(Run, LM22) %>%
+    dplyr::select(Run, LM22, data_source) %>%
     tibble::column_to_rownames("Run")
 
   up_deg_heatmap <- pheatmap(
-    main = paste0(tag),
+    main = paste0(title),
     df_DEG_log2tpm_batch_corrrected,
     scale = "row",
     show_rownames=F,
@@ -90,7 +90,7 @@ list2heatmap <- function(ls_genes, tag ){
 
   save_pheatmap_pdf(
     up_deg_heatmap,
-    paste0(opt$out_dir,"/UP_DEG_heatmap.pdf"))
+    paste0(opt$out_dir,output_name,".pdf"))
 
 }
 
@@ -107,7 +107,6 @@ make_umap <- function(num_neighbor,meta_col,df,out_path) {
   log2trans_dat_filt <- df[getVar > param & !is.na(getVar), ]
 
   print(dim(log2trans_dat_filt))
-
 
   # Transpose and format
   log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt)) %>%
@@ -181,6 +180,9 @@ if (!dir.exists(file.path(opt$out_dir,"/volcano_plots/"))){
 if (!dir.exists(file.path(opt$out_dir,"/UMAPs_DEG/"))){
   dir.create(file.path(opt$out_dir,"/UMAPs_DEG/"),
               recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(file.path(opt$out_dir,"/heatmaps_DEG/"))){
+  dir.create(file.path(opt$out_dir,"/heatmaps_DEG/"),
+              recursive = TRUE, showWarnings = TRUE)}
 
 # Open files
 df_metadata <- read.csv(file = paste0(opt$in_dir,"/metadata.csv"), header=TRUE)
@@ -195,17 +197,12 @@ ls_deseq_paths = list.files(
 stopifnot(length(unique(df_metadata$LM22))==length(ls_deseq_paths))
 
 # Import deseq2 outputs, make volcano, and get list of top up DEG
-ls_topN_results <-lapply(ls_deseq_paths, read_in_deseq2, topN=10)
-
-print("read in done")
+ls_topN_results <-lapply(ls_deseq_paths, read_in_deseq2, topN=20)
 
 # Split DEG lists from read_in_deseq2 into different lists
 ls_res_topN_DEG_by_pval <- unlist(lapply(c(1:length(ls_topN_results)), function(x) ls_topN_results[[x]]$ls_topN_DEG_by_pval))
-print(length(ls_res_topN_DEG_by_pval))
 ls_res_topN_upDEG <- unlist(lapply(c(1:length(ls_topN_results)), function(x) ls_topN_results[[x]]$ls_topN_DEG_up_reg))
-print(length(ls_res_topN_upDEG))
 ls_res_topN_downDEG <- unlist(lapply(c(1:length(ls_topN_results)), function(x) ls_topN_results[[x]]$ls_topN_DEG_down_reg))
-print(length(ls_res_topN_downDEG))
 
 ##################################
 # UMAPs and heatmaps using DEG
@@ -220,7 +217,7 @@ df_log2tpm_batch_corrrected_topDEG <- df_log2tpm_batch_corrrected %>% dplyr::fil
 print(dim(df_log2tpm_batch_corrrected_topDEG))
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22", df = df_log2tpm_batch_corrrected_topDEG, out_path = "UMAPs_DEG/top_DEG_by_pval")
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",df = df_log2tpm_batch_corrrected_topDEG, out_path = "UMAPs_DEG/top_DEG_by_pval")
-# list2heatmap(ls_res_topN_DEG_by_pval, "All top DEG")
+list2heatmap(ls_res_topN_DEG_by_pval, "All top DEG","/heatmaps_DEG/top_DEG_by_pval" )
 
 # Filter df to top upregulated DEG and UMAP and heatmap
 print("up")
@@ -228,13 +225,12 @@ df_log2tpm_batch_corrrected_top_up_DEG <- df_log2tpm_batch_corrrected  %>% dplyr
 print(dim(df_log2tpm_batch_corrrected_top_up_DEG))
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22", df = df_log2tpm_batch_corrrected_top_up_DEG, out_path = "UMAPs_DEG/top_up_DEG")
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",df = df_log2tpm_batch_corrrected_top_up_DEG, out_path = "UMAPs_DEG/top_up_DEG")
-# list2heatmap(ls_topN_DEG_up_reg, "All top upregulated DEG")
+list2heatmap(ls_res_topN_upDEG, "All top upregulated DEG", "/heatmaps_DEG/top_up_DEG")
 
-
-# # Filter df to top downregulated DEG and UMAP and heatmap
+# Filter df to top downregulated DEG and UMAP and heatmap
 print("down")
 df_log2tpm_batch_corrrected_top_down_DEG <- df_log2tpm_batch_corrrected %>% dplyr::filter(X %in% ls_res_topN_downDEG)
 print(dim(df_log2tpm_batch_corrrected_top_down_DEG))
 lapply(c(5,10,15,20,25,30,35), make_umap, meta_col="LM22", df = df_log2tpm_batch_corrrected_top_down_DEG, out_path = "UMAPs_DEG/top_down_DEG")
 lapply(c(5,10,15,20,25,30,35), make_umap, meta_col="data_source",df = df_log2tpm_batch_corrrected_top_down_DEG, out_path = "UMAPs_DEG/top_down_DEG")
-# list2heatmap(ls_topN_DEG_down_reg, "All top downregulated DEG")
+list2heatmap(ls_res_topN_downDEG, "All top downregulated DEG", "/heatmaps_DEG/top_down_DEG")
