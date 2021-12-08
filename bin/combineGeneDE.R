@@ -127,51 +127,6 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   dev.off()
 }
 
-# Function to make a heatmap from a DEG list from 1 cell type
-list2heatmap <- function(cell_type, meta_col_to_use, results){
-
-  # UP DEG
-  # up_cell_type <- log2trans_dat %>%
-  #   dplyr::filter(row.names(log2trans_dat) %in% unlist(results["DEG_up",cell_type]))
-
-  up_cell_type <- log2trans_dat %>%
-    tibble::rownames_to_column("gene") %>%
-    dplyr::filter(gene %in% unlist(results["DEG_up",cell_type])) %>%
-    tibble::column_to_rownames("gene")
-
-  print("in list2heatmap")
-  print(head(up_cell_type))
-  print(dim(up_cell_type))
-
-  # # DOWN DEG
-  # down_cell_type <- log2trans_dat %>%
-  #   dplyr::filter(row.names(log2trans_dat) %in% unlist(results["DEG_down",cell_type]))
-
-  # UP and DOWN DEG
-  # up_down_cell_type <- log2trans_dat %>%
-  #   dplyr::filter(row.names(log2trans_dat) %in% unlist(results["DEG_down",cell_type])  |
-  #                   row.names(log2trans_dat) %in% unlist(results["DEG_up",cell_type]))
-
-  # If at least 2 DEG in the condition , make heatmap
-  if (nrow(up_cell_type) >= 2){
-
-    up_deg_heatmap <- pheatmap(
-      main = paste0(" UP DEG in ", cell_type),
-      up_cell_type,
-      scale = "row",
-      show_rownames=F,
-      show_colnames=F,
-      annotation_col=df_sample_annotations)
-
-    save_pheatmap_pdf(
-      up_deg_heatmap,
-      paste0(opt$out_dir,"/deseq2_outputs/",meta_col_to_use,"_", cell_type,"_UP_DEG_heatmap.pdf"))
-  }
-
-  return(list("DEG"=row.names(up_cell_type)))
-
-}
-
 
 ###################
 # MAIN
