@@ -248,9 +248,12 @@ prcomp.out$Run = rownames(log2trans_dat_filt_t)
 prcomp.out.merge = merge(prcomp.out, y = log2trans_dat)
 
 # Making variations of UMAPs with different numbers of neighbors
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22", df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general", df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source", df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
+  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
+  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
+  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
 
 ####################################
 # UMAPs after batch correction
@@ -283,9 +286,12 @@ prcomp.out.batch.corr$Run = rownames(log2trans_dat_batch_corr_filt_t)
 # prcomp.out.merge = merge(prcomp.out, y = log2trans_dat)
 
 # Making variations of UMAPs with different numbers of neighbors
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
-lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
+  df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
+  df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
+  df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
 
 ##################
 # DESEQ2 LM22
