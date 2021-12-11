@@ -6,7 +6,7 @@
 nextflow.enable.dsl = 2
 
 // import modules
-include { COMBINE_GENE } from './modules/gene_combine'
+include { COMBINE_GENE; COMBINE_MESA } from './modules/combine'
 
 
 def helpMessage() {
@@ -27,17 +27,14 @@ println "Input manifiest:  $params.manifest "
 println "Output directory: $params.outdir \n"
 
 
-
 workflow {
   main:
 
   //kallisto gene expression , DE, batch correction
   COMBINE_GENE(params.manifest)
 
-  // build expression reference matrix
-
-
   //MESA splicing
+  // COMBINE_MESA(params.manifest)
 
 
 

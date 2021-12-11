@@ -219,6 +219,8 @@ lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
     df = df_log2tpm_batch_corrrected_topDEG, out_path = "UMAPs_DEG/top_DEG_by_pval")
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
     df = df_log2tpm_batch_corrrected_topDEG, out_path = "UMAPs_DEG/top_DEG_by_pval")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
+    df = df_log2tpm_batch_corrrected_topDEG, out_path = "UMAPs_DEG/top_DEG_by_pval")
 list2heatmap(ls_res_topN_DEG_by_pval, "All top DEG","/heatmaps_DEG/top_DEG_by_pval" )
 
 # Filter df to top upregulated DEG and UMAP and heatmap
@@ -228,6 +230,8 @@ lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
     df = df_log2tpm_batch_corrrected_top_up_DEG, out_path = "UMAPs_DEG/top_up_DEG")
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
     df = df_log2tpm_batch_corrrected_top_up_DEG, out_path = "UMAPs_DEG/top_up_DEG")
+lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
+    df = df_log2tpm_batch_corrrected_top_up_DEG, out_path = "UMAPs_DEG/top_up_DEG")
 list2heatmap(ls_res_topN_upDEG, "All top upregulated DEG", "/heatmaps_DEG/top_up_DEG")
 
 # Filter df to top downregulated DEG and UMAP and heatmap
@@ -236,5 +240,7 @@ df_log2tpm_batch_corrrected_top_down_DEG <- df_log2tpm_batch_corrrected %>%
 lapply(c(5,10,15,20,25,30,35), make_umap, meta_col="LM22",
     df = df_log2tpm_batch_corrrected_top_down_DEG, out_path = "UMAPs_DEG/top_down_DEG")
 lapply(c(5,10,15,20,25,30,35), make_umap, meta_col="data_source",
+    df = df_log2tpm_batch_corrrected_top_down_DEG, out_path = "UMAPs_DEG/top_down_DEG")
+lapply(c(5,10,15,20,25,30,35), make_umap, meta_col="sigil_general",
     df = df_log2tpm_batch_corrrected_top_down_DEG, out_path = "UMAPs_DEG/top_down_DEG")
 list2heatmap(ls_res_topN_downDEG, "All top downregulated DEG", "/heatmaps_DEG/top_down_DEG")

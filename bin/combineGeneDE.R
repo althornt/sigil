@@ -297,7 +297,7 @@ lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
 # DESEQ2 LM22
 ##################
 
-Run deseq2 on each LM22 cell type vs all others
+# Run deseq2 on each LM22 cell type vs all others
 if("LM22" %in% colnames(df_merged_metadata_lm22)){
   print("Running...")
 

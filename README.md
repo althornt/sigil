@@ -185,12 +185,20 @@ sudo nextflow run sigil_process.nf \
 
 
 **Running Choi et al (MESA only)**
-
+```
 sudo nextflow run sigil_process.nf \
   --outdir /mnt/results/sigil_results_SRP150419_Choi_20211124 \
   --metadata  /mnt/sra-manifest/SRP150419_SraRunTable_sigil.csv \
   --mesa_only
   --skip_QC
+```
+**Running Choi et al (cluster only)**
+```
+sudo nextflow run sigil_process.nf  \
+    --outdir /mnt/results/sigil_results_SRP150419_Choi_20211124 \
+    --metadata  /mnt/sra-manifest/SRP150419_SraRunTable_sigil.csv \
+    --cluster
+```
 
 
 ### [Calderon et al](link)
@@ -201,7 +209,7 @@ SRP156452/GSE118165 - Calderon
 bash bin/fasterqDumpFromMeta.sh \
   /mnt/sra-manifest/SRP156452_SraRunTable.csv \
   /mnt/fastq/sra-fastq-SRP156452 \
-  15
+  10
 ```
 
 _____________________________________________________________________________________________
@@ -210,5 +218,19 @@ ________________________________________________________________________________
 ```
 sudo nextflow run sigil_combine.nf \
   --manifest /mnt/files/sigil_res_manifest.txt \
-  --outdir /mnt/results_sigil_combine/sigil_results_test2
+  --outdir /mnt/results_sigil_combine/sigil_results_20211202
+
+sudo nextflow run sigil_combine.nf \
+  --manifest /mnt/files/sigil_res_manifest.txt \
+  --outdir /mnt/results_sigil_combine/sigil_results_20211208
+
+sudo nextflow run sigil_combine.nf \
+  --manifest /mnt/files/sigil_res_manifest.txt \
+  --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_20211210
+
+sudo nextflow run sigil_combine.nf \
+    --manifest /mnt/files/sigil_res_manifest.txt \
+    --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_v2_20211210
+
+
 ```
