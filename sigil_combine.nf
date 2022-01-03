@@ -31,10 +31,10 @@ workflow {
   main:
 
   //kallisto gene expression , DE, batch correction
-  COMBINE_GENE(params.manifest)
+  // COMBINE_GENE(params.manifest)
 
   //MESA splicing
-  // COMBINE_MESA(params.manifest)
+  COMBINE_MESA(params.manifest)
 
 
 

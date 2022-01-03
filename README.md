@@ -212,6 +212,15 @@ bash bin/fasterqDumpFromMeta.sh \
   10
 ```
 
+Run full
+```
+sudo nextflow run sigil_process.nf \
+  --outdir /mnt/results/sigil_results_SRP156452_Calderon_20211211 \
+  --metadata  /mnt/sra-manifest/SraRunTable_SRP156452_Calderon_sigil.csv \
+  --reads /mnt/fastq/sra-fastq-SRP156452/ \
+  --paired_end
+```
+
 _____________________________________________________________________________________________
 
 ## sigil_combine.nf
@@ -231,6 +240,10 @@ sudo nextflow run sigil_combine.nf \
 sudo nextflow run sigil_combine.nf \
     --manifest /mnt/files/sigil_res_manifest.txt \
     --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_v2_20211210
+
+sudo nextflow run sigil_combine.nf \
+    --manifest /mnt/files/sigil_res_manifest.txt \
+    --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_splicing_20220103
 
 
 ```
