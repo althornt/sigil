@@ -171,15 +171,15 @@ print(head(df_manifest))
 ls_kallisto_meta = apply(df_manifest, 1, importMetaKallisto)
 
 # Split into kallisto and metadata files for each data set
-ls_kallisto <- ls_mesa <- ls_sample_names <- c()
+ls_kallisto <- ls_meta <- ls_sample_names <- c()
 for (item in ls_kallisto_meta) {
      ls_kallisto <- append(ls_kallisto, item[1])
-     ls_mesa <- append(ls_mesa, item[2])
+     ls_meta <- append(ls_meta, item[2])
      ls_sample_names <- append(ls_sample_names, item[3])
    }
 
 # Merge metadata from each data source by rows
-df_merged_metadata <- do.call("rbind", ls_mesa)
+df_merged_metadata <- do.call("rbind", ls_meta)
 rownames(df_merged_metadata) <- c()
 
 # List of samples with LM22 labels
