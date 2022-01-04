@@ -83,11 +83,6 @@ for (item in ls_mesa_meta) {
 df_merged_metadata <- do.call("rbind", ls_meta)
 rownames(df_merged_metadata) <- c()
 
-# List of samples with LM22 labels
-ls_smpls_lm22 <- df_merged_metadata %>%
-   dplyr::filter(LM22 != "") %>%
-   dplyr::pull(Run)
-
 # Remove samples without LM22 labels from metadata
 df_merged_metadata_lm22 <- df_merged_metadata %>%
    dplyr::filter(LM22 != "")
@@ -95,21 +90,35 @@ write.csv(df_merged_metadata_lm22,
             file.path(file.path(opt$out_dir,"metadata.csv")),
             row.names = FALSE)
 
+# List of samples with LM22 labels
+ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
+print(typeof(unlist(ls_smpls_lm22)))
+print(unlist(ls_smpls_lm22))
+
 # Merge mesa inclusion count files
 df_mesa_merge <- unlist(ls_mesa_files) %>%
   lapply(read.csv, sep = "\t") %>%
-  reduce(inner_join, by = "cluster")
+  purrr::reduce(inner_join, by = "cluster")
 
 # Drop non LM22 samples from mesa counts
-df_mesa_merge_lm22 <- df_mesa_merge[ls_smpls_lm22]
-head(df_mesa_merge_lm22)
+df_mesa_merge_lm22 <- df_mesa_merge %>%
+  dplyr::select(ls_smpls_lm22)
 
-# head(df_mesa_merge_lm22[,-1])
+print(head(df_mesa_merge_lm22))
+print(dim(df_mesa_merge_lm22))
 
+#  Log2 + 1 transform
+df_mesa_merge_lm22_log2 <- as.data.frame(log2(df_mesa_merge_lm22 +1))
 
-# Log2 transform
-# log2trans_dat <- as.data.frame(log2(df_mesa_merge_lm22 +1))
-# head(log2trans_dat)
+head(df_mesa_merge_lm22_log2)
+print(dim(df_mesa_merge_lm22_log2))
 
+# Batch correction
+df_mesa_merge_lm22_log2_batch_corr <- limma::removeBatchEffect(
+                                  df_mesa_merge_lm22_log2,
+                                  batch = df_merged_metadata_lm22$data_source,
+                                  batch2 = df_merged_metadata_lm22$type
+                                  )
 
-# Batch correct
+head(df_mesa_merge_lm22_log2_batch_corr)
+dim(df_mesa_merge_lm22_log2_batch_corr)
