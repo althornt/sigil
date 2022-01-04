@@ -27,10 +27,45 @@ importMetaMESA <- function(row){
   res_path <- file.path(row[2], "mesa_out", "mesa_inclusionCounts.tsv")
 
   return(list(
-      "ls_kallsto_paths"=res_path,
+      "ls_mesa_paths"=res_path,
       "metadata"=df_metadata,
       "ls_samples_run"=df_metadata$Run))
 }
+
+make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
+
+  set.seed(123)
+
+  # Make color palette
+  n <- length(unique(df_merged_metadata_lm22[[meta_col]]))
+  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+  # Run UMAP
+  umap.out <- umap(df_PCA, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
+  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
+  umap.out$Run <- rownames(df_PCA)
+
+  # Merge UMAP results with metadata
+  umap.out.merge = merge(umap.out, df_merged_metadata_lm22)
+
+  # Plot UMAP
+  ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="bottom",legend.title = element_blank()) +
+    scale_color_manual(values=pal) +
+    labs(title= paste("UMAP MESA: Cell types, n_neighbors =",num_neighbor, sep = ' '))
+
+  # Save UMAP plot
+  ggsave(file.path(opt$out_dir,
+                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
+         device = "png",
+         width = 12,
+         dpi = 300)
+
+}
+
 
 ###################
 # MAIN
@@ -71,7 +106,7 @@ print(head(df_manifest))
 # Import and combine source metadata files
 ls_mesa_meta = apply(df_manifest, 1, importMetaMESA)
 
-# Split into kallisto and metadata files for each data set
+# Split into mesa and metadata files for each data set
 ls_mesa_files <- ls_meta <- ls_sample_names <- c()
 for (item in ls_mesa_meta) {
      ls_mesa_files <- append(ls_mesa_files, item[1])
@@ -108,17 +143,72 @@ print(head(df_mesa_merge_lm22))
 print(dim(df_mesa_merge_lm22))
 
 #  Log2 + 1 transform
-df_mesa_merge_lm22_log2 <- as.data.frame(log2(df_mesa_merge_lm22 +1))
+log2trans_dat <- as.data.frame(log2(df_mesa_merge_lm22 +1))
 
-head(df_mesa_merge_lm22_log2)
-print(dim(df_mesa_merge_lm22_log2))
+####################################
+# UMAPs before batch correction
+####################################
 
+# Drop genes with low variance.
+getVar <- apply(log2trans_dat[, -1], 1, var)
+
+# For gene I used median (50% quantile) as the cutoff
+# For splicing using 75% due to therembeing much more rows)
+param <- quantile(getVar, c(.75))
+log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
+
+# Transpose and format
+log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt))
+rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)
+
+print(head(log2trans_dat_filt_t))
+print(dim(log2trans_dat_filt_t))
+
+# PCA.
+prcomp.out = as.data.frame(prcomp(log2trans_dat_filt_t, scale = F)$x)
+
+print(dim(prcomp.out))
+print(head(prcomp.out))
+
+# Making variations of UMAPs with different numbers of neighbors
+lapply(c(20), make_umap, meta_col="data_source",
+  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+
+# Making variations of UMAPs with different numbers of neighbors
+# lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
+#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+# lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
+#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+# lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
+#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+
+#######################
 # Batch correction
+#######################
 df_mesa_merge_lm22_log2_batch_corr <- limma::removeBatchEffect(
-                                  df_mesa_merge_lm22_log2,
+                                  log2trans_dat,
                                   batch = df_merged_metadata_lm22$data_source,
                                   batch2 = df_merged_metadata_lm22$type
                                   )
 
-head(df_mesa_merge_lm22_log2_batch_corr)
-dim(df_mesa_merge_lm22_log2_batch_corr)
+
+# Drop genes with low variance.
+getVar_bc <- apply(df_mesa_merge_lm22_log2_batch_corr[, -1], 1, var)
+
+# For gene I used median (50% quantile) as the cutoff
+# For splicing using 75% due to therembeing much more rows)
+param_bc <- quantile(getVar_bc, c(.75))
+log2trans_dat_filt_bc <- df_mesa_merge_lm22_log2_batch_corr[getVar_bc > param_bc & !is.na(getVar_bc), ]
+
+# Transpose and format
+log2trans_dat_filt_t_bc <- as.data.frame(t(log2trans_dat_filt_bc))
+rownames(log2trans_dat_filt_t_bc) <- colnames(log2trans_dat_filt_bc)
+
+# PCA.
+prcomp.out.bc = as.data.frame(prcomp(log2trans_dat_filt_t_bc, scale = F)$x)
+
+# Making variations of UMAPs with different numbers of neighbors
+lapply(c(20), make_umap, meta_col="data_source",
+  df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
+lapply(c(20), make_umap, meta_col="LM22",
+  df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
