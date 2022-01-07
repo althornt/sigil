@@ -63,9 +63,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
          device = "png",
          width = 12,
          dpi = 300)
-
 }
-
 
 ###################
 # MAIN
@@ -127,8 +125,6 @@ write.csv(df_merged_metadata_lm22,
 
 # List of samples with LM22 labels
 ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
-print(typeof(unlist(ls_smpls_lm22)))
-print(unlist(ls_smpls_lm22))
 
 # Merge mesa inclusion count files
 df_mesa_merge <- unlist(ls_mesa_files) %>%
@@ -138,9 +134,11 @@ df_mesa_merge <- unlist(ls_mesa_files) %>%
 # Drop non LM22 samples from mesa counts
 df_mesa_merge_lm22 <- df_mesa_merge %>%
   dplyr::select(ls_smpls_lm22)
+rownames(df_mesa_merge_lm22) <- df_mesa_merge$cluster
 
-print(head(df_mesa_merge_lm22))
-print(dim(df_mesa_merge_lm22))
+write.csv(
+  df_mesa_merge_lm22,
+  file.path(opt$out_dir,"LM22_mesa_inclusionCounts.tsv"))
 
 #  Log2 + 1 transform
 log2trans_dat <- as.data.frame(log2(df_mesa_merge_lm22 +1))
@@ -161,26 +159,16 @@ log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
 log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt))
 rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)
 
-print(head(log2trans_dat_filt_t))
-print(dim(log2trans_dat_filt_t))
-
 # PCA.
 prcomp.out = as.data.frame(prcomp(log2trans_dat_filt_t, scale = F)$x)
-
-print(dim(prcomp.out))
-print(head(prcomp.out))
 
 # Making variations of UMAPs with different numbers of neighbors
 lapply(c(20), make_umap, meta_col="data_source",
   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-
-# Making variations of UMAPs with different numbers of neighbors
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+lapply(c(20), make_umap, meta_col="LM22",
+  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+lapply(c(20), make_umap, meta_col="sigil_general",
+  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
 
 #######################
 # Batch correction
@@ -190,7 +178,6 @@ df_mesa_merge_lm22_log2_batch_corr <- limma::removeBatchEffect(
                                   batch = df_merged_metadata_lm22$data_source,
                                   batch2 = df_merged_metadata_lm22$type
                                   )
-
 
 # Drop genes with low variance.
 getVar_bc <- apply(df_mesa_merge_lm22_log2_batch_corr[, -1], 1, var)
@@ -212,3 +199,15 @@ lapply(c(20), make_umap, meta_col="data_source",
   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
 lapply(c(20), make_umap, meta_col="LM22",
   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
+lapply(c(20), make_umap, meta_col="sigil_general",
+  df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
+
+#######################
+# Undo log2(x+1) with 2^x - 1
+#######################
+df_mesa_merge_lm22_bc_counts = 2^df_mesa_merge_lm22_log2_batch_corr -1
+rownames(df_mesa_merge_lm22_bc_counts) <- df_mesa_merge$cluster
+
+write.csv(
+  df_mesa_merge_lm22_bc_counts,
+  file.path(opt$out_dir,"LM22_batch_corr_mesa_inclusionCounts.tsv"))
