@@ -17,10 +17,12 @@ def helpMessage() {
 
         --help                         This usage statement.
         --manifest
+        --gtf                          gtf file needed for MESA
 
         """
 }
 
+params.gtf  = '/mnt/files/homo_sapiens/Homo_sapiens.GRCh38.96.gtf'
 
 println "\n"
 println "Input manifiest:  $params.manifest "
@@ -34,7 +36,7 @@ workflow {
   // COMBINE_GENE(params.manifest)
 
   //MESA splicing
-  COMBINE_MESA(params.manifest)
+  COMBINE_MESA(params.manifest, params.gtf)
 
 
 

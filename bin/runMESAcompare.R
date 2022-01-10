@@ -180,49 +180,74 @@ if (!dir.exists(paste0(opt$out_dir,"/mesa_compare_outputs/mesa_css_outputs/heatm
    recursive = TRUE, showWarnings = TRUE)
 }
 
+
 ###################
 # sigil_general
 ###################
-if("sigil_general" %in% colnames(metadata)){
-  ls_general_cell_types <- unique(metadata[["sigil_general"]])
+if("LM22" %in% colnames(metadata)){
+  ls_lm22_cell_types <- unique(metadata[["LM22"]])
 
-  print(ls_general_cell_types)
+  print(ls_lm22_cell_types)
 
-  # Run MESA compare_sample_sets for each general subtype and make heatmap
-  sigil_general_mesa_comp_res <- sapply(
-    ls_general_cell_types,
-    runCompareSampleSets_1_vs_all,
-    meta_col_to_use="sigil_general",
-    USE.NAMES = TRUE)
-
-  ls_combined_diff_splice_events <- unlist(sigil_general_mesa_comp_res)
-  print(length(ls_combined_diff_splice_events))
-
-  list2heatmap(ls_combined_diff_splice_events,
-              "All significant events",
-              "all_diff_splicing_sigil_general",
-              "sigil_general")
+  # # Run MESA compare_sample_sets for each general subtype and make heatmap
+  # sigil_lm22_mesa_comp_res <- sapply(
+  #   ls_lm22_cell_types,
+  #   runCompareSampleSets_1_vs_all,
+  #   meta_col_to_use="LM22",
+  #   USE.NAMES = TRUE)
+  #
+  # ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
+  # print(length(ls_combined_diff_splice_events))
+  #
+  # list2heatmap(ls_combined_diff_splice_events,
+  #             "All significant events",
+  #             "all_diff_splicing_sigil_general",
+  #             "LM22")
 }
 
-######################################
-# sigil_cell_type_treatment
-######################################
-
-if("sigil_cell_type_treatment" %in% colnames(metadata)){
-  ls_sigil_cell_type_treatment_cell_types <- unique(metadata[["sigil_cell_type_treatment"]])
-
-  # Run MESA compare_sample_sets for each general subtype and make heatmap
-  sigil_treatment_mesa_comp_res <- sapply(
-    ls_sigil_cell_type_treatment_cell_types,
-    runCompareSampleSets_1_vs_all,
-    meta_col_to_use="sigil_cell_type_treatment",
-    USE.NAMES = TRUE)
-
-  ls_combined_diff_splice_events_treatment <- unlist(sigil_treatment_mesa_comp_res)
-  print(length(ls_combined_diff_splice_events_treatment))
-
-  list2heatmap(ls_combined_diff_splice_events_treatment,
-              "All significant events from comparisons using treatment",
-              "all_diff_splicing_sigil_cell_type_treatment",
-              "sigil_cell_type_treatment")
-}
+# ###################
+# # sigil_general
+# ###################
+# if("sigil_general" %in% colnames(metadata)){
+#   ls_general_cell_types <- unique(metadata[["sigil_general"]])
+#
+#   print(ls_general_cell_types)
+#
+#   # Run MESA compare_sample_sets for each general subtype and make heatmap
+#   sigil_general_mesa_comp_res <- sapply(
+#     ls_general_cell_types,
+#     runCompareSampleSets_1_vs_all,
+#     meta_col_to_use="sigil_general",
+#     USE.NAMES = TRUE)
+#
+#   ls_combined_diff_splice_events <- unlist(sigil_general_mesa_comp_res)
+#   print(length(ls_combined_diff_splice_events))
+#
+#   list2heatmap(ls_combined_diff_splice_events,
+#               "All significant events",
+#               "all_diff_splicing_sigil_general",
+#               "sigil_general")
+# }
+#
+# ######################################
+# # sigil_cell_type_treatment
+# ######################################
+#
+# if("sigil_cell_type_treatment" %in% colnames(metadata)){
+#   ls_sigil_cell_type_treatment_cell_types <- unique(metadata[["sigil_cell_type_treatment"]])
+#
+#   # Run MESA compare_sample_sets for each general subtype and make heatmap
+#   sigil_treatment_mesa_comp_res <- sapply(
+#     ls_sigil_cell_type_treatment_cell_types,
+#     runCompareSampleSets_1_vs_all,
+#     meta_col_to_use="sigil_cell_type_treatment",
+#     USE.NAMES = TRUE)
+#
+#   ls_combined_diff_splice_events_treatment <- unlist(sigil_treatment_mesa_comp_res)
+#   print(length(ls_combined_diff_splice_events_treatment))
+#
+#   list2heatmap(ls_combined_diff_splice_events_treatment,
+#               "All significant events from comparisons using treatment",
+#               "all_diff_splicing_sigil_cell_type_treatment",
+#               "sigil_cell_type_treatment")
+# }

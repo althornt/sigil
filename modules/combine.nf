@@ -24,6 +24,7 @@ process COMBINE_MESA {
 
   input:
   path metadata
+  path gtf
 
   """
   echo "Running COMBINE_MESA..."
@@ -31,8 +32,21 @@ process COMBINE_MESA {
   mkdir ${params.outdir}/combine_mesa_out -p
 
 
-  # Import and combine
+  # Import,  combine, batch correct
   combineMESAbatchcorr.R  -m ${params.manifest} -o ${params.outdir}/combine_mesa_out
+
+  # Run MESA on batch corrected values
+  # command
+
+  # Run compare sample sets on combined all PS
+  # eventually change to import batch corrected mesa_allPS
+  runMESAcompare.R -i ${params.outdir}/combine_mesa_out/LM22_mesa_allPS.tsv \
+    -o ${params.outdir}/combine_mesa_out \
+    -m ${params.outdir}/combine_mesa_out/lm22_metadata.csv \
+    --gtf $gtf
+
+
+  # Make ref matix
 
   """
 }

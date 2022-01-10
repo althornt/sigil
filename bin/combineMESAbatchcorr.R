@@ -124,7 +124,7 @@ df_merged_metadata_lm22 <- df_merged_metadata %>%
    dplyr::filter(LM22 != "")
 write.csv(df_merged_metadata_lm22,
             file.path(file.path(opt$out_dir,"lm22_metadata.csv")),
-            row.names = FALSE,sep="\t")
+            row.names = FALSE, quote=F)
 
 # List of samples with LM22 labels
 ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
