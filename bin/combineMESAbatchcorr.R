@@ -124,7 +124,7 @@ df_merged_metadata_lm22 <- df_merged_metadata %>%
    dplyr::filter(LM22 != "")
 write.csv(df_merged_metadata_lm22,
             file.path(file.path(opt$out_dir,"lm22_metadata.csv")),
-            row.names = FALSE)
+            row.names = FALSE,sep="\t")
 
 # List of samples with LM22 labels
 ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
@@ -140,7 +140,7 @@ df_mesa_inc_count_merge_lm22 <- df_mesa_inc_count_merge %>%
 rownames(df_mesa_inc_count_merge_lm22) <- df_mesa_inc_count_merge$cluster
 write.csv(
   df_mesa_inc_count_merge_lm22,
-  file.path(opt$out_dir,"LM22_mesa_inclusionCounts.tsv"),quote=F)
+  file.path(opt$out_dir,"LM22_mesa_inclusionCounts.tsv"),quote=F,sep="\t")
 
 #  Log2 + 1 transform counts
 log2trans_dat <- as.data.frame(log2(df_mesa_inc_count_merge_lm22 +1))
@@ -156,7 +156,7 @@ df_mesa_allPS_merge_lm22 <- df_mesa_allPS_merge %>%
 rownames(df_mesa_allPS_merge_lm22) <- df_mesa_allPS_merge$cluster
 write.csv(
   df_mesa_allPS_merge_lm22,
-  file.path(opt$out_dir,"LM22_mesa_allPS.tsv"), quote=F)
+  file.path(opt$out_dir,"LM22_mesa_allPS.tsv"), quote=F,sep="\t")
 
 
 ####################################
@@ -226,4 +226,5 @@ rownames(df_mesa_inc_count_merge_lm22_bc_counts) <- df_mesa_inc_count_merge$clus
 
 write.csv(
   df_mesa_inc_count_merge_lm22_bc_counts,
-  file.path(opt$out_dir,"LM22_batch_corr_mesa_inclusionCounts.tsv"))
+  file.path(opt$out_dir,"LM22_batch_corr_mesa_inclusionCounts.tsv"),
+  sep="\t",quote=F)
