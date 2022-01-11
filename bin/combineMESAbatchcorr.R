@@ -138,7 +138,7 @@ df_mesa_inc_count_merge <- unlist(ls_mesa_inc_count_files) %>%
 df_mesa_inc_count_merge_lm22 <- df_mesa_inc_count_merge %>%
   dplyr::select(ls_smpls_lm22)
 rownames(df_mesa_inc_count_merge_lm22) <- df_mesa_inc_count_merge$cluster
-write.csv(
+write.table(
   df_mesa_inc_count_merge_lm22,
   file.path(opt$out_dir,"LM22_mesa_inclusionCounts.tsv"),quote=F,sep="\t")
 
@@ -154,9 +154,9 @@ df_mesa_allPS_merge <- unlist(ls_mesa_allPS_files) %>%
 df_mesa_allPS_merge_lm22 <- df_mesa_allPS_merge %>%
   dplyr::select(ls_smpls_lm22)
 rownames(df_mesa_allPS_merge_lm22) <- df_mesa_allPS_merge$cluster
-write.csv(
+write.table(
   df_mesa_allPS_merge_lm22,
-  file.path(opt$out_dir,"LM22_mesa_allPS.tsv"), quote=F,sep="\t")
+  file.path(opt$out_dir,"LM22_mesa_allPS.tsv"), quote=F,sep="\t", na="nan")
 
 
 ####################################

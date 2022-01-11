@@ -33,18 +33,23 @@ process COMBINE_MESA {
 
 
   # Import,  combine, batch correct
-  combineMESAbatchcorr.R  -m ${params.manifest} -o ${params.outdir}/combine_mesa_out
+  #combineMESAbatchcorr.R  -m ${params.manifest} -o ${params.outdir}/combine_mesa_out
 
   # Run MESA on batch corrected values
   # command
 
   # Run compare sample sets on combined all PS
   # eventually change to import batch corrected mesa_allPS
-  runMESAcompare.R -i ${params.outdir}/combine_mesa_out/LM22_mesa_allPS.tsv \
-    -o ${params.outdir}/combine_mesa_out \
-    -m ${params.outdir}/combine_mesa_out/lm22_metadata.csv \
-    --gtf $gtf
+  #runMESAcompare.R -i ${params.outdir}/combine_mesa_out/LM22_mesa_allPS.tsv \
+  #  -o ${params.outdir}/combine_mesa_out \
+  #  -m ${params.outdir}/combine_mesa_out/lm22_metadata.csv \
+  #  --gtf $gtf
 
+  # Explore LM22 results
+  LM22_splicing_explore.R \
+    -i ${params.outdir}/combine_mesa_out/LM22_mesa_allPS.tsv \
+    -o ${params.outdir}/combine_mesa_out \
+    -m ${params.outdir}/combine_mesa_out/lm22_metadata.csv
 
   # Make ref matix
 

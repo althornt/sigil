@@ -18,6 +18,8 @@ list2heatmap <- function(ls_events,heatmap_title,out_file_desc,meta_col_to_use )
     dplyr::filter(event %in% ls_events) %>%
     tibble::column_to_rownames('event')
 
+  print(ls_events)
+
   # DF to label samples(columns) with general and more specific labels if they exist
   if("sigil_cell_type_treatment" %in% colnames(metadata)){
     df_sample_annotations <- metadata %>%
@@ -26,12 +28,14 @@ list2heatmap <- function(ls_events,heatmap_title,out_file_desc,meta_col_to_use )
   }
   else {
     df_sample_annotations <- metadata %>%
-      dplyr::select(Run,sigil_general) %>%
+      dplyr::select(Run,LM22) %>%
       tibble::column_to_rownames("Run")
   }
 
   # Create and save heatmap
   if (length(ls_events) >= 2){
+
+      print("making heatmap....")
 
       heatmap_res <- pheatmap(
         main = paste0(" Splicing - ", heatmap_title),
@@ -65,6 +69,8 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
   str_cell_type_val <- paste(unlist(strsplit(
                                     as.character(cell_type_val), split=" ")),
                                      collapse="_")
+
+  print(str_cell_type_val)
 
   # Make manifest 1 - given cell type
   df_m1_main_cell_type <- metadata %>%
@@ -106,21 +112,21 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
   # (mesa doesnt run if not enough samples)
 
 
-  if (file.exists(file_css_out)){
-    df_css_out = read.csv(file = file_css_out, sep="\t")
-
-    # Filter MESA all PS file to significant events
-    ls_sig_css_out <- df_css_out %>%
-      dplyr::filter((corrected < .01) & (abs(delta) > .2)) %>%
-      dplyr::pull(event)
-
-    list2heatmap(ls_sig_css_out,cell_type_val,str_cell_type_val,meta_col_to_use)
-    return(ls_sig_css_out)
-
-  } else{
-    # return empty vector , since no diff splicing
-    return( vector())
-    }
+  # if (file.exists(file_css_out)){
+  #   df_css_out = read.csv(file = file_css_out, sep="\t")
+  #
+  #   # Filter MESA all PS file to significant events
+  #   ls_sig_css_out <- df_css_out %>%
+  #     dplyr::filter((corrected < .01) & (abs(delta) > .2)) %>%
+  #     dplyr::pull(event)
+  #
+  #   list2heatmap(ls_sig_css_out,cell_type_val,str_cell_type_val,meta_col_to_use)
+  #   return(ls_sig_css_out)
+  #
+  # } else{
+  #   # return empty vector , since no diff splicing
+  #   return( vector())
+  #   }
 
 }
 
@@ -185,24 +191,24 @@ if (!dir.exists(paste0(opt$out_dir,"/mesa_compare_outputs/mesa_css_outputs/heatm
 # sigil_general
 ###################
 if("LM22" %in% colnames(metadata)){
-  ls_lm22_cell_types <- unique(metadata[["LM22"]])
+  ls_lm22_cell_types <- rev(unique(metadata[["LM22"]]))
 
   print(ls_lm22_cell_types)
 
-  # # Run MESA compare_sample_sets for each general subtype and make heatmap
-  # sigil_lm22_mesa_comp_res <- sapply(
-  #   ls_lm22_cell_types,
-  #   runCompareSampleSets_1_vs_all,
-  #   meta_col_to_use="LM22",
-  #   USE.NAMES = TRUE)
-  #
-  # ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
-  # print(length(ls_combined_diff_splice_events))
-  #
-  # list2heatmap(ls_combined_diff_splice_events,
-  #             "All significant events",
-  #             "all_diff_splicing_sigil_general",
-  #             "LM22")
+  # Run MESA compare_sample_sets for each general subtype and make heatmap
+  sigil_lm22_mesa_comp_res <- sapply(
+    ls_lm22_cell_types,
+    runCompareSampleSets_1_vs_all,
+    meta_col_to_use="LM22",
+    USE.NAMES = TRUE)
+
+  ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
+  print(length(ls_combined_diff_splice_events))
+
+  list2heatmap(ls_combined_diff_splice_events,
+              "All significant events",
+              "all_diff_splicing_sigil_general",
+              "LM22")
 }
 
 # ###################
