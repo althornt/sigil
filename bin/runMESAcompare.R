@@ -13,7 +13,7 @@ list2heatmap <- function(ls_events,heatmap_title,out_file_desc,meta_col_to_use )
   #' @return NA
 
   # Filter MESA all PS file to events of interest
-  df_all_PS_sig_events <- all_PS %>%
+  df_all_PS_sig_events <- all_PS_nan_filt %>%
     tibble::rownames_to_column('event') %>%
     dplyr::filter(event %in% ls_events) %>%
     tibble::column_to_rownames('event')
@@ -100,12 +100,13 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
 
     # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
     cmd <- paste0(
-      "mesa compare_sample_sets --psiMESA ",opt$mesa_PS," -m1 ",
-      opt$out_dir,"/mesa_compare_outputs/manifests/",str_cell_type_val,".tsv",
+      "mesa compare_sample_sets --psiMESA ",opt$out_dir, "/LM22_mesa_allPS_nan_filt.tsv",
+      " -m1 ",opt$out_dir,"/mesa_compare_outputs/manifests/",str_cell_type_val,".tsv",
       " -m2 ",opt$out_dir, "/mesa_compare_outputs/manifests/not_",str_cell_type_val,".tsv  -o",
       opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
       opt$gtf, " 2>&1")
     system(cmd)
+    print(cmd)
   }
 
   # Read in MESA compare_sample_sets results if they were  made
@@ -170,11 +171,6 @@ option_list <- list(
 opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
-# Open files
-metadata = read.csv(file = opt$metadata)
-all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
-# mesa_ps = read.csv(file = opt$mesa_PS, sep="\t", row.names = "cluster")
-
 # Make output directories
 if (!dir.exists(paste0(opt$out_dir,"/mesa_compare_outputs/manifests/"))){
   dir.create(paste0(opt$out_dir,"/mesa_compare_outputs/manifests/"),
@@ -186,12 +182,24 @@ if (!dir.exists(paste0(opt$out_dir,"/mesa_compare_outputs/mesa_css_outputs/heatm
    recursive = TRUE, showWarnings = TRUE)
 }
 
+# Open files
+metadata = read.csv(file = opt$metadata)
+all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
+
+# Remove rows with more than 50% NA
+all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.5), ]
+
+write.table(x = all_PS_nan_filt,na="nan", row.names = TRUE, quote=FALSE,
+          col.names=TRUE, sep = "\t",
+          file = paste0(opt$out_dir, "/LM22_mesa_allPS_nan_filt.tsv"))
+print("Number of junctions removed for having over 50% samples with Nans:")
+print(nrow(all_PS)- nrow(all_PS_nan_filt))
 
 ###################
-# sigil_general
+# LM22
 ###################
 if("LM22" %in% colnames(metadata)){
-  ls_lm22_cell_types <- rev(unique(metadata[["LM22"]]))
+  ls_lm22_cell_types <- unique(metadata[["LM22"]])
 
   print(ls_lm22_cell_types)
 
@@ -205,10 +213,10 @@ if("LM22" %in% colnames(metadata)){
   ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
   print(length(ls_combined_diff_splice_events))
 
-  list2heatmap(ls_combined_diff_splice_events,
-              "All significant events",
-              "all_diff_splicing_sigil_general",
-              "LM22")
+  # list2heatmap(ls_combined_diff_splice_events,
+  #             "All significant events",
+  #             "all_diff_splicing_sigil_general",
+  #             "LM22")
 }
 
 # ###################
