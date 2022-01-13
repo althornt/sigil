@@ -4,7 +4,9 @@ library(magrittr)
 library(dplyr)
 library(pheatmap)
 library(ggplot2)
-# library(tidyr)
+library(tidyverse)
+library(tidyr)
+library(dplyr)
 
 # Arguments
 option_list <- list(
@@ -63,11 +65,10 @@ df_dend_rest %>%
   dplyr::arrange(corrected) %>%
   head()
 
-str_event_example <- as.character(df_dend_act %>%
+str_event_example <- as.character(df_dend_rest %>%
   dplyr::arrange(corrected) %>%
   head(1) %>%
   pull(event))
-
 
 # make df for the 1 example event
 event_ex <- all_PS_meta %>%
@@ -76,21 +77,20 @@ event_ex <- all_PS_meta %>%
   t() %>%
   as.data.frame()
 
-new_event_ex <- event_ex
+new_event_ex <- event_ex # copy df
 colnames(new_event_ex) <- c( "PS","LM22") #add column names from first row
-new_event_ex <- new_event_ex[-1,] # drop first row
+
+new_event_ex <- new_event_ex[-1,] %>% # drop first row
+        dplyr::filter(PS != "NaN") #drop samples with Nan
+
 
 print(new_event_ex)
 
-new_event_ex %>%
-  dplyr::group_by(LM22)
+
+p <- ggplot( new_event_ex, aes(x = LM22, y = PS, color=LM22)) +
+    geom_point(alpha = 0.5) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+    theme(legend.position = "None")
 
 
-# p <-    ggplot( new_event_ex, aes(PS)) +
-#     geom_freqpoly(  binwidth = 5, stat = "count") +
-#     labs(fill="")
-#
-# ggsave(plot = p, filename = paste0(opt$out_dir,"/explore/test.png"))
-
-# plot
-# r5roup?
+ggsave(plot = p, filename = paste0(opt$out_dir,"/explore/test2.png"))
