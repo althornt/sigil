@@ -8,6 +8,80 @@ library(tidyverse)
 library(tidyr)
 library(dplyr)
 
+#############################
+# Functions
+##########################
+import_mesa_css <- function(filename, topN){
+
+  # Filename to string
+  LM22_type <-  substr(filename, 1, nchar(filename)-4)
+  print(LM22_type
+  )
+  # Make output directories
+  if (!dir.exists(paste0(opt$out_dir,"/explore/",LM22_type))){
+    dir.create(paste0(opt$out_dir,"/explore/",LM22_type),
+     recursive = TRUE, showWarnings = TRUE)
+  }
+
+  # Open mesa css
+  df <- read.table(
+            file = paste0(
+              opt$out_dir,
+              "/mesa_compare_outputs/mesa_css_outputs/",
+              filename),
+            sep="\t", header = TRUE)
+
+  # Get top events by pvalue
+  top_sig_by_pval <- df %>%
+    dplyr::arrange(p.value) %>%
+    head(2*topN)
+
+  # Get top negative delta events
+  top_sig_by_pval_negdelta <- top_sig_by_pval %>%
+    dplyr::filter(delta < -.2 ) %>%
+    dplyr::arrange(delta) %>%
+    head(topN)%>%
+    pull(event)
+
+  # Make plots for top negative events
+  lapply(top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type)
+
+  # Get top positive delta events
+  top_sig_by_pval_posdelta <- top_sig_by_pval %>%
+    dplyr::filter(delta > .2 ) %>%
+    dplyr::arrange(desc(delta)) %>%
+    head(topN)%>%
+    pull(event)
+
+  # Make plots for top positive events
+  lapply(top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type)
+
+}
+
+plot_event <- function(sig_event, cell_type){
+
+  df <- all_PS_meta %>%
+    tibble::rownames_to_column(var = "event")%>%
+    dplyr::filter(event %in% list(paste0(sig_event),"LM22"))%>%
+    t() %>%
+    as.data.frame()
+
+  df_ <- df # copy df
+  colnames(df_) <- c( "PS","LM22") #add column names from first row
+
+  df_ <- df_[-1,] %>% # drop first row
+          dplyr::filter(PS != "NaN") #drop samples with Nan
+
+  p <- ggplot( df_, aes(x = LM22, y = PS, color=LM22)) +
+      geom_point(alpha = 0.5) +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
+      theme(legend.position = "None")
+
+  ggsave(plot = p, filename = paste0(opt$out_dir,"/explore/",cell_type,"/",sig_event,".png"))
+
+}
+
+
 # Arguments
 option_list <- list(
   optparse::make_option(
@@ -51,46 +125,8 @@ if (!dir.exists(paste0(opt$out_dir,"/explore/"))){
    recursive = TRUE, showWarnings = TRUE)
 }
 
-ls_css_outputs <- list.files(paste0(opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/"))
-print(ls_css_outputs)
+# Get all outputs from compare sample sets 1 vs all comparisons
+ls_css_file_names <- list.files(paste0(opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/"))[1:5]
 
-df_dend_rest <-  read.table(file = paste0(
-                  opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/Dendritic_cells_resting.tsv"),
-                  sep="\t", header = TRUE)
-df_dend_act <-  read.table(file = paste0(
-                  opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/Dendritic_cells_activated.tsv"),
-                  sep="\t",  header = TRUE)
-
-df_dend_rest %>%
-  dplyr::arrange(corrected) %>%
-  head()
-
-str_event_example <- as.character(df_dend_rest %>%
-  dplyr::arrange(corrected) %>%
-  head(1) %>%
-  pull(event))
-
-# make df for the 1 example event
-event_ex <- all_PS_meta %>%
-  tibble::rownames_to_column(var = "event") %>%
-  dplyr::filter(event %in% list(str_event_example,"LM22")) %>%
-  t() %>%
-  as.data.frame()
-
-new_event_ex <- event_ex # copy df
-colnames(new_event_ex) <- c( "PS","LM22") #add column names from first row
-
-new_event_ex <- new_event_ex[-1,] %>% # drop first row
-        dplyr::filter(PS != "NaN") #drop samples with Nan
-
-
-print(new_event_ex)
-
-
-p <- ggplot( new_event_ex, aes(x = LM22, y = PS, color=LM22)) +
-    geom_point(alpha = 0.5) +
-    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-    theme(legend.position = "None")
-
-
-ggsave(plot = p, filename = paste0(opt$out_dir,"/explore/test2.png"))
+# Import ,  find signficant events , plot
+lapply(ls_css_file_names, topN=5,  import_mesa_css)
