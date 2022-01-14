@@ -70,14 +70,21 @@ plot_event <- function(sig_event, cell_type){
   colnames(df_) <- c( "PS","LM22") #add column names from first row
 
   df_ <- df_[-1,] %>% # drop first row
-          dplyr::filter(PS != "NaN") #drop samples with Nan
+          dplyr::filter(PS != "NaN")  #drop samples with Nan
+
+  df_$PS <- as.numeric(df_$PS)
+
+
 
   p <- ggplot( df_, aes(x = LM22, y = PS, color=LM22)) +
-      geom_point(alpha = 0.5) +
+      # geom_violin() +
+      geom_jitter(position=position_jitter(0.2), alpha = 0.5) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      theme(legend.position = "None")
+      theme(legend.position = "None") +
+      scale_y_continuous(limits = c(0, 100))
 
-  ggsave(plot = p, filename = paste0(opt$out_dir,"/explore/",cell_type,"/",sig_event,".png"))
+  ggsave(plot = p, filename = paste0(
+                opt$out_dir,"/explore/",cell_type,"/",sig_event,".png"))
 
 }
 
@@ -126,7 +133,13 @@ if (!dir.exists(paste0(opt$out_dir,"/explore/"))){
 }
 
 # Get all outputs from compare sample sets 1 vs all comparisons
-ls_css_file_names <- list.files(paste0(opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/"))[1:5]
+ls_css_file_names <- list.files(
+                        paste0(opt$out_dir,
+                        "/mesa_compare_outputs/mesa_css_outputs/"),
+                      pattern = ".tsv")
+
+ls_css_file_names <- ls_css_file_names[!ls_css_file_names %in% c("heatmaps")]
+print(ls_css_file_names)
 
 # Import ,  find signficant events , plot
 lapply(ls_css_file_names, topN=5,  import_mesa_css)
