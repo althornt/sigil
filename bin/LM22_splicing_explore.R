@@ -11,6 +11,17 @@ library(dplyr)
 #############################
 # Functions
 ##########################
+
+save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
+  #' Function to save pheatmaps to a pdf file
+  stopifnot(!missing(x))
+  stopifnot(!missing(filename))
+  pdf(filename, width=width, height=height)
+  grid::grid.newpage()
+  grid::grid.draw(x$gtable)
+  dev.off()
+}
+
 import_mesa_css <- function(filename, topN){
 
   # Filename to string
@@ -56,6 +67,11 @@ import_mesa_css <- function(filename, topN){
   # Make plots for top positive events
   lapply(top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type)
 
+  return(list("top_pos" = top_sig_by_pval_posdelta,
+              "top_neg" = top_sig_by_pval_negdelta,
+              "top_neg_and_pos" = unlist(list(top_sig_by_pval_negdelta,top_sig_by_pval_posdelta)))
+        )
+
 }
 
 plot_event <- function(sig_event, cell_type){
@@ -73,8 +89,6 @@ plot_event <- function(sig_event, cell_type){
           dplyr::filter(PS != "NaN")  #drop samples with Nan
 
   df_$PS <- as.numeric(df_$PS)
-
-
 
   p <- ggplot( df_, aes(x = LM22, y = PS, color=LM22)) +
       # geom_violin() +
@@ -142,4 +156,42 @@ ls_css_file_names <- ls_css_file_names[!ls_css_file_names %in% c("heatmaps")]
 print(ls_css_file_names)
 
 # Import ,  find signficant events , plot
-lapply(ls_css_file_names, topN=5,  import_mesa_css)
+ls_res <- lapply(ls_css_file_names, topN=10,  import_mesa_css)
+
+ls_top_pos <- ls_top_neg <- ls_top_neg_and_pos  <- c()
+for (item in ls_res) {
+     ls_top_pos <- append(ls_top_pos, item[1])
+     ls_top_neg <- append(ls_top_neg, item[2])
+     ls_top_neg_and_pos <- append(ls_top_neg_and_pos, item[3])
+   }
+
+ls_top_pos<- unlist(ls_top_pos)
+ls_top_neg<- unlist(ls_top_neg)
+ls_top_neg_and_pos<- unlist(ls_top_neg_and_pos)
+
+
+# make heatmap / reference matrix
+# Filter MESA all PS file to events of interest
+df_all_PS_sig_events <- all_PS %>%
+  tibble::rownames_to_column('event') %>%
+  dplyr::filter(event %in% ls_top_neg_and_pos) %>%
+  tibble::column_to_rownames('event')
+
+# DF to label samples(columns) with labels
+df_sample_annotations <- metadata %>%
+  dplyr::select(Run, LM22) %>%
+  tibble::column_to_rownames("Run")
+
+heatmap_res <- pheatmap(
+  main = paste0(" "),
+  df_all_PS_sig_events,
+  scale = "row",
+  show_rownames=F,
+  show_colnames=F,
+  na_col = "grey",
+  annotation_col = df_sample_annotations)
+
+save_pheatmap_pdf(
+  heatmap_res,
+  paste0(opt$out_dir,
+        "/diff_splicing_heatmap.pdf"))
