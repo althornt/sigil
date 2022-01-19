@@ -26,8 +26,7 @@ import_mesa_css <- function(filename, topN){
 
   # Filename to string
   LM22_type <-  substr(filename, 1, nchar(filename)-4)
-  print(LM22_type
-  )
+  # print(LM22_type)
   # Make output directories
   if (!dir.exists(paste0(opt$out_dir,"/explore/",LM22_type))){
     dir.create(paste0(opt$out_dir,"/explore/",LM22_type),
@@ -153,7 +152,6 @@ ls_css_file_names <- list.files(
                       pattern = ".tsv")
 
 ls_css_file_names <- ls_css_file_names[!ls_css_file_names %in% c("heatmaps")]
-print(ls_css_file_names)
 
 # Import ,  find signficant events , plot
 ls_res <- lapply(ls_css_file_names, topN=10,  import_mesa_css)
@@ -177,9 +175,11 @@ df_all_PS_sig_events <- all_PS %>%
   dplyr::filter(event %in% ls_top_neg_and_pos) %>%
   tibble::column_to_rownames('event')
 
+for (val in list("LM22", "LM6"))
+{
 # DF to label samples(columns) with labels
 df_sample_annotations <- metadata %>%
-  dplyr::select(Run, LM22) %>%
+  dplyr::select(Run, val) %>%
   tibble::column_to_rownames("Run")
 
 heatmap_res <- pheatmap(
@@ -194,4 +194,5 @@ heatmap_res <- pheatmap(
 save_pheatmap_pdf(
   heatmap_res,
   paste0(opt$out_dir,
-        "/diff_splicing_heatmap.pdf"))
+        "/explore/diff_splicing_heatmap_",val,".pdf"))
+}

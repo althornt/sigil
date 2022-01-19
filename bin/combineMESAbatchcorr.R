@@ -17,7 +17,7 @@ library(purrr)
 importMetaMESA <- function(row){
   # Read metadata and add column for run
   df_metadata <- read.csv(file.path(row[3])) %>%
-    dplyr::select(Run, sigil_general, LM22)
+    dplyr::select(Run, sigil_general, LM22, LM6)
 
   # Add metadata to column
   df_metadata$data_source <- row[1] # add name of data source
@@ -185,7 +185,8 @@ lapply(c(20), make_umap, meta_col="LM22",
   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
 lapply(c(20), make_umap, meta_col="sigil_general",
   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-
+lapply(c(20), make_umap, meta_col="LM6",
+  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
 #######################
 # Batch correction
 #######################
@@ -217,7 +218,8 @@ lapply(c(20), make_umap, meta_col="LM22",
   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
 lapply(c(20), make_umap, meta_col="sigil_general",
   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-
+lapply(c(20), make_umap, meta_col="LM6",
+  df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
 ##############################################
 # Undo log2(x+1) with 2^x - 1
 ##############################################
