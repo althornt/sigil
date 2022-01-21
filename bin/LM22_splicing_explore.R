@@ -8,10 +8,9 @@ library(tidyverse)
 library(tidyr)
 library(dplyr)
 
-#############################
+##########################
 # Functions
 ##########################
-
 save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   #' Function to save pheatmaps to a pdf file
   stopifnot(!missing(x))
@@ -22,14 +21,14 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   dev.off()
 }
 
-import_mesa_css <- function(filename, topN){
+import_mesa_css <- function(filename, topN, plot_out_dir){
 
   # Filename to string
   LM22_type <-  substr(filename, 1, nchar(filename)-4)
   # print(LM22_type)
   # Make output directories
-  if (!dir.exists(paste0(opt$out_dir,"/explore/",LM22_type))){
-    dir.create(paste0(opt$out_dir,"/explore/",LM22_type),
+  if (!dir.exists(paste0(plot_out_dir,LM22_type))){
+    dir.create(paste0(plot_out_dir,LM22_type),
      recursive = TRUE, showWarnings = TRUE)
   }
 
@@ -48,32 +47,33 @@ import_mesa_css <- function(filename, topN){
 
   # Get top negative delta events
   top_sig_by_pval_negdelta <- top_sig_by_pval %>%
-    dplyr::filter(delta < -.2 ) %>%
+    dplyr::filter(delta < -.1 ) %>%
     dplyr::arrange(delta) %>%
     head(topN)%>%
     pull(event)
 
   # Make plots for top negative events
-  lapply(top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type)
+  lapply(top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
+    out_dir = plot_out_dir)
 
   # Get top positive delta events
   top_sig_by_pval_posdelta <- top_sig_by_pval %>%
-    dplyr::filter(delta > .2 ) %>%
+    dplyr::filter(delta > .1 ) %>%
     dplyr::arrange(desc(delta)) %>%
     head(topN)%>%
     pull(event)
 
   # Make plots for top positive events
-  lapply(top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type)
+  lapply(top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
+          out_dir = plot_out_dir )
 
   return(list("top_pos" = top_sig_by_pval_posdelta,
               "top_neg" = top_sig_by_pval_negdelta,
               "top_neg_and_pos" = unlist(list(top_sig_by_pval_negdelta,top_sig_by_pval_posdelta)))
         )
-
 }
 
-plot_event <- function(sig_event, cell_type){
+plot_event <- function(sig_event, cell_type, out_dir){
 
   df <- all_PS_meta %>%
     tibble::rownames_to_column(var = "event")%>%
@@ -96,10 +96,24 @@ plot_event <- function(sig_event, cell_type){
       theme(legend.position = "None") +
       scale_y_continuous(limits = c(0, 100))
 
-  ggsave(plot = p, filename = paste0(
-                opt$out_dir,"/explore/",cell_type,"/",sig_event,".png"))
+  ggsave(plot = p, filename = paste0(out_dir,cell_type,"/",sig_event,".png"))
 
 }
+
+unpack_import_css_res <- function(ls_res){
+  ls_top_pos <- ls_top_neg <- ls_top_neg_and_pos  <- c()
+  for (item in ls_res) {
+       ls_top_pos <- append(ls_top_pos, item[1])
+       ls_top_neg <- append(ls_top_neg, item[2])
+       ls_top_neg_and_pos <- append(ls_top_neg_and_pos, item[3])
+     }
+
+  ls_top_pos<- unlist(ls_top_pos)
+  ls_top_neg<- unlist(ls_top_neg)
+  ls_top_neg_and_pos<- unlist(ls_top_neg_and_pos)
+
+  return(list(ls_top_pos,ls_top_neg,ls_top_neg_and_pos))
+  }
 
 
 # Arguments
@@ -134,65 +148,158 @@ df_sample_annotations <- metadata %>%
   t()
 
 all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE)
-# all_PS <- tibble::rownames_to_column(all_PS, var = "event")
-
-# add metadata to PS
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
 
 # Make output directories
-if (!dir.exists(paste0(opt$out_dir,"/explore/"))){
-  dir.create(paste0(opt$out_dir,"/explore/"),
+if (!dir.exists(paste0(opt$out_dir,"/explore/LM22"))){
+  dir.create(paste0(opt$out_dir,"/explore/LM22"),
    recursive = TRUE, showWarnings = TRUE)
 }
 
+if (!dir.exists(paste0(opt$out_dir,"/explore/within_type"))){
+  dir.create(paste0(opt$out_dir,"/explore/within_type"),
+   recursive = TRUE, showWarnings = TRUE)
+}
+
+#########################################
+# Import LM22 1 vs all comparisons
+########################################
 # Get all outputs from compare sample sets 1 vs all comparisons
 ls_css_file_names <- list.files(
                         paste0(opt$out_dir,
                         "/mesa_compare_outputs/mesa_css_outputs/"),
                       pattern = ".tsv")
-
 ls_css_file_names <- ls_css_file_names[!ls_css_file_names %in% c("heatmaps")]
 
-# Import ,  find signficant events , plot
-ls_res <- lapply(ls_css_file_names, topN=10,  import_mesa_css)
+# Import, find signficant events and plot each one
+ls_res <- lapply(ls_css_file_names, topN=10,  import_mesa_css, plot_out_dir = paste0(opt$out_dir,"/explore/LM22/"))
+# Unpack top events into lists
+ls_top_events <- unpack_import_css_res(ls_res)
 
-ls_top_pos <- ls_top_neg <- ls_top_neg_and_pos  <- c()
-for (item in ls_res) {
-     ls_top_pos <- append(ls_top_pos, item[1])
-     ls_top_neg <- append(ls_top_neg, item[2])
-     ls_top_neg_and_pos <- append(ls_top_neg_and_pos, item[3])
-   }
+# ls_top_pos <- ls_top_neg <- ls_top_neg_and_pos  <- c()
+# for (item in ls_res) {
+#      ls_top_pos <- append(ls_top_pos, item[1])
+#      ls_top_neg <- append(ls_top_neg, item[2])
+#      ls_top_neg_and_pos <- append(ls_top_neg_and_pos, item[3])
+#    }
+#
+# ls_top_pos<- unlist(ls_top_pos)
+# ls_top_neg<- unlist(ls_top_neg)
+# ls_top_neg_and_pos<- unlist(ls_top_neg_and_pos)
 
-ls_top_pos<- unlist(ls_top_pos)
-ls_top_neg<- unlist(ls_top_neg)
-ls_top_neg_and_pos<- unlist(ls_top_neg_and_pos)
-
+#############################
+# heatmap all diff splicng
+#############################
 
 # make heatmap / reference matrix
 # Filter MESA all PS file to events of interest
-df_all_PS_sig_events <- all_PS %>%
-  tibble::rownames_to_column('event') %>%
-  dplyr::filter(event %in% ls_top_neg_and_pos) %>%
-  tibble::column_to_rownames('event')
+# df_all_PS_sig_events <- all_PS %>%
+#   tibble::rownames_to_column('event') %>%
+#   dplyr::filter(event %in% ls_top_neg_and_pos) %>%
+#   tibble::column_to_rownames('event')
+#
+# for (val in list("LM22", "LM6"))
+# {
+# # DF to label samples(columns) with labels
+# df_sample_annotations <- metadata %>%
+#   dplyr::select(Run, val) %>%
+#   tibble::column_to_rownames("Run")
+#
+# heatmap_res <- pheatmap(
+#   main = paste0(" "),
+#   df_all_PS_sig_events,
+#   scale = "row",
+#   show_rownames=F,
+#   show_colnames=F,
+#   na_col = "grey",
+#   annotation_col = df_sample_annotations)
+#
+# save_pheatmap_pdf(
+#   heatmap_res,
+#   paste0(opt$out_dir,
+#         "/explore/diff_splicing_heatmap_",val,".pdf"))
+# }
 
-for (val in list("LM22", "LM6"))
-{
-# DF to label samples(columns) with labels
-df_sample_annotations <- metadata %>%
-  dplyr::select(Run, val) %>%
-  tibble::column_to_rownames("Run")
+#########################################
+# Import T-cell 1 vs all comparisons
+########################################
+# Get output files from compareWithinType script
+ls_css_file_names_tcells <- list.files(
+                        paste0(opt$out_dir,
+                        "/compareWithinType/mesa_compare_outputs/mesa_css_outputs/"),
+                        pattern = ".tsv")
 
-heatmap_res <- pheatmap(
-  main = paste0(" "),
-  df_all_PS_sig_events,
-  scale = "row",
-  show_rownames=F,
-  show_colnames=F,
-  na_col = "grey",
-  annotation_col = df_sample_annotations)
+# Import files, find top signficant events, plot each event
+ls_res_tcells <- lapply(
+                        ls_css_file_names_tcells,
+                        topN=10,
+                        import_mesa_css,
+                        plot_out_dir =  paste0(opt$out_dir,"/explore/within_type/"))
 
-save_pheatmap_pdf(
-  heatmap_res,
-  paste0(opt$out_dir,
-        "/explore/diff_splicing_heatmap_",val,".pdf"))
-}
+# Unpack top events into lists
+tcell_top_events <- unpack_import_css_res(ls_res_tcells)
+
+print(tcell_top_events[[3]])
+
+#############################
+# heatmap T-cell
+#############################
+
+T_cell_types <- list(
+  "T cells CD8",
+  "T cells CD4 naive",
+  "T cells CD4 memory resting",
+  "T cells CD4 memory  activated",
+  "T cells follicular helper",
+  "T cells regulatory (Tregs)",
+  "T cells gamma delta")
+
+
+# Get samples with this cell type
+ls_samples_T_cell_types <- metadata %>%
+  dplyr::filter(LM22 %in% T_cell_types) %>%
+  dplyr::pull(Run)
+
+print(ls_samples_T_cell_types)
+
+# make heatmap / reference matrix
+# Filter MESA all PS file to events of interest
+# # Reduce df to T-cell types
+# df_all_PS_sig_events_tcell <- all_PS %>%
+#   tibble::rownames_to_column('event') %>%
+#   dplyr::filter(event %in% tcell_top_events[[3]]) %>%
+#   tibble::column_to_rownames('event')
+#
+#
+# df_ <- df_all_PS_sig_events_tcell %>%
+#   dplyr::select(ls_samples_T_cell_types)
+#
+# print(df_)
+
+# df_all_PS_sig_events_tcell <- all_PS[ls_samples_T_cell_types]
+#
+#
+# print(head(df_all_PS_sig_events_tcell))
+# print(head(df_all_PS_sig_events))
+
+# for (val in list("LM22", "LM6"))
+# {
+# # DF to label samples(columns) with labels
+# df_sample_annotations <- metadata %>%
+#   dplyr::select(Run, val) %>%
+#   tibble::column_to_rownames("Run")
+#
+# heatmap_res <- pheatmap(
+#   main = paste0(" "),
+#   df_all_PS_sig_events_tcell,
+#   scale = "row",
+#   show_rownames=F,
+#   show_colnames=F,
+#   na_col = "grey",
+#   annotation_col = df_sample_annotations)
+#
+# save_pheatmap_pdf(
+#   heatmap_res,
+#   paste0(opt$out_dir,
+#         "/explore/diff_splicing_heatmap_",val,"_tcell.pdf"))
+# }
