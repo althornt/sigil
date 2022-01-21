@@ -193,32 +193,32 @@ ls_top_events <- unpack_import_css_res(ls_res)
 
 # make heatmap / reference matrix
 # Filter MESA all PS file to events of interest
-# df_all_PS_sig_events <- all_PS %>%
-#   tibble::rownames_to_column('event') %>%
-#   dplyr::filter(event %in% ls_top_neg_and_pos) %>%
-#   tibble::column_to_rownames('event')
-#
-# for (val in list("LM22", "LM6"))
-# {
-# # DF to label samples(columns) with labels
-# df_sample_annotations <- metadata %>%
-#   dplyr::select(Run, val) %>%
-#   tibble::column_to_rownames("Run")
-#
-# heatmap_res <- pheatmap(
-#   main = paste0(" "),
-#   df_all_PS_sig_events,
-#   scale = "row",
-#   show_rownames=F,
-#   show_colnames=F,
-#   na_col = "grey",
-#   annotation_col = df_sample_annotations)
-#
-# save_pheatmap_pdf(
-#   heatmap_res,
-#   paste0(opt$out_dir,
-#         "/explore/diff_splicing_heatmap_",val,".pdf"))
-# }
+df_all_PS_sig_events <- all_PS %>%
+  tibble::rownames_to_column('event') %>%
+  dplyr::filter(event %in% ls_top_events[[3]]) %>%
+  tibble::column_to_rownames('event')
+
+for (val in list("LM22", "LM6"))
+{
+# DF to label samples(columns) with labels
+df_sample_annotations <- metadata %>%
+  dplyr::select(Run, val) %>%
+  tibble::column_to_rownames("Run")
+
+heatmap_res <- pheatmap(
+  main = paste0(" "),
+  df_all_PS_sig_events,
+  # scale = "row",
+  show_rownames=F,
+  show_colnames=F,
+  na_col = "grey",
+  annotation_col = df_sample_annotations)
+
+save_pheatmap_pdf(
+  heatmap_res,
+  paste0(opt$out_dir,
+        "/explore/diff_splicing_heatmap_",val,".pdf"))
+}
 
 #########################################
 # Import T-cell 1 vs all comparisons
@@ -254,52 +254,52 @@ T_cell_types <- list(
   "T cells regulatory (Tregs)",
   "T cells gamma delta")
 
-
 # Get samples with this cell type
-ls_samples_T_cell_types <- metadata %>%
-  dplyr::filter(LM22 %in% T_cell_types) %>%
-  dplyr::pull(Run)
+metadata_T_cell_types <- metadata %>%
+  dplyr::filter(LM22 %in% T_cell_types)
 
-print(ls_samples_T_cell_types)
+# Filter MESA all PS file to events from T-cell types
+df_all_PS_sig_events_tcell <- all_PS[metadata_T_cell_types$Run]
+df_all_PS_sig_events_tcell <- df_all_PS_sig_events_tcell %>%
+  tibble::rownames_to_column('event') %>%
+  dplyr::filter(event %in% tcell_top_events[[3]]) %>%
+  tibble::column_to_rownames('event')
 
-# make heatmap / reference matrix
-# Filter MESA all PS file to events of interest
-# # Reduce df to T-cell types
-# df_all_PS_sig_events_tcell <- all_PS %>%
-#   tibble::rownames_to_column('event') %>%
-#   dplyr::filter(event %in% tcell_top_events[[3]]) %>%
-#   tibble::column_to_rownames('event')
-#
-#
-# df_ <- df_all_PS_sig_events_tcell %>%
-#   dplyr::select(ls_samples_T_cell_types)
-#
-# print(df_)
 
-# df_all_PS_sig_events_tcell <- all_PS[ls_samples_T_cell_types]
-#
-#
-# print(head(df_all_PS_sig_events_tcell))
-# print(head(df_all_PS_sig_events))
+print(colnames(df_all_PS_sig_events_tcell))
 
-# for (val in list("LM22", "LM6"))
-# {
-# # DF to label samples(columns) with labels
-# df_sample_annotations <- metadata %>%
-#   dplyr::select(Run, val) %>%
-#   tibble::column_to_rownames("Run")
-#
-# heatmap_res <- pheatmap(
-#   main = paste0(" "),
-#   df_all_PS_sig_events_tcell,
-#   scale = "row",
-#   show_rownames=F,
-#   show_colnames=F,
-#   na_col = "grey",
-#   annotation_col = df_sample_annotations)
-#
-# save_pheatmap_pdf(
-#   heatmap_res,
-#   paste0(opt$out_dir,
-#         "/explore/diff_splicing_heatmap_",val,"_tcell.pdf"))
-# }
+for (val in list("LM22", "LM6"))
+{
+  print(val)
+  # DF to label samples(columns) with labels
+  df_sample_annotations <- metadata_T_cell_types %>%
+    dplyr::select(Run, val) %>%
+    tibble::column_to_rownames("Run")
+
+  print(df_sample_annotations)
+
+  heatmap_res <- pheatmap(
+    main = paste0(" "),
+    df_all_PS_sig_events_tcell,
+    # scale = "row",
+    show_rownames=T,
+    show_colnames=F,
+    na_col = "grey",
+    annotation_col = df_sample_annotations)
+
+  save_pheatmap_pdf(
+    heatmap_res,
+    paste0(opt$out_dir,
+          "/explore/diff_splicing_heatmap_",val,"_tcell.pdf"))
+}
+
+
+
+############################
+# monocytes and macrophages
+##################################
+mon_mac_cell_types <- list(
+  "Monocytes",
+  "Macrophages M0",
+  "Macrophages M1",
+  "Macrophages M2")
