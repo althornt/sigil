@@ -116,6 +116,45 @@ unpack_import_css_res <- function(ls_res){
   }
 
 
+  # rownames(colData_D) = colnames(mat)
+  # mycolors <- newCols(length(unique(colData_D$time)))
+  # names(mycolors) <- unique(colData_D$time)
+  # mycolors <- list(time = mycolors)
+  # pheatmap(mat,annotation_col = colData_D, annotation_colors = mycolors)
+
+make_pheatmap <- function(ls_events, label, df_meta, df_PS){
+
+  # Filter MESA all PS file to events of interest
+  df_all_PS_sig_events <- df_PS %>%
+    tibble::rownames_to_column('event') %>%
+    dplyr::filter(event %in% ls_events[[3]]) %>%
+    dplyr::select(noquote(order(colnames(.)))) %>%
+    tibble::column_to_rownames('event')
+
+  for (val in list("LM22", "LM6")){
+  # DF to label samples(columns) with labels
+  df_sample_annotations <- df_meta %>%
+    dplyr::select(Run, val, data_source) %>%
+    dplyr::arrange(Run) %>%
+    tibble::column_to_rownames("Run")
+
+  stopifnot(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
+
+  heatmap_res <- pheatmap(
+    main = paste0(" "),
+    df_all_PS_sig_events,
+    # scale = "row",
+    show_rownames=F,
+    show_colnames=F,
+    na_col = "grey",
+    annotation_col = df_sample_annotations)
+
+  save_pheatmap_pdf(
+    heatmap_res,
+    paste0(opt$out_dir,"/explore/",label,"_",val,".pdf"))
+}
+}
+
 # Arguments
 option_list <- list(
   optparse::make_option(
@@ -172,57 +211,28 @@ ls_css_file_names <- list.files(
 ls_css_file_names <- ls_css_file_names[!ls_css_file_names %in% c("heatmaps")]
 
 # Import, find signficant events and plot each one
-ls_res <- lapply(ls_css_file_names, topN=10,  import_mesa_css, plot_out_dir = paste0(opt$out_dir,"/explore/LM22/"))
+ls_res <- lapply(ls_css_file_names, topN=10,  import_mesa_css,
+                  plot_out_dir = paste0(opt$out_dir,"/explore/LM22/"))
 # Unpack top events into lists
 ls_top_events <- unpack_import_css_res(ls_res)
 
-# ls_top_pos <- ls_top_neg <- ls_top_neg_and_pos  <- c()
-# for (item in ls_res) {
-#      ls_top_pos <- append(ls_top_pos, item[1])
-#      ls_top_neg <- append(ls_top_neg, item[2])
-#      ls_top_neg_and_pos <- append(ls_top_neg_and_pos, item[3])
-#    }
-#
-# ls_top_pos<- unlist(ls_top_pos)
-# ls_top_neg<- unlist(ls_top_neg)
-# ls_top_neg_and_pos<- unlist(ls_top_neg_and_pos)
-
-#############################
-# heatmap all diff splicng
-#############################
-
-# make heatmap / reference matrix
-# Filter MESA all PS file to events of interest
-df_all_PS_sig_events <- all_PS %>%
-  tibble::rownames_to_column('event') %>%
-  dplyr::filter(event %in% ls_top_events[[3]]) %>%
-  tibble::column_to_rownames('event')
-
-for (val in list("LM22", "LM6"))
-{
-# DF to label samples(columns) with labels
-df_sample_annotations <- metadata %>%
-  dplyr::select(Run, val) %>%
-  tibble::column_to_rownames("Run")
-
-heatmap_res <- pheatmap(
-  main = paste0(" "),
-  df_all_PS_sig_events,
-  # scale = "row",
-  show_rownames=F,
-  show_colnames=F,
-  na_col = "grey",
-  annotation_col = df_sample_annotations)
-
-save_pheatmap_pdf(
-  heatmap_res,
-  paste0(opt$out_dir,
-        "/explore/diff_splicing_heatmap_",val,".pdf"))
-}
+# Make heatmap using top events
+make_pheatmap(ls_top_events, "LM22_diff_splicing_heatmap", metadata, all_PS )
 
 #########################################
-# Import T-cell 1 vs all comparisons
+# T-cell 1 vs all comparisons
 ########################################
+
+# Get samples with this cell type
+T_cell_types <- list(
+  "T cells CD8",
+  "T cells CD4 naive",
+  "T cells CD4 memory resting",
+  "T cells CD4 memory  activated",
+  "T cells follicular helper",
+  "T cells regulatory (Tregs)",
+  "T cells gamma delta")
+
 # Get output files from compareWithinType script
 ls_css_file_names_tcells <- list.files(
                         paste0(opt$out_dir,
@@ -239,67 +249,66 @@ ls_res_tcells <- lapply(
 # Unpack top events into lists
 tcell_top_events <- unpack_import_css_res(ls_res_tcells)
 
-print(tcell_top_events[[3]])
+# Filter metadata
+metadata_tcell_types <- metadata %>%
+  dplyr::filter(LM22 %in% T_cell_types) %>%
+  droplevels(.) %>%
+  dplyr::arrange(Run)
 
-#############################
-# heatmap T-cell
-#############################
+# Filter all PS
+df_all_PS_Tcell <- all_PS %>%
+  dplyr::select(as.vector(unlist(metadata_tcell_types$Run)))
 
-T_cell_types <- list(
-  "T cells CD8",
-  "T cells CD4 naive",
-  "T cells CD4 memory resting",
-  "T cells CD4 memory  activated",
-  "T cells follicular helper",
-  "T cells regulatory (Tregs)",
-  "T cells gamma delta")
+# Make heatmap with T-cell events and only T-cell samples
+make_pheatmap(tcell_top_events, "Tcell_diff_splicing_heatmap",
+        metadata_tcell_types, df_all_PS_Tcell )
+
+# Make heatmap with T-cell events and all samples
+make_pheatmap(tcell_top_events, "Tcell_diff_splicing_heatmap_all_samples",
+        metadata, all_PS )
+
+
+######################################################
+# Monocytes and macrophages 1 vs all comparisons
+######################################################
 
 # Get samples with this cell type
-metadata_T_cell_types <- metadata %>%
-  dplyr::filter(LM22 %in% T_cell_types)
-
-# Filter MESA all PS file to events from T-cell types
-df_all_PS_sig_events_tcell <- all_PS[metadata_T_cell_types$Run]
-df_all_PS_sig_events_tcell <- df_all_PS_sig_events_tcell %>%
-  tibble::rownames_to_column('event') %>%
-  dplyr::filter(event %in% tcell_top_events[[3]]) %>%
-  tibble::column_to_rownames('event')
-
-
-print(colnames(df_all_PS_sig_events_tcell))
-
-for (val in list("LM22", "LM6"))
-{
-  print(val)
-  # DF to label samples(columns) with labels
-  df_sample_annotations <- metadata_T_cell_types %>%
-    dplyr::select(Run, val) %>%
-    tibble::column_to_rownames("Run")
-
-  print(df_sample_annotations)
-
-  heatmap_res <- pheatmap(
-    main = paste0(" "),
-    df_all_PS_sig_events_tcell,
-    # scale = "row",
-    show_rownames=T,
-    show_colnames=F,
-    na_col = "grey",
-    annotation_col = df_sample_annotations)
-
-  save_pheatmap_pdf(
-    heatmap_res,
-    paste0(opt$out_dir,
-          "/explore/diff_splicing_heatmap_",val,"_tcell.pdf"))
-}
-
-
-
-############################
-# monocytes and macrophages
-##################################
 mon_mac_cell_types <- list(
   "Monocytes",
   "Macrophages M0",
   "Macrophages M1",
   "Macrophages M2")
+
+# Get output files from compareWithinType script
+ls_css_file_names_mon_mac <- list.files(
+                        paste0(opt$out_dir,
+                        "/compareWithinType/mesa_compare_outputs/mesa_css_outputs/"),
+                        pattern = ".tsv")
+
+# Import files, find top signficant events, plot each event
+ls_res_mon_mac <- lapply(
+                        ls_css_file_names_mon_mac,
+                        topN=10,
+                        import_mesa_css,
+                        plot_out_dir =  paste0(opt$out_dir,"/explore/within_type/"))
+
+# Unpack top events into lists
+mon_mac_top_events <- unpack_import_css_res(ls_res_mon_mac)
+
+# Filter metadata
+metadata_mon_mac_types <- metadata %>%
+  dplyr::filter(LM22 %in% mon_mac_cell_types) %>%
+  droplevels(.) %>%
+  dplyr::arrange(Run)
+
+# Filter all PS
+df_all_PS_mon_mac <- all_PS %>%
+  dplyr::select(as.vector(unlist(metadata_mon_mac_types$Run)))
+
+# Make heatmap with T-cell events and only T-cell samples
+make_pheatmap(mon_mac_top_events, "Monocytes_macrophages_diff_splicing_heatmap",
+        metadata_mon_mac_types, df_all_PS_mon_mac )
+
+# Make heatmap with T-cell events and all samples
+make_pheatmap(mon_mac_top_events, "Monocytes_macrophages_diff_splicing_heatmap_all_samples",
+        metadata, all_PS )
