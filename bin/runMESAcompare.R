@@ -177,8 +177,8 @@ if (!dir.exists(paste0(opt$out_dir,"/mesa_compare_outputs/manifests/"))){
    recursive = TRUE, showWarnings = TRUE)
 }
 
-if (!dir.exists(paste0(opt$out_dir,"/mesa_compare_outputs/mesa_css_outputs/heatmaps/"))){
-  dir.create(paste0(opt$out_dir,"/mesa_compare_outputs/mesa_css_outputs/heatmaps/"),
+if (!dir.exists(paste0(opt$out_dir,"/mesa_compare_outputs/mesa_css_outputs/"))){
+  dir.create(paste0(opt$out_dir,"/mesa_compare_outputs/mesa_css_outputs/"),
    recursive = TRUE, showWarnings = TRUE)
 }
 

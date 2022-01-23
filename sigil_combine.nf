@@ -1,12 +1,13 @@
 #!/usr/bin/env nextflow
 
+// to be ran after sigil_process has been run on each data set
 // combining gene and splicing outputs of multiple data sets
 
 // enable modules
 nextflow.enable.dsl = 2
 
 // import modules
-include { COMBINE_GENE; COMBINE_MESA } from './modules/combine'
+include { COMBINE_GENE; COMBINE_MESA; } from './modules/combine'
 
 
 def helpMessage() {
@@ -38,6 +39,9 @@ workflow {
   //MESA splicing
   COMBINE_MESA(params.manifest, params.gtf)
 
-
+  //Gene and MESA splicing
+  // GENE_AND_SPLICING(params.manifest,
+                      // COMBINE_GENE.out.collect(),
+                      // COMBINE_MESA.out.collect())
 
   }
