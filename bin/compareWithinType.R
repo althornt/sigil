@@ -2,7 +2,6 @@
 library(optparse)
 library(magrittr)
 library(dplyr)
-library(pheatmap)
 library(ggplot2)
 library(tidyverse)
 library(tidyr)
@@ -13,14 +12,12 @@ library(dplyr)
 # Functions
 ##########################
 runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val, PS_path){
-  #' Run MESA compare_sample_sets comparing the given cell_type_val and
-  #' create a heatmap of sifnificant events
+  #' Run MESA compare_sample_sets comparing the given cell_type_val
   #'
   #' @param meta_col_to_use - column from the metadata file to use for cell type
   #' usually either "sigil_general" or "sigil_cell_type"
   #' @param cell_type_val - cell type name that is in the meta_col_to_use to
   #' compare to all other cell types
-  #' @return List of differentially spliced events
 
   # Convert the given cell type to string with no spaces
   str_cell_type_val <- paste(unlist(strsplit(
@@ -186,31 +183,40 @@ mon_mac_cell_types <- list(
   "Macrophages M1",
   "Macrophages M2")
 
-# Get samples with this cell type
-ls_samples_mon_mac_types <- metadata %>%
-  dplyr::filter(LM22 %in% mon_mac_cell_types) %>%
-  dplyr::pull(Run)
 
-# Reduce df to T-cell types ; write df to file
-mon_mac_all_PS_nan_filt <- all_PS_nan_filt[ls_samples_mon_mac_types]
+call_run_css_cell_type <- function(ls_cell_types, label){
+  #' This function calls runCompareSampleSets_1_vs_all to compare within
+  #' the given list of cell types
+  #' @params
 
-# Remove rows with more than 50% NA within Monocytes and Macrophages samples
-mon_mac_all_PS_nan_filt <- mon_mac_all_PS_nan_filt[which(rowMeans(!is.na(all_PS)) > 0.5), ]
+  # Get samples with this cell type
+  ls_samples_types <- metadata %>%
+    dplyr::filter(LM22 %in% ls_cell_types) %>%
+    dplyr::pull(Run)
 
-#!!!! writing wrong file need to fix !!!
+  # Reduce df to T-cell types ; write df to file
+  df_all_PS_nan_filt_subset <- all_PS_nan_filt[ls_samples_types]
 
-write.table(x = all_PS_nan_filt, na="nan", row.names = TRUE, quote=FALSE,
-          col.names=TRUE, sep = "\t",
-          file = paste0(opt$out_dir, "/celltype_subset_dfs/","LM22_mesa_allPS_nan_filt_Mon_Mac.tsv"))
+  # Remove rows with more than 50% NA within Monocytes and Macrophages samples
+  df_all_PS_nan_filt_subset <- df_all_PS_nan_filt_subset[which(rowMeans(!is.na(all_PS)) > 0.5), ]
+
+  #!!!! writing wrong file need to fix !!!
+
+  write.table(x = all_PS_nan_filt, na="nan", row.names = TRUE, quote=FALSE,
+            col.names=TRUE, sep = "\t",
+            file = paste0(opt$out_dir, "/celltype_subset_dfs/","mesa_allPS_nan_filt_",label,".tsv"))
 
 
-# Run MESA compare_sample_sets within each subtype using new reduced df
-sigil_lm22_mesa_comp_res <- sapply(
-  mon_mac_cell_types,
-  runCompareSampleSets_1_vs_all,
-  meta_col_to_use="LM22",
-  PS_path = paste0(opt$out_dir, "/celltype_subset_dfs/","LM22_mesa_allPS_nan_filt_Mon_Mac.tsv"),
-  USE.NAMES = TRUE)
+  # Run MESA compare_sample_sets within each subtype using new reduced df
+  sapply(
+    ls_cell_types,
+    runCompareSampleSets_1_vs_all,
+    meta_col_to_use="LM22",
+    PS_path = paste0(opt$out_dir, "/celltype_subset_dfs/","mesa_allPS_nan_filt_",label,".tsv"),
+    USE.NAMES = TRUE)
 
-# ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
-# print(length(ls_combined_diff_splice_events))
+
+}
+
+# Do 1 vs all comparsino within Monocytes and Macrophages cell types
+call_run_css_cell_type(mon_mac_cell_types, "Mon_Mac" )
