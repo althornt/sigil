@@ -32,23 +32,23 @@ process COMBINE_MESA {
   mkdir ${params.outdir}/combine_mesa_out -p
 
   # Import, combine data sets, batch correct
-  combineMESAbatchcorr.R  -m ${params.manifest} -o ${params.outdir}/combine_mesa_out
+  #combineMESAbatchcorr.R  -m ${params.manifest} -o ${params.outdir}/combine_mesa_out
 
   # Run MESA quant on batch corrected MESA counts
   # command
 
   # Run compare sample sets on batch corrected PS values using LM22 cell types
   # eventually change to import batch corrected mesa_allPS
-  runMESAcompare.R -i ${params.outdir}/combine_mesa_out/LM22_mesa_allPS.tsv \
-    -o ${params.outdir}/combine_mesa_out \
-    -m ${params.outdir}/combine_mesa_out/lm22_metadata.csv \
-    --gtf $gtf
+  #runMESAcompare.R -i ${params.outdir}/combine_mesa_out/LM22_mesa_allPS.tsv \
+  #  -o ${params.outdir}/combine_mesa_out \
+  #  -m ${params.outdir}/combine_mesa_out/lm22_metadata.csv \
+  #  --gtf $gtf
 
   # More specific splicing comparisons within eacah cell type
-  compareWithinType.R -i ${params.outdir}/combine_mesa_out/LM22_mesa_allPS.tsv \
-    -o ${params.outdir}/combine_mesa_out/compareWithinType \
-    -m ${params.outdir}/combine_mesa_out/lm22_metadata.csv \
-    --gtf $gtf
+  #compareWithinType.R -i ${params.outdir}/combine_mesa_out/LM22_mesa_allPS.tsv \
+  #  -o ${params.outdir}/combine_mesa_out/compareWithinType \
+  #  -m ${params.outdir}/combine_mesa_out/lm22_metadata.csv \
+  #  --gtf $gtf
 
   # Explore LM22 results and make ref matrix
   # Analyze splicing comparison outputs

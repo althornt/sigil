@@ -8,6 +8,13 @@ library(tidyverse)
 library(tidyr)
 library(dplyr)
 
+# This script ...
+# (1) Reads and plots the results from runMESAcompare.R , which does 1 vs all comparisons
+#     using uses LM22 and LM6 cell sub types
+# (2) Reads and plots the results from compareWithinType.R, which does 1 vs all comparisons
+#     within T-cells, Monocytes/macrophages, etc
+
+
 ##########################
 # Functions
 ##########################
@@ -22,6 +29,13 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
 }
 
 import_mesa_css <- function(filename, topN, plot_out_dir){
+  #' Import results from MESA compare sample set script to get the top N
+  #' significant events into lists
+  #' @param filename -
+  #' @param topN -
+  #' @param plot_out_dir - path to output directory
+  #' @return  list of top N positive evnets, top negative events, top N
+  #' negative and top N positive
 
   # Filename to string
   LM22_type <-  substr(filename, 1, nchar(filename)-4)
@@ -67,13 +81,20 @@ import_mesa_css <- function(filename, topN, plot_out_dir){
   lapply(top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
           out_dir = plot_out_dir )
 
-  return(list("top_pos" = top_sig_by_pval_posdelta,
+  return(list(
+              "top_pos" = top_sig_by_pval_posdelta,
               "top_neg" = top_sig_by_pval_negdelta,
               "top_neg_and_pos" = unlist(list(top_sig_by_pval_negdelta,top_sig_by_pval_posdelta)))
-        )
+              )
 }
 
 plot_event <- function(sig_event, cell_type, out_dir){
+  #' Make jitter plot for a given event in all samples
+  #'
+  #' @param sig_event - string for the significant event to ploit
+  #' @param cell_type - string of the cell type the event was significant in
+  #' @param out_dir - path to output directory
+  #' @return NA
 
   df <- all_PS_meta %>%
     tibble::rownames_to_column(var = "event")%>%
@@ -101,6 +122,11 @@ plot_event <- function(sig_event, cell_type, out_dir){
 }
 
 unpack_import_css_res <- function(ls_res){
+  #' Unpack the results from the import_mesa_css() into lists
+  #'
+  #' @param ls_res output from
+  #' @param list of top positive evnet, top negative events, top negative and positive
+
   ls_top_pos <- ls_top_neg <- ls_top_neg_and_pos  <- c()
   for (item in ls_res) {
        ls_top_pos <- append(ls_top_pos, item[1])
@@ -116,13 +142,14 @@ unpack_import_css_res <- function(ls_res){
   }
 
 
-  # rownames(colData_D) = colnames(mat)
-  # mycolors <- newCols(length(unique(colData_D$time)))
-  # names(mycolors) <- unique(colData_D$time)
-  # mycolors <- list(time = mycolors)
-  # pheatmap(mat,annotation_col = colData_D, annotation_colors = mycolors)
-
 make_pheatmap <- function(ls_events, label, df_meta, df_PS){
+  #' Make heatmap using the pheatmap package using the given events
+  #' and data
+  #'
+  #' @param ls_events - list of events of interest to use in heatmap
+  #' @param label - label to use in output file path
+  #' @param df_meta - df of metadata with Run, val, and data_source, LM6, LM22 columns
+  #' @param df_PS - df of MESA all PS file
 
   # Filter MESA all PS file to events of interest
   df_all_PS_sig_events <- df_PS %>%
@@ -153,6 +180,56 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
     heatmap_res,
     paste0(opt$out_dir,"/explore/",label,"_",val,".pdf"))
 }
+}
+
+import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label){
+  #' Import results from MESA compare_sample_sets runs within a broader cell type
+  #' (e.g. within T-cells). Find the top signficant events, make event level
+  #' plots, make heatmaps of the events. This function calls import_mesa_css(),
+  #' unpack_import_css_res(), and make_pheatmap()
+  #'
+  #' @param ls_cell_types - list of LM22 cell-types that were compared in
+  #' compareWithinType.R script
+  #' @param top_n - integer; how many of the top splicing events to use
+  #' @param label - string to use to represent cell type in output files
+  #' @return ls_top_events - list containing 3 list - top positive events, top
+  #' negative events, and top negative and positive
+
+  # Get output files from compareWithinType script
+  ls_css_file_names <- list.files(
+                          paste0(opt$out_dir,
+                          "/compareWithinType/mesa_compare_outputs/mesa_css_outputs/"),
+                          pattern = ".tsv")
+
+  # Import files, find top signficant events, plot each event
+  ls_res <- lapply(
+                          ls_css_file_names,
+                          topN=top_n,
+                          import_mesa_css,
+                          plot_out_dir =  paste0(opt$out_dir,"/explore/within_type/"))
+
+  # Unpack top events into lists
+  ls_top_events <- unpack_import_css_res(ls_res)
+
+  # Filter metadata
+  df_metadata_subset <- metadata %>%
+    dplyr::filter(LM22 %in% ls_cell_types) %>%
+    droplevels(.) %>%
+    dplyr::arrange(Run)
+
+  # Filter all PS
+  df_all_PS <- all_PS %>%
+    dplyr::select(as.vector(unlist(df_metadata_subset$Run)))
+
+  # Make heatmap with this cell types events only within this cell types samples
+  make_pheatmap(ls_top_events, paste0(label, "_diff_splicing_heatmap"),
+          df_metadata_subset, df_all_PS )
+
+  # Make heatmap with this cell types events and all samples
+  make_pheatmap(ls_top_events, paste0(label,"_diff_splicing_heatmap_all_samples"),
+          metadata, all_PS )
+
+  return(ls_top_events)
 }
 
 # Arguments
@@ -233,39 +310,9 @@ T_cell_types <- list(
   "T cells regulatory (Tregs)",
   "T cells gamma delta")
 
-# Get output files from compareWithinType script
-ls_css_file_names_tcells <- list.files(
-                        paste0(opt$out_dir,
-                        "/compareWithinType/mesa_compare_outputs/mesa_css_outputs/"),
-                        pattern = ".tsv")
-
-# Import files, find top signficant events, plot each event
-ls_res_tcells <- lapply(
-                        ls_css_file_names_tcells,
-                        topN=10,
-                        import_mesa_css,
-                        plot_out_dir =  paste0(opt$out_dir,"/explore/within_type/"))
-
-# Unpack top events into lists
-tcell_top_events <- unpack_import_css_res(ls_res_tcells)
-
-# Filter metadata
-metadata_tcell_types <- metadata %>%
-  dplyr::filter(LM22 %in% T_cell_types) %>%
-  droplevels(.) %>%
-  dplyr::arrange(Run)
-
-# Filter all PS
-df_all_PS_Tcell <- all_PS %>%
-  dplyr::select(as.vector(unlist(metadata_tcell_types$Run)))
-
-# Make heatmap with T-cell events and only T-cell samples
-make_pheatmap(tcell_top_events, "Tcell_diff_splicing_heatmap",
-        metadata_tcell_types, df_all_PS_Tcell )
-
-# Make heatmap with T-cell events and all samples
-make_pheatmap(tcell_top_events, "Tcell_diff_splicing_heatmap_all_samples",
-        metadata, all_PS )
+# Import files, find top signficant events, make event level plots event, make heatmaps
+ls_Tcell_top_events <- import_mesa_to_heatmap(T_cell_types, 10,  "Tcells")
+print(ls_Tcell_top_events)
 
 
 ######################################################
@@ -279,36 +326,6 @@ mon_mac_cell_types <- list(
   "Macrophages M1",
   "Macrophages M2")
 
-# Get output files from compareWithinType script
-ls_css_file_names_mon_mac <- list.files(
-                        paste0(opt$out_dir,
-                        "/compareWithinType/mesa_compare_outputs/mesa_css_outputs/"),
-                        pattern = ".tsv")
-
-# Import files, find top signficant events, plot each event
-ls_res_mon_mac <- lapply(
-                        ls_css_file_names_mon_mac,
-                        topN=10,
-                        import_mesa_css,
-                        plot_out_dir =  paste0(opt$out_dir,"/explore/within_type/"))
-
-# Unpack top events into lists
-mon_mac_top_events <- unpack_import_css_res(ls_res_mon_mac)
-
-# Filter metadata
-metadata_mon_mac_types <- metadata %>%
-  dplyr::filter(LM22 %in% mon_mac_cell_types) %>%
-  droplevels(.) %>%
-  dplyr::arrange(Run)
-
-# Filter all PS
-df_all_PS_mon_mac <- all_PS %>%
-  dplyr::select(as.vector(unlist(metadata_mon_mac_types$Run)))
-
-# Make heatmap with T-cell events and only T-cell samples
-make_pheatmap(mon_mac_top_events, "Monocytes_macrophages_diff_splicing_heatmap",
-        metadata_mon_mac_types, df_all_PS_mon_mac )
-
-# Make heatmap with T-cell events and all samples
-make_pheatmap(mon_mac_top_events, "Monocytes_macrophages_diff_splicing_heatmap_all_samples",
-        metadata, all_PS )
+# Import files, find top signficant events, make event level plots event, make heatmaps
+ls_mon_mac_top_events <- import_mesa_to_heatmap(mon_mac_cell_types, 10,  "Monocytes_macrophages")
+print(ls_mon_mac_top_events)
