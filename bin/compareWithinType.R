@@ -11,7 +11,8 @@ library(dplyr)
 #############################
 # Functions
 ##########################
-runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val, PS_path){
+runCompareSampleSets_1_vs_all <- function(meta_col_to_use, ls_gen_cell_types,
+                                                  cell_type_val, PS_path){
   #' Run MESA compare_sample_sets comparing the given cell_type_val
   #'
   #' @param meta_col_to_use - column from the metadata file to use for cell type
@@ -19,10 +20,18 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val, PS_pat
   #' @param cell_type_val - cell type name that is in the meta_col_to_use to
   #' compare to all other cell types
 
+  #'
+
+  print("----------------")
+  # print(meta_col_to_use)
+  # print(ls_gen_cell_types)
+  print(cell_type_val)
+  print("----------------")
+
   # Convert the given cell type to string with no spaces
   str_cell_type_val <- paste(unlist(strsplit(
                                     as.character(cell_type_val), split=" ")),
-                                     collapse="_")
+                                    collapse="_")
 
   print(str_cell_type_val)
 
@@ -31,8 +40,7 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val, PS_pat
     dplyr::filter(get(meta_col_to_use) == cell_type_val) %>%
     dplyr::select(Run)
 
-
-  print(df_m1_main_cell_type)
+  print(nrow(df_m1_main_cell_type))
 
   write.table(x = df_m1_main_cell_type,row.names = FALSE, quote=FALSE,col.names=FALSE,
             file = paste0(opt$out_dir, "/mesa_compare_outputs/manifests/",
@@ -40,16 +48,14 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val, PS_pat
 
   # Make manifest 2 - all other cell types
   df_m2_others <- metadata %>%
+    dplyr::filter(get(meta_col_to_use) %in% ls_gen_cell_types) %>%
     dplyr::filter(get(meta_col_to_use) != cell_type_val) %>%
     dplyr::select(Run)
 
-  print(df_m2_others)
+  print(nrow(df_m2_others))
   write.table(x = df_m2_others,row.names = FALSE, quote=FALSE,col.names=FALSE,
             file = paste0(opt$out_dir, "/mesa_compare_outputs/manifests/not_",
             paste0(str_cell_type_val),".tsv"))
-
-  # file_css_out <- paste0(opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/",
-  #                              str_cell_type_val,".tsv")
 
   # If enough samples, compare groups
   if ((nrow(df_m1_main_cell_type)>2) & (nrow(df_m2_others)>2)){
@@ -57,17 +63,90 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val, PS_pat
     print("running MESA compare...")
 
     # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
+    # cmd <- paste0(
+    #   "mesa compare_sample_sets --psiMESA ",PS_path,
+    #   " -m1 ",opt$out_dir,"/mesa_compare_outputs/manifests/",str_cell_type_val,".tsv",
+    #   " -m2 ",opt$out_dir, "/mesa_compare_outputs/manifests/not_",str_cell_type_val,".tsv  -o ",
+    #   opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
+    #   opt$gtf, " 2>&1")
+
     cmd <- paste0(
-      "mesa compare_sample_sets --psiMESA ",PS_path,
+      "mesa compare_sample_sets --psiMESA ",paste0(opt$out_dir, "/LM22_mesa_allPS_nan_filt.tsv"),
       " -m1 ",opt$out_dir,"/mesa_compare_outputs/manifests/",str_cell_type_val,".tsv",
       " -m2 ",opt$out_dir, "/mesa_compare_outputs/manifests/not_",str_cell_type_val,".tsv  -o ",
       opt$out_dir, "/mesa_compare_outputs/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
       opt$gtf, " 2>&1")
+
     print(cmd)
     system(cmd)
 
+  } else {
+    print("Not running MESA compare...")
   }
 }
+
+call_run_css_cell_type <- function(ls_cell_types, label){
+  #' This function calls runCompareSampleSets_1_vs_all to compare within
+  #' the given list of cell types
+  #' @params
+
+  # print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  # print(unlist(ls_cell_types))
+  # print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+  # Get samples with this cell type
+  ls_samples_types <- metadata %>%
+    dplyr::filter(LM22 %in% ls_cell_types) %>%
+    dplyr::pull(Run)
+
+  ls_events_keep <- c()
+  for (val in ls_cell_types){
+    # print(val)
+
+    df_samples <- metadata  %>%
+      dplyr::filter(LM22 %in% val)
+
+    all_PS_nan_filt_sub <- all_PS_nan_filt %>%
+      dplyr::select(as.vector(unlist(df_samples$Run)))
+
+    all_PS_nan_filt_sub_nans <- all_PS_nan_filt_sub[which(
+                              rowMeans(!is.na(all_PS_nan_filt_sub)) > 0.8), ]
+    ls_events_keep <- append(
+                      ls_events_keep,
+                      as.vector(rownames(all_PS_nan_filt_sub_nans))
+                      )
+    }
+
+  # print(length(ls_events_keep))
+  # print(length(unique(ls_events_keep)))
+  print(dim(all_PS_nan_filt))
+
+  # Filter to events with atleast 80% of data for each condition in each event
+  df_all_PS_nan_filt_subset <- all_PS_nan_filt[unique(ls_events_keep), ]
+
+  # Filter df to cell types
+  df_all_PS_nan_filt_subset <- df_all_PS_nan_filt_subset[ls_samples_types]
+  print(dim(df_all_PS_nan_filt_subset))
+
+  # Write to file to be used by MESA compare
+  path_all_PS_filt_out <- paste0(opt$out_dir, "/celltype_subset_dfs/",
+                "mesa_allPS_nan_filt_",label,".tsv")
+  write.table(x = df_all_PS_nan_filt_subset, na="nan", row.names = TRUE,
+              quote=FALSE, col.names=TRUE, sep = "\t",
+              file = path_all_PS_filt_out)
+
+  # Run MESA compare_sample_sets within each subtype using new reduced df
+  # For each cell type within this general cell type (Tcells, mac and monoc, etc)
+  sapply(
+    unlist(ls_cell_types),
+    runCompareSampleSets_1_vs_all,
+    meta_col_to_use="LM22",
+    ls_gen_cell_types=unlist(ls_cell_types),
+    PS_path = path_all_PS_filt_out,
+    USE.NAMES = TRUE)
+
+}
+
 
 # Arguments
 option_list <- list(
@@ -133,48 +212,21 @@ print(ls_lm22_cell_types)
 ##########################
 # T-cell
 ##########################
-# T_cell_types <- list(
-#   "T cells CD8",
-#   "T cells CD4 naive",
-#   "T cells CD4 memory resting",
-#   "T cells CD4 memory  activated",
-#   "T cells follicular helper",
-#   "T cells regulatory (Tregs)",
-#   "T cells gamma delta")
-#
-# print(metadata)
-# # Get samples with this cell type
-# ls_samples_T_cell_types <- metadata %>%
-#   dplyr::filter(LM22 %in% T_cell_types) %>%
-#   dplyr::pull(Run)
-#
-# # Reduce df to T-cell types ; write df to file
-# Tcell_all_PS_nan_filt <- all_PS_nan_filt[ls_samples_T_cell_types]
-#
-# # Remove rows with more than 50% NA within Tcells
-# Tcell_all_PS_nan_filt <- Tcell_all_PS_nan_filt[which(rowMeans(!is.na(all_PS)) > 0.5), ]
-#
-# #!!!! writing wrong file need to fix !!!
-# write.table(x = all_PS_nan_filt, na="nan", row.names = TRUE, quote=FALSE,
-#           col.names=TRUE, sep = "\t",
-#           file = paste0(opt$out_dir, "/celltype_subset_dfs/","LM22_mesa_allPS_nan_filt_Tcells.tsv"))
-#
-#
-# # Run MESA compare_sample_sets within each subtype using new reduced df
-# sigil_lm22_mesa_comp_res <- sapply(
-#   T_cell_types,
-#   runCompareSampleSets_1_vs_all,
-#   meta_col_to_use="LM22",
-#   PS_path = paste0(opt$out_dir, "/celltype_subset_dfs/","LM22_mesa_allPS_nan_filt_Tcells.tsv"),
-#   USE.NAMES = TRUE)
+T_cell_types <- list(
+  "T cells CD8",
+  "T cells CD4 naive",
+  "T cells CD4 memory resting",
+  "T cells CD4 memory  activated",
+  "T cells follicular helper",
+  "T cells regulatory (Tregs)",
+  "T cells gamma delta")
 
-# ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
-# print(length(ls_combined_diff_splice_events))
+# Do 1 vs all comparsino within T cell cell types
+# call_run_css_cell_type(T_cell_types, "Tcell" )
 
-#
-# ######################################################
-# # Monocytes and macrophages
-# ######################################################
+######################################################
+# Monocytes and macrophages
+######################################################
 
 # Get samples with this cell type
 mon_mac_cell_types <- list(
@@ -182,41 +234,6 @@ mon_mac_cell_types <- list(
   "Macrophages M0",
   "Macrophages M1",
   "Macrophages M2")
-
-
-call_run_css_cell_type <- function(ls_cell_types, label){
-  #' This function calls runCompareSampleSets_1_vs_all to compare within
-  #' the given list of cell types
-  #' @params
-
-  # Get samples with this cell type
-  ls_samples_types <- metadata %>%
-    dplyr::filter(LM22 %in% ls_cell_types) %>%
-    dplyr::pull(Run)
-
-  # Reduce df to T-cell types ; write df to file
-  df_all_PS_nan_filt_subset <- all_PS_nan_filt[ls_samples_types]
-
-  # Remove rows with more than 50% NA within Monocytes and Macrophages samples
-  df_all_PS_nan_filt_subset <- df_all_PS_nan_filt_subset[which(rowMeans(!is.na(all_PS)) > 0.5), ]
-
-  #!!!! writing wrong file need to fix !!!
-
-  write.table(x = all_PS_nan_filt, na="nan", row.names = TRUE, quote=FALSE,
-            col.names=TRUE, sep = "\t",
-            file = paste0(opt$out_dir, "/celltype_subset_dfs/","mesa_allPS_nan_filt_",label,".tsv"))
-
-
-  # Run MESA compare_sample_sets within each subtype using new reduced df
-  sapply(
-    ls_cell_types,
-    runCompareSampleSets_1_vs_all,
-    meta_col_to_use="LM22",
-    PS_path = paste0(opt$out_dir, "/celltype_subset_dfs/","mesa_allPS_nan_filt_",label,".tsv"),
-    USE.NAMES = TRUE)
-
-
-}
 
 # Do 1 vs all comparsino within Monocytes and Macrophages cell types
 call_run_css_cell_type(mon_mac_cell_types, "Mon_Mac" )
