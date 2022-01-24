@@ -201,9 +201,24 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label){
                           "/compareWithinType/mesa_compare_outputs/mesa_css_outputs/"),
                           pattern = ".tsv")
 
-  # Import files, find top signficant events, plot each event
+  # For input cell type list , convert to filename
+  ls_cell_types_file <- c()
+  for (val in ls_cell_types){
+    new_val <- paste0(gsub(" ","_", val), ".tsv")
+    ls_cell_types_file <- append(ls_cell_types_file, new_val)
+  }
+
+  # Intersect with the files that exist (Not all will have a mesa css output )
+  ls_css_file_names_cell_type  <- intersect(ls_css_file_names, ls_cell_types_file)
+
+  print(ls_css_file_names_cell_type)
+  print(">>>>>>>>>>>>>>>>>>>>>>>>")
+
+
+
+  #Import files, find top signficant events, plot each event
   ls_res <- lapply(
-                          ls_css_file_names,
+                          ls_css_file_names_cell_type,
                           topN=top_n,
                           import_mesa_css,
                           plot_out_dir =  paste0(opt$out_dir,"/explore/within_type/"))
@@ -280,7 +295,7 @@ if (!dir.exists(paste0(opt$out_dir,"/explore/within_type"))){
 #########################################
 # Import LM22 1 vs all comparisons
 ########################################
-# Get all outputs from compare sample sets 1 vs all comparisons
+Get all outputs from compare sample sets 1 vs all comparisons
 ls_css_file_names <- list.files(
                         paste0(opt$out_dir,
                         "/mesa_compare_outputs/mesa_css_outputs/"),
@@ -299,7 +314,7 @@ make_pheatmap(ls_top_events, "LM22_diff_splicing_heatmap", metadata, all_PS )
 #########################################
 # T-cell 1 vs all comparisons
 ########################################
-
+# print("T-cells .........................")
 # Get samples with this cell type
 T_cell_types <- list(
   "T cells CD8",
@@ -318,6 +333,7 @@ print(ls_Tcell_top_events)
 ######################################################
 # Monocytes and macrophages 1 vs all comparisons
 ######################################################
+print("Monocytes and macrophages .........................")
 
 # Get samples with this cell type
 mon_mac_cell_types <- list(
