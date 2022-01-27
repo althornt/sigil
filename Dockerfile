@@ -5,7 +5,7 @@ COPY ./environment.yml .
 RUN conda env create -f environment.yml && conda clean -a
 ENV PATH /opt/conda/envs/sigl_prep/bin:$PATH
 
-# Install git
+# Install git and pip
 RUN apt-get update && apt-get install -y \
   git \
   python3-pip \
