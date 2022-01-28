@@ -28,12 +28,13 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   dev.off()
 }
 
-import_mesa_css <- function(filename, topN, plot_out_dir){
+import_mesa_css <- function(filename, topN, plot_out_dir, css_dir){
   #' Import results from MESA compare sample set script to get the top N
   #' significant events into lists
   #' @param filename -
   #' @param topN -
   #' @param plot_out_dir - path to output directory
+  #' @param path tom esa compare sample set output directory
   #' @return  list of top N positive evnets, top negative events, top N
   #' negative and top N positive
 
@@ -48,10 +49,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir){
 
   # Open mesa css
   df <- read.table(
-            file = paste0(
-              opt$out_dir,
-              "/mesa_compare_outputs/mesa_css_outputs/",
-              filename),
+            file = paste0(css_dir, filename),
             sep="\t", header = TRUE)
 
   # Get top events by pvalue
@@ -178,11 +176,11 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
 
   save_pheatmap_pdf(
     heatmap_res,
-    paste0(opt$out_dir,"/explore/",label,"_",val,".pdf"))
+    paste0(opt$out_dir,"/ref_matrix/",label,"_",val,".pdf"))
 }
 }
 
-import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label){
+import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir){
   #' Import results from MESA compare_sample_sets runs within a broader cell type
   #' (e.g. within T-cells). Find the top signficant events, make event level
   #' plots, make heatmaps of the events. This function calls import_mesa_css(),
@@ -198,7 +196,7 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label){
   # Get output files from compareWithinType script
   ls_css_file_names <- list.files(
                           paste0(opt$out_dir,
-                          "/compareWithinType/mesa_compare_outputs/mesa_css_outputs/"),
+                          "/compare_within_type/mesa_compare_outputs/mesa_css_outputs/"),
                           pattern = ".tsv")
 
   # For input cell type list , convert to filename
@@ -211,17 +209,13 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label){
   # Intersect with the files that exist (Not all will have a mesa css output )
   ls_css_file_names_cell_type  <- intersect(ls_css_file_names, ls_cell_types_file)
 
-  print(ls_css_file_names_cell_type)
-  print(">>>>>>>>>>>>>>>>>>>>>>>>")
-
-
-
   #Import files, find top signficant events, plot each event
   ls_res <- lapply(
                           ls_css_file_names_cell_type,
                           topN=top_n,
                           import_mesa_css,
-                          plot_out_dir =  paste0(opt$out_dir,"/explore/within_type/"))
+                          plot_out_dir =  paste0(opt$out_dir,"/ref_matrix/within_type/"),
+                          css_dir =  css_dir)
 
   # Unpack top events into lists
   ls_top_events <- unpack_import_css_res(ls_res)
@@ -278,35 +272,50 @@ df_sample_annotations <- metadata %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
-all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE)
+print(head(df_sample_annotations))
+
+all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1)
+print(head(all_PS))
+print(dim(all_PS))
+
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
+print(head(all_PS_meta))
+print(dim(all_PS_meta))
+
 
 # Make output directories
-if (!dir.exists(paste0(opt$out_dir,"/explore/LM22"))){
-  dir.create(paste0(opt$out_dir,"/explore/LM22"),
+if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM22"))){
+  dir.create(paste0(opt$out_dir,"/ref_matrix/LM22"),
    recursive = TRUE, showWarnings = TRUE)
 }
 
-if (!dir.exists(paste0(opt$out_dir,"/explore/within_type"))){
-  dir.create(paste0(opt$out_dir,"/explore/within_type"),
+if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/within_type"))){
+  dir.create(paste0(opt$out_dir,"/ref_matrix/within_type"),
    recursive = TRUE, showWarnings = TRUE)
 }
 
 #########################################
 # Import LM22 1 vs all comparisons
 ########################################
-Get all outputs from compare sample sets 1 vs all comparisons
+# Get all outputs from compare sample sets 1 vs all comparisons
 ls_css_file_names <- list.files(
                         paste0(opt$out_dir,
-                        "/mesa_compare_outputs/mesa_css_outputs/"),
+                        "/compare_LM22/mesa_css_outputs/"),
                       pattern = ".tsv")
 ls_css_file_names <- ls_css_file_names[!ls_css_file_names %in% c("heatmaps")]
 
 # Import, find signficant events and plot each one
 ls_res <- lapply(ls_css_file_names, topN=10,  import_mesa_css,
-                  plot_out_dir = paste0(opt$out_dir,"/explore/LM22/"))
+                  plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/"),
+                css_dir=paste0(
+                  opt$out_dir,
+                  "/compare_LM22/mesa_css_outputs/"))
+
+print(ls_res)
+
 # Unpack top events into lists
 ls_top_events <- unpack_import_css_res(ls_res)
+print(ls_top_events)
 
 # Make heatmap using top events
 make_pheatmap(ls_top_events, "LM22_diff_splicing_heatmap", metadata, all_PS )
@@ -326,7 +335,9 @@ T_cell_types <- list(
   "T cells gamma delta")
 
 # Import files, find top signficant events, make event level plots event, make heatmaps
-ls_Tcell_top_events <- import_mesa_to_heatmap(T_cell_types, 10,  "Tcells")
+ls_Tcell_top_events <- import_mesa_to_heatmap(T_cell_types, 10,  "Tcells", css_dir=paste0(
+  opt$out_dir,
+  "/compare_within_type/mesa_compare_outputs/mesa_css_outputs/"))
 print(ls_Tcell_top_events)
 
 
@@ -343,5 +354,8 @@ mon_mac_cell_types <- list(
   "Macrophages M2")
 
 # Import files, find top signficant events, make event level plots event, make heatmaps
-ls_mon_mac_top_events <- import_mesa_to_heatmap(mon_mac_cell_types, 10,  "Monocytes_macrophages")
+ls_mon_mac_top_events <- import_mesa_to_heatmap(mon_mac_cell_types, 10,  "Monocytes_macrophages",
+    css_dir=paste0(
+  opt$out_dir,
+  "/compare_within_type/mesa_compare_outputs/mesa_css_outputs/"))
 print(ls_mon_mac_top_events)
