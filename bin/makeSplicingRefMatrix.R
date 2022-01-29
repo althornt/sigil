@@ -40,7 +40,8 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir){
 
   # Filename to string
   LM22_type <-  substr(filename, 1, nchar(filename)-4)
-  # print(LM22_type)
+  print(LM22_type)
+
   # Make output directories
   if (!dir.exists(paste0(plot_out_dir,LM22_type))){
     dir.create(paste0(plot_out_dir,LM22_type),
@@ -54,8 +55,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir){
 
   # Get top events by pvalue
   top_sig_by_pval <- df %>%
-    dplyr::arrange(p.value) %>%
-    head(2*topN)
+    dplyr::arrange(p.value)
 
   # Get top negative delta events
   top_sig_by_pval_negdelta <- top_sig_by_pval %>%
@@ -63,6 +63,9 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir){
     dplyr::arrange(delta) %>%
     head(topN)%>%
     pull(event)
+
+  print("top_sig_by_pval_negdelta:")
+  print(top_sig_by_pval_negdelta)
 
   # Make plots for top negative events
   lapply(top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
@@ -193,11 +196,11 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir){
   #' @return ls_top_events - list containing 3 list - top positive events, top
   #' negative events, and top negative and positive
 
+
   # Get output files from compareWithinType script
-  ls_css_file_names <- list.files(
-                          paste0(opt$out_dir,
-                          "/compare_within_type/mesa_compare_outputs/mesa_css_outputs/"),
-                          pattern = ".tsv")
+  ls_css_file_names <- list.files(css_dir,pattern = ".tsv")
+
+  print(ls_css_file_names)
 
   # For input cell type list , convert to filename
   ls_cell_types_file <- c()
@@ -208,6 +211,8 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir){
 
   # Intersect with the files that exist (Not all will have a mesa css output )
   ls_css_file_names_cell_type  <- intersect(ls_css_file_names, ls_cell_types_file)
+
+  print(ls_css_file_names_cell_type)
 
   #Import files, find top signficant events, plot each event
   ls_res <- lapply(
@@ -335,9 +340,11 @@ T_cell_types <- list(
   "T cells gamma delta")
 
 # Import files, find top signficant events, make event level plots event, make heatmaps
-ls_Tcell_top_events <- import_mesa_to_heatmap(T_cell_types, 10,  "Tcells", css_dir=paste0(
-  opt$out_dir,
-  "/compare_within_type/mesa_compare_outputs/mesa_css_outputs/"))
+ls_Tcell_top_events <- import_mesa_to_heatmap(
+                T_cell_types, top_n=10, label= "Tcells",
+                css_dir=paste0(
+                  opt$out_dir,
+                  "/compare_within_type/mesa_css_outputs/"))
 print(ls_Tcell_top_events)
 
 
@@ -354,8 +361,9 @@ mon_mac_cell_types <- list(
   "Macrophages M2")
 
 # Import files, find top signficant events, make event level plots event, make heatmaps
-ls_mon_mac_top_events <- import_mesa_to_heatmap(mon_mac_cell_types, 10,  "Monocytes_macrophages",
-    css_dir=paste0(
-  opt$out_dir,
-  "/compare_within_type/mesa_compare_outputs/mesa_css_outputs/"))
+ls_mon_mac_top_events <- import_mesa_to_heatmap(
+                          mon_mac_cell_types, top_n = 10,
+                          label = "Monocytes_macrophages",
+                          css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
+
 print(ls_mon_mac_top_events)
