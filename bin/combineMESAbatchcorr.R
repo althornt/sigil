@@ -26,10 +26,12 @@ importMetaMESA <- function(row){
   # Get paths to MESA inclusion count files and allPS files
   res_inc_count_path <- file.path(row[2], "mesa_out", "mesa_inclusionCounts.tsv")
   res_allPS_path <- file.path(row[2], "mesa_out", "mesa_allPS.tsv")
+  res_cluster_path <- file.path(row[2], "mesa_out", "mesa_allClusters.tsv")
 
   return(list(
       "ls_mesa_inc_count_files"=res_inc_count_path,
       "ls_mesa_allPS_files"=res_allPS_path,
+      "ls_mesa_cluster_files"=res_cluster_path,
       "metadata"=df_metadata,
       "ls_samples_run"=df_metadata$Run))
 }
@@ -107,12 +109,13 @@ print(head(df_manifest))
 ls_mesa_meta = apply(df_manifest, 1, importMetaMESA)
 
 # Split into mesa and metadata files for each data set
-ls_mesa_inc_count_files <- ls_mesa_allPS_files <- ls_meta <- ls_sample_names <- c()
+ls_mesa_inc_count_files <- ls_mesa_allPS_files <- ls_mesa_cluster_files <- ls_meta <- ls_sample_names <- c()
 for (item in ls_mesa_meta) {
      ls_mesa_inc_count_files <- append(ls_mesa_inc_count_files, item[1])
      ls_mesa_allPS_files <- append(ls_mesa_allPS_files, item[2])
-     ls_meta <- append(ls_meta, item[3])
-     ls_sample_names <- append(ls_sample_names, item[4])
+     ls_mesa_cluster_files <- append(ls_mesa_cluster_files, item[3])
+     ls_meta <- append(ls_meta, item[4])
+     ls_sample_names <- append(ls_sample_names, item[5])
    }
 
 # Merge metadata from each data source by rows
@@ -134,6 +137,15 @@ df_mesa_inc_count_merge <- unlist(ls_mesa_inc_count_files) %>%
   lapply(read.csv, sep = "\t") %>%
   purrr::reduce(inner_join, by = "cluster")
 
+# Merge mesa cluster files and remove duplicate clusters
+ls_df_mesa_clusters <- unlist(ls_mesa_cluster_files) %>%
+  lapply(read.table, sep = "\t", header= F)
+df_mesa_clusters_merge <- do.call("rbind", ls_df_mesa_clusters) %>%
+  distinct(.)
+write.table(
+  df_mesa_clusters_merge,
+  file.path(opt$out_dir,"mesa_allClusters.tsv"),
+  quote=F,sep="\t", col.names = FALSE, row.names = FALSE)
 
 # Drop non LM22 samples from mesa counts
 df_mesa_inc_count_merge_lm22 <- df_mesa_inc_count_merge %>%
@@ -168,34 +180,34 @@ write.table(
 print("df_mesa_allPS_merge_lm22")
 print(dim(df_mesa_allPS_merge_lm22))
 
-####################################
-# UMAPs before batch correction
-####################################
-
-# Drop genes with low variance.
-getVar <- apply(log2trans_dat[, -1], 1, var)
-
-# For gene I used median (50% quantile) as the cutoff
-# For splicing using 75% due to therembeing much more rows)
-param <- quantile(getVar, c(.75))
-log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
-
-# Transpose and format
-log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt))
-rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)
-
-# PCA.
-prcomp.out = as.data.frame(prcomp(log2trans_dat_filt_t, scale = F)$x)
-
-# Making variations of UMAPs with different numbers of neighbors
-lapply(c(20), make_umap, meta_col="data_source",
-  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-lapply(c(20), make_umap, meta_col="LM22",
-  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-lapply(c(20), make_umap, meta_col="sigil_general",
-  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-lapply(c(20), make_umap, meta_col="LM6",
-  df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+# ####################################
+# # UMAPs before batch correction
+# ####################################
+#
+# # Drop genes with low variance.
+# getVar <- apply(log2trans_dat[, -1], 1, var)
+#
+# # For gene I used median (50% quantile) as the cutoff
+# # For splicing using 75% due to therembeing much more rows)
+# param <- quantile(getVar, c(.75))
+# log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
+#
+# # Transpose and format
+# log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt))
+# rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)
+#
+# # PCA.
+# prcomp.out = as.data.frame(prcomp(log2trans_dat_filt_t, scale = F)$x)
+#
+# # Making variations of UMAPs with different numbers of neighbors
+# lapply(c(20), make_umap, meta_col="data_source",
+#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+# lapply(c(20), make_umap, meta_col="LM22",
+#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+# lapply(c(20), make_umap, meta_col="sigil_general",
+#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+# lapply(c(20), make_umap, meta_col="LM6",
+#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
 #######################
 # Batch correction
 #######################
@@ -216,26 +228,45 @@ log2trans_dat_filt_bc <- df_mesa_inc_count_merge_lm22_log2_batch_corr[getVar_bc 
 # Transpose and format
 log2trans_dat_filt_t_bc <- as.data.frame(t(log2trans_dat_filt_bc))
 rownames(log2trans_dat_filt_t_bc) <- colnames(log2trans_dat_filt_bc)
-
-# PCA.
-prcomp.out.bc = as.data.frame(prcomp(log2trans_dat_filt_t_bc, scale = F)$x)
-
-# Making variations of UMAPs with different numbers of neighbors
-lapply(c(20), make_umap, meta_col="data_source",
-  df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-lapply(c(20), make_umap, meta_col="LM22",
-  df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-lapply(c(20), make_umap, meta_col="sigil_general",
-  df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-lapply(c(20), make_umap, meta_col="LM6",
-  df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-##############################################
-# Undo log2(x+1) with 2^x - 1
-##############################################
-df_mesa_inc_count_merge_lm22_bc_counts = 2^df_mesa_inc_count_merge_lm22_log2_batch_corr -1
-rownames(df_mesa_inc_count_merge_lm22_bc_counts) <- df_mesa_inc_count_merge$cluster
-
-write.table(
-  df_mesa_inc_count_merge_lm22_bc_counts,
-  file.path(opt$out_dir,"LM22_batch_corr_mesa_inclusionCounts.tsv"),
-  sep="\t",quote=F)
+#
+# # PCA.
+# prcomp.out.bc = as.data.frame(prcomp(log2trans_dat_filt_t_bc, scale = F)$x)
+#
+# # Making variations of UMAPs with different numbers of neighbors
+# lapply(c(20), make_umap, meta_col="data_source",
+#   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
+# lapply(c(20), make_umap, meta_col="LM22",
+#   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
+# lapply(c(20), make_umap, meta_col="sigil_general",
+#   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
+# lapply(c(20), make_umap, meta_col="LM6",
+#   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
+# ##############################################
+# # Undo log2(x+1) with 2^x - 1
+# ##############################################
+# df_mesa_inc_count_merge_lm22_bc_counts = 2^df_mesa_inc_count_merge_lm22_log2_batch_corr -1
+# rownames(df_mesa_inc_count_merge_lm22_bc_counts) <- df_mesa_inc_count_merge$cluster
+#
+# write.table(
+#   df_mesa_inc_count_merge_lm22_bc_counts,
+#   file.path(opt$out_dir,"LM22_batch_corr_mesa_inclusionCounts.tsv"),
+#   sep="\t",quote=F)
+#
+# ##############################################
+# # MESA quant on batch corrected counts
+# ##############################################
+# #mesa counts_to_ps \
+# #    -i ${params.outdir}/combine_mesa_out/LM22_batch_corr_mesa_inclusionCounts.tsv \
+# #    -c your_allClusters.tsv \
+# #    -o LM22_batch_corr_mesa_allPS.tsv
+#
+#
+#       # # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
+#       # cmd <- paste0(
+#       #   "mesa compare_sample_sets --psiMESA ",PS_path,
+#       #   " -m1 ",opt$out_dir,"/manifests/",str_cell_type_val,".tsv",
+#       #   " -m2 ",opt$out_dir, "/manifests/not_",str_cell_type_val,".tsv  -o ",
+#       #   opt$out_dir, "/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
+#       #   opt$gtf, " 2>&1")
+#       #
+#       # system(cmd)
