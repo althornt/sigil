@@ -228,7 +228,7 @@ log2trans_dat_filt_bc <- df_mesa_inc_count_merge_lm22_log2_batch_corr[getVar_bc 
 # Transpose and format
 log2trans_dat_filt_t_bc <- as.data.frame(t(log2trans_dat_filt_bc))
 rownames(log2trans_dat_filt_t_bc) <- colnames(log2trans_dat_filt_bc)
-#
+
 # # PCA.
 # prcomp.out.bc = as.data.frame(prcomp(log2trans_dat_filt_t_bc, scale = F)$x)
 #
@@ -241,32 +241,54 @@ rownames(log2trans_dat_filt_t_bc) <- colnames(log2trans_dat_filt_bc)
 #   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
 # lapply(c(20), make_umap, meta_col="LM6",
 #   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-# ##############################################
-# # Undo log2(x+1) with 2^x - 1
-# ##############################################
-# df_mesa_inc_count_merge_lm22_bc_counts = 2^df_mesa_inc_count_merge_lm22_log2_batch_corr -1
-# rownames(df_mesa_inc_count_merge_lm22_bc_counts) <- df_mesa_inc_count_merge$cluster
-#
-# write.table(
-#   df_mesa_inc_count_merge_lm22_bc_counts,
-#   file.path(opt$out_dir,"LM22_batch_corr_mesa_inclusionCounts.tsv"),
-#   sep="\t",quote=F)
-#
-# ##############################################
-# # MESA quant on batch corrected counts
-# ##############################################
-# #mesa counts_to_ps \
-# #    -i ${params.outdir}/combine_mesa_out/LM22_batch_corr_mesa_inclusionCounts.tsv \
-# #    -c your_allClusters.tsv \
-# #    -o LM22_batch_corr_mesa_allPS.tsv
-#
-#
-#       # # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
-#       # cmd <- paste0(
-#       #   "mesa compare_sample_sets --psiMESA ",PS_path,
-#       #   " -m1 ",opt$out_dir,"/manifests/",str_cell_type_val,".tsv",
-#       #   " -m2 ",opt$out_dir, "/manifests/not_",str_cell_type_val,".tsv  -o ",
-#       #   opt$out_dir, "/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
-#       #   opt$gtf, " 2>&1")
-#       #
-#       # system(cmd)
+##############################################
+# Undo log2(x+1) with 2^x - 1
+##############################################
+df_mesa_inc_count_merge_lm22_bc_counts = 2^df_mesa_inc_count_merge_lm22_log2_batch_corr -1
+rownames(df_mesa_inc_count_merge_lm22_bc_counts) <- df_mesa_inc_count_merge$cluster
+
+# print(sapply(df_mesa_inc_count_merge_lm22_bc_counts, class))
+
+df_mesa_inc_count_merge_lm22_bc_counts_r <- round(df_mesa_inc_count_merge_lm22_bc_counts, digits=0)
+
+# df_mesa_inc_count_merge_lm22_bc_counts <- df_mesa_inc_count_merge_lm22_bc_counts %>%
+#   dplyr::mutate_if(is.numeric, round, digits=0)
+
+# print(sapply(df_mesa_inc_count_merge_lm22_bc_counts, class))
+
+print(head(df_mesa_inc_count_merge_lm22_bc_counts))
+print(head(df_mesa_inc_count_merge_lm22_bc_counts_r))
+
+print(dim(df_mesa_inc_count_merge_lm22_bc_counts))
+print(dim(df_mesa_inc_count_merge_lm22_bc_counts_r))
+
+write.table(
+  df_mesa_inc_count_merge_lm22_bc_counts_r,
+  file.path(opt$out_dir,"LM22_batch_corr_mesa_inclusionCounts.tsv"),
+  sep="\t",quote=F, col.names = NA)
+##############################################
+# MESA quant on batch corrected counts
+##############################################
+
+# MESA counts_to_ps command, 2>&1 sends standard error standard output
+# cmd <- paste0(
+#     "mesa counts_to_ps -i ",
+#     opt$out_dir,"/LM22_batch_corr_mesa_inclusionCounts.tsv -c ",
+#     opt$out_dir,"/mesa_allClusters.tsv -o ",
+#     opt$out_dir,"/LM22_batch_corr_mesa_allPS.tsv  2>&1"
+# )
+
+cmd <- paste0(
+    "mesa counts_to_ps -i ",
+    opt$out_dir,"/LM22_mesa_inclusionCounts.tsv -c ",
+    opt$out_dir,"/mesa_allClusters.tsv -o ",
+    opt$out_dir,"/LM22_batch_corr_mesa_allPS.tsv  2>&1"
+)
+
+print(cmd)
+system(cmd)
+
+
+
+df_bc_allPS <- read.table(paste0(opt$out_dir,"/LM22_batch_corr_mesa_allPS.tsv"))
+print(head(df_bc_allPS))
