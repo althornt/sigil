@@ -367,3 +367,62 @@ ls_mon_mac_top_events <- import_mesa_to_heatmap(
                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
 
 print(ls_mon_mac_top_events)
+
+
+##########################
+# B-cells
+##########################
+# Get samples with this cell type
+B_cell_types <- list(
+  "B cells naive",
+  "B cells memory")
+
+# Import files, find top signficant events, make event level plots event, make heatmaps
+ls_Bcell_top_events <- import_mesa_to_heatmap(
+                          B_cell_types, top_n = 10,
+                          label = "Bcells",
+                          css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
+
+
+##########################
+# Dendritic cells
+##########################
+dendritic_cell_types <- list(
+  "Dendritic cells resting",
+  "Dendritic cells activated")
+
+# Import files, find top signficant events, make event level plots event, make heatmaps
+ls_dendritic_top_events <- import_mesa_to_heatmap(
+                          dendritic_cell_types, top_n = 10,
+                          label = "Dendritic",
+                          css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
+
+
+##########################
+# Mast cells
+##########################
+# mast_cell_types <- list(
+#   "Mast cells resting",
+#   "Mast cells activated")
+#
+# # Import files, find top signficant events, make event level plots event, make heatmaps
+# ls_mast_top_events <- import_mesa_to_heatmap(
+#                           mast_cell_types, top_n = 10,
+#                           label = "Mast",
+#                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
+
+
+# ##########################
+# # NK cells
+# ##########################
+# NK_cell_types <- list(
+#   "NK cells resting",
+#   "NK cells activated")
+#
+
+# Import files, find top signficant events, make event level plots event, make heatmaps
+# ls_NK_top_events <- import_mesa_to_heatmap(
+#                           NK_cell_types, top_n = 10,
+#                           label = "NK",
+#                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
+#
