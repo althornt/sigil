@@ -131,8 +131,8 @@ print("all_PS")
 print(head(all_PS))
 print(dim(all_PS))
 
-# Remove rows with more than 50% NA
-all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.5), ]
+# Remove rows with less than 25% NA
+all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.75), ]
 
 print("all_PS_nan_filt")
 print(dim(all_PS_nan_filt))
@@ -140,7 +140,7 @@ print(dim(all_PS_nan_filt))
 write.table(x = all_PS_nan_filt,na="nan", row.names = TRUE, quote=FALSE,
           col.names=NA, sep = "\t",
           file = paste0(opt$out_dir, "/LM22_mesa_allPS_nan_filt.tsv"))
-print("Number of junctions removed for having over 50% samples with Nans:")
+print("Number of junctions removed for having over 75% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
 
 ###################
