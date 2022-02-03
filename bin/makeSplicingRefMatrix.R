@@ -28,7 +28,7 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   dev.off()
 }
 
-import_mesa_css <- function(filename, topN, plot_out_dir, css_dir){
+import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
   #' Import results from MESA compare sample set script to get the top N
   #' significant events into lists
   #' @param filename -
@@ -69,7 +69,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir){
 
   # Make plots for top negative events
   lapply(top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
-    out_dir = plot_out_dir)
+        LM_type=meta_col, out_dir = plot_out_dir)
 
   # Get top positive delta events
   top_sig_by_pval_posdelta <- top_sig_by_pval %>%
@@ -80,6 +80,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir){
 
   # Make plots for top positive events
   lapply(top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
+          LM_type=meta_col,
           out_dir = plot_out_dir )
 
   return(list(
@@ -89,7 +90,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir){
               )
 }
 
-plot_event <- function(sig_event, cell_type, out_dir){
+plot_event <- function(sig_event, cell_type, out_dir, LM_type){
   #' Make jitter plot for a given event in all samples
   #'
   #' @param sig_event - string for the significant event to ploit
@@ -99,24 +100,25 @@ plot_event <- function(sig_event, cell_type, out_dir){
 
   df <- all_PS_meta %>%
     tibble::rownames_to_column(var = "event")%>%
-    dplyr::filter(event %in% list(paste0(sig_event),"LM22"))%>%
+    dplyr::filter(event %in% list(paste0(sig_event), paste0(LM_type)))%>%
     t() %>%
     as.data.frame()
 
   df_ <- df # copy df
-  colnames(df_) <- c( "PS","LM22") #add column names from first row
+  colnames(df_) <- c( "PS", paste0(LM_type)) #add column names from first row
 
   df_ <- df_[-1,] %>% # drop first row
           dplyr::filter(PS != "NaN")  #drop samples with Nan
 
   df_$PS <- as.numeric(df_$PS)
 
-  p <- ggplot( df_, aes(x = LM22, y = PS, color=LM22)) +
+  p <- ggplot( df_, aes(x = get(LM_type), y = PS, color=get(LM_type))) +
       # geom_violin() +
       geom_jitter(position=position_jitter(0.2), alpha = 0.5) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
       theme(legend.position = "None") +
-      scale_y_continuous(limits = c(0, 100))
+      scale_y_continuous(limits = c(0, 100)) +
+      labs(x = "cell type")
 
   ggsave(plot = p, filename = paste0(out_dir,cell_type,"/",sig_event,".png"))
 
@@ -183,7 +185,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
 }
 }
 
-import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir){
+import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir, meta_col){
   #' Import results from MESA compare_sample_sets runs within a broader cell type
   #' (e.g. within T-cells). Find the top signficant events, make event level
   #' plots, make heatmaps of the events. This function calls import_mesa_css(),
@@ -218,7 +220,7 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir){
   ls_res <- lapply(
                           ls_css_file_names_cell_type,
                           topN=top_n,
-                          import_mesa_css,
+                          import_mesa_css, meta_col =meta_col,
                           plot_out_dir =  paste0(opt$out_dir,"/ref_matrix/within_type/"),
                           css_dir =  css_dir)
 
@@ -273,7 +275,7 @@ opt <- optparse::parse_args(opt_parser)
 # Open files
 metadata <- read.csv(file = opt$metadata)
 df_sample_annotations <- metadata %>%
-  dplyr::select(Run,LM22,sigil_general) %>%
+  dplyr::select(Run,LM22,LM6, sigil_general) %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
@@ -285,6 +287,8 @@ print(dim(all_PS))
 
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
 print(head(all_PS_meta))
+print(tail(all_PS_meta))
+
 print(dim(all_PS_meta))
 
 
@@ -316,6 +320,7 @@ ls_lm22_css_file_names <- ls_lm22_css_file_names[!ls_lm22_css_file_names %in% c(
 
 # Import, find signficant events and plot each one
 ls_lm22_res <- lapply(ls_lm22_css_file_names, topN=10,  import_mesa_css,
+              meta_col  = "LM22",
                   plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/"),
                 css_dir=paste0(
                   opt$out_dir,
@@ -342,6 +347,7 @@ ls_lm6_css_file_names <- ls_lm6_css_file_names[!ls_lm6_css_file_names %in% c("he
 
 # Import, find signficant events and plot each one
 ls_lm6_res <- lapply(ls_lm6_css_file_names, topN=10,  import_mesa_css,
+              meta_col  = "LM6",
                   plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM6/"),
                 css_dir=paste0(
                   opt$out_dir,
@@ -356,104 +362,108 @@ print(ls_lm6_top_events)
 # Make heatmap using top events
 make_pheatmap(ls_lm6_top_events, "LM6_diff_splicing_heatmap", metadata, all_PS )
 
-# #########################################
-# # T-cell 1 vs all comparisons
-# ########################################
-# # print("T-cells .........................")
-# # Get samples with this cell type
-# T_cell_types <- list(
-#   "T cells CD8",
-#   "T cells CD4 naive",
-#   "T cells CD4 memory resting",
-#   "T cells CD4 memory  activated",
-#   "T cells follicular helper",
-#   "T cells regulatory (Tregs)",
-#   "T cells gamma delta")
+#########################################
+# T-cell 1 vs all comparisons
+########################################
+# print("T-cells .........................")
+# Get samples with this cell type
+T_cell_types <- list(
+  "T cells CD8",
+  "T cells CD4 naive",
+  "T cells CD4 memory resting",
+  "T cells CD4 memory  activated",
+  "T cells follicular helper",
+  "T cells regulatory (Tregs)",
+  "T cells gamma delta")
+
+# Import files, find top signficant events, make event level plots event, make heatmaps
+ls_Tcell_top_events <- import_mesa_to_heatmap(
+                T_cell_types, top_n=10, label= "Tcells",
+                css_dir=paste0(
+                  opt$out_dir,
+                  "/compare_within_type/mesa_css_outputs/"),
+                meta_col="LM22")
+print(ls_Tcell_top_events)
+
+
+######################################################
+# Monocytes and macrophages 1 vs all comparisons
+######################################################
+print("Monocytes and macrophages .........................")
+
+# Get samples with this cell type
+mon_mac_cell_types <- list(
+  "Monocytes",
+  "Macrophages M0",
+  "Macrophages M1",
+  "Macrophages M2")
+
+# Import files, find top signficant events, make event level plots event, make heatmaps
+ls_mon_mac_top_events <- import_mesa_to_heatmap(
+                          mon_mac_cell_types, top_n = 10,
+                          label = "Monocytes_macrophages",
+                          css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"),
+                        meta_col="LM22")
+
+print(ls_mon_mac_top_events)
+
+
+##########################
+# B-cells
+##########################
+# Get samples with this cell type
+B_cell_types <- list(
+  "B cells naive",
+  "B cells memory")
+
+# Import files, find top signficant events, make event level plots event, make heatmaps
+ls_Bcell_top_events <- import_mesa_to_heatmap(
+                          B_cell_types, top_n = 10,
+                          label = "Bcells",
+                          css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"),
+                        meta_col="LM22")
+
+
+##########################
+# Dendritic cells
+##########################
+dendritic_cell_types <- list(
+  "Dendritic cells resting",
+  "Dendritic cells activated")
+
+# Import files, find top signficant events, make event level plots event, make heatmaps
+ls_dendritic_top_events <- import_mesa_to_heatmap(
+                          dendritic_cell_types, top_n = 10,
+                          label = "Dendritic",
+                          css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"),
+                        meta_col="LM22")
+
+
+##########################
+# Mast cells
+##########################
+# mast_cell_types <- list(
+#   "Mast cells resting",
+#   "Mast cells activated")
 #
 # # Import files, find top signficant events, make event level plots event, make heatmaps
-# ls_Tcell_top_events <- import_mesa_to_heatmap(
-#                 T_cell_types, top_n=10, label= "Tcells",
-#                 css_dir=paste0(
-#                   opt$out_dir,
-#                   "/compare_within_type/mesa_css_outputs/"))
-# print(ls_Tcell_top_events)
+# ls_mast_top_events <- import_mesa_to_heatmap(
+#                           mast_cell_types, top_n = 10,
+#                           label = "Mast",
+#                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
+
+
+# ##########################
+# # NK cells
+# ##########################
+# NK_cell_types <- list(
+#   "NK cells resting",
+#   "NK cells activated")
 #
-#
-# ######################################################
-# # Monocytes and macrophages 1 vs all comparisons
-# ######################################################
-# print("Monocytes and macrophages .........................")
-#
-# # Get samples with this cell type
-# mon_mac_cell_types <- list(
-#   "Monocytes",
-#   "Macrophages M0",
-#   "Macrophages M1",
-#   "Macrophages M2")
-#
-# # Import files, find top signficant events, make event level plots event, make heatmaps
-# ls_mon_mac_top_events <- import_mesa_to_heatmap(
-#                           mon_mac_cell_types, top_n = 10,
-#                           label = "Monocytes_macrophages",
+
+# Import files, find top signficant events, make event level plots event, make heatmaps
+# ls_NK_top_events <- import_mesa_to_heatmap(
+#                           NK_cell_types, top_n = 10,
+#                           label = "NK",
 #                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
 #
-# print(ls_mon_mac_top_events)
-#
-#
-# ##########################
-# # B-cells
-# ##########################
-# # Get samples with this cell type
-# B_cell_types <- list(
-#   "B cells naive",
-#   "B cells memory")
-#
-# # Import files, find top signficant events, make event level plots event, make heatmaps
-# ls_Bcell_top_events <- import_mesa_to_heatmap(
-#                           B_cell_types, top_n = 10,
-#                           label = "Bcells",
-#                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
-#
-#
-# ##########################
-# # Dendritic cells
-# ##########################
-# dendritic_cell_types <- list(
-#   "Dendritic cells resting",
-#   "Dendritic cells activated")
-#
-# # Import files, find top signficant events, make event level plots event, make heatmaps
-# ls_dendritic_top_events <- import_mesa_to_heatmap(
-#                           dendritic_cell_types, top_n = 10,
-#                           label = "Dendritic",
-#                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
-#
-#
-# ##########################
-# # Mast cells
-# ##########################
-# # mast_cell_types <- list(
-# #   "Mast cells resting",
-# #   "Mast cells activated")
-# #
-# # # Import files, find top signficant events, make event level plots event, make heatmaps
-# # ls_mast_top_events <- import_mesa_to_heatmap(
-# #                           mast_cell_types, top_n = 10,
-# #                           label = "Mast",
-# #                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
-#
-#
-# # ##########################
-# # # NK cells
-# # ##########################
-# # NK_cell_types <- list(
-# #   "NK cells resting",
-# #   "NK cells activated")
-# #
-#
-# # Import files, find top signficant events, make event level plots event, make heatmaps
-# # ls_NK_top_events <- import_mesa_to_heatmap(
-# #                           NK_cell_types, top_n = 10,
-# #                           label = "NK",
-# #                           css_dir=paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"))
-# #
