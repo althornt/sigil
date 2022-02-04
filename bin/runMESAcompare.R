@@ -33,7 +33,7 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
 
   # Make manifest 2 - all other cell types
   df_m2_others <- metadata %>%
-    dplyr::filter(get(meta_col_to_use) != cell_type_val) %>%
+    dplyr::filter((get(meta_col_to_use) != cell_type_val) & (get(meta_col_to_use) != "") ) %>%
     dplyr::select(Run)
 
   write.table(x = df_m2_others,row.names = FALSE, quote=FALSE,
@@ -146,22 +146,22 @@ print(nrow(all_PS)- nrow(all_PS_nan_filt))
 ###################
 # LM22
 ###################
-if("LM22" %in% colnames(metadata)){
-  ls_lm22_cell_types <- unique(metadata[["LM22"]])
-
-  print(ls_lm22_cell_types)
-
-  # Run MESA compare_sample_sets for each general subtype and make heatmap
-  sigil_lm22_mesa_comp_res <- sapply(
-    ls_lm22_cell_types,
-    runCompareSampleSets_1_vs_all,
-    meta_col_to_use="LM22",
-    USE.NAMES = TRUE)
-
-  ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
-  print(length(ls_combined_diff_splice_events))
-
-}
+# if("LM22" %in% colnames(metadata)){
+#   ls_lm22_cell_types <- unique(metadata[["LM22"]])
+#
+#   print(ls_lm22_cell_types)
+#
+#   # Run MESA compare_sample_sets for each general subtype and make heatmap
+#   sigil_lm22_mesa_comp_res <- sapply(
+#     ls_lm22_cell_types,
+#     runCompareSampleSets_1_vs_all,
+#     meta_col_to_use="LM22",
+#     USE.NAMES = TRUE)
+#
+#   ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
+#   print(length(ls_combined_diff_splice_events))
+#
+# }
 
 ###################
 # LM6
