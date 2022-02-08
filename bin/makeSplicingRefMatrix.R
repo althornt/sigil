@@ -100,24 +100,25 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
 
   df <- all_PS_meta %>%
     tibble::rownames_to_column(var = "event")%>%
-    dplyr::filter(event %in% list(paste0(sig_event), paste0(LM_type)))%>%
+    dplyr::filter(event %in% list(paste0(sig_event), paste0(LM_type), "data_source"))%>%
     t() %>%
     as.data.frame()
 
   df_ <- df # copy df
-  colnames(df_) <- c( "PS", paste0(LM_type)) #add column names from first row
+  colnames(df_) <- c( "PS", paste0(LM_type), "data_source") #add column names from first row
 
   df_ <- df_[-1,] %>% # drop first row
-          dplyr::filter(PS != "NaN")  #drop samples with Nan
+          dplyr::filter(PS != "NaN") %>% #drop samples with Nan
+          dplyr::filter(get(LM_type) != "") #drop samaples with out the cell type label
 
-  df_$PS <- as.numeric(df_$PS)
+  df_$PS <- as.numeric(as.character(df_$PS))
 
-  p <- ggplot( df_, aes(x = get(LM_type), y = PS, color=get(LM_type))) +
+  p <- ggplot( df_, aes(x = get(LM_type), y = PS, color=data_source)) +
       # geom_violin() +
       geom_jitter(position=position_jitter(0.2), alpha = 0.5) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-      theme(legend.position = "None") +
-      scale_y_continuous(limits = c(0, 100)) +
+      theme(legend.position = "right") +
+      scale_y_continuous(limits = c(0, 1)) +
       labs(x = "cell type")
 
   ggsave(plot = p, filename = paste0(out_dir,cell_type,"/",sig_event,".png"))
@@ -162,26 +163,27 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
     tibble::column_to_rownames('event')
 
   for (val in list("LM22", "LM6")){
-  # DF to label samples(columns) with labels
-  df_sample_annotations <- df_meta %>%
-    dplyr::select(Run, val, data_source) %>%
-    dplyr::arrange(Run) %>%
-    tibble::column_to_rownames("Run")
+    # DF to label samples(columns) with labels
+    df_sample_annotations <- df_meta %>%
+      dplyr::filter(paste0(val) != "") %>%
+      dplyr::select(Run, val, data_source) %>%
+      dplyr::arrange(Run) %>%
+      tibble::column_to_rownames("Run")
 
-  stopifnot(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
+    stopifnot(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
 
-  heatmap_res <- pheatmap(
-    main = paste0(" "),
-    df_all_PS_sig_events,
-    # scale = "row",
-    show_rownames=F,
-    show_colnames=F,
-    na_col = "grey",
-    annotation_col = df_sample_annotations)
+    heatmap_res <- pheatmap(
+      main = paste0(" "),
+      df_all_PS_sig_events,
+      # scale = "row",
+      show_rownames=F,
+      show_colnames=F,
+      na_col = "grey",
+      annotation_col = df_sample_annotations)
 
-  save_pheatmap_pdf(
-    heatmap_res,
-    paste0(opt$out_dir,"/ref_matrix/",label,"_",val,".pdf"))
+    save_pheatmap_pdf(
+      heatmap_res,
+      paste0(opt$out_dir,"/ref_matrix/",label,"_",val,".pdf"))
 }
 }
 
@@ -241,7 +243,7 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir, meta_co
   make_pheatmap(ls_top_events, paste0(label, "_diff_splicing_heatmap"),
           df_metadata_subset, df_all_PS )
 
-  # Make heatmap with this cell types events and all samples
+  # Make heatmap with this cell types events and ALL samples
   make_pheatmap(ls_top_events, paste0(label,"_diff_splicing_heatmap_all_samples"),
           metadata, all_PS )
 
@@ -275,22 +277,14 @@ opt <- optparse::parse_args(opt_parser)
 # Open files
 metadata <- read.csv(file = opt$metadata)
 df_sample_annotations <- metadata %>%
-  dplyr::select(Run,LM22,LM6, sigil_general) %>%
+  dplyr::select(Run,LM22,LM6, sigil_general, data_source) %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
 print(head(df_sample_annotations))
 
 all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1)
-print(head(all_PS))
-print(dim(all_PS))
-
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
-print(head(all_PS_meta))
-print(tail(all_PS_meta))
-
-print(dim(all_PS_meta))
-
 
 # Make output directories
 if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM22"))){
@@ -307,6 +301,8 @@ if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/within_type"))){
   dir.create(paste0(opt$out_dir,"/ref_matrix/within_type"),
    recursive = TRUE, showWarnings = TRUE)
 }
+
+
 
 #########################################
 # Import LM22 1 vs all comparisons
@@ -361,10 +357,10 @@ print(ls_lm6_top_events)
 
 # Make heatmap using top events
 make_pheatmap(ls_lm6_top_events, "LM6_diff_splicing_heatmap", metadata, all_PS )
-
-#########################################
-# T-cell 1 vs all comparisons
-########################################
+#
+# #########################################
+# # T-cell 1 vs all comparisons
+# ########################################
 # print("T-cells .........................")
 # Get samples with this cell type
 T_cell_types <- list(
