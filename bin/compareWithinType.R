@@ -220,7 +220,7 @@ all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
 all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.5), ]
 write.table(x = all_PS_nan_filt,na="nan", row.names = TRUE, quote=FALSE,
           col.names=NA, sep = "\t",
-          file = paste0(opt$out_dir, "/LM22_mesa_allPS_nan_filt.tsv"))
+          file = paste0(opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"))
 print("Number of junctions removed for having over 50% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
 

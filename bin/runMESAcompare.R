@@ -49,11 +49,11 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
     print("running MESA compare...")
 
     # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
-    # Can use LM22_mesa_allPS_nan_filt for both LM6 and LM22 comparisons
+    # Can use batch_corr_mesa_allPS_LM22_nan_filt for both LM6 and LM22 comparisons
     cmd <- paste0(
-      "mesa compare_sample_sets --psiMESA ",opt$out_dir, "/LM22_mesa_allPS_nan_filt.tsv",
+      "mesa compare_sample_sets --psiMESA ",opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv",
       " -m1 ",opt$out_dir,"/compare_",meta_col_to_use,"/manifests/",str_cell_type_val,".tsv",
-      " -m2 ",opt$out_dir, "/compare_",meta_col_to_use,"/manifests/not_",str_cell_type_val,".tsv  -o",
+      " -m2 ",opt$out_dir, "/compare_",meta_col_to_use,"/manifests/not_",str_cell_type_val,".tsv  -o ",
       opt$out_dir, "/compare_",meta_col_to_use,"/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
       opt$gtf, " 2>&1")
     system(cmd)
@@ -139,29 +139,42 @@ print(dim(all_PS_nan_filt))
 
 write.table(x = all_PS_nan_filt,na="nan", row.names = TRUE, quote=FALSE,
           col.names=NA, sep = "\t",
-          file = paste0(opt$out_dir, "/LM22_mesa_allPS_nan_filt.tsv"))
+          file = paste0(opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"))
 print("Number of junctions removed for having over 75% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
+
+# print(head(metadata))
+#
+# bcells <- metadata %>%
+#   dplyr::filter(LM6  == "B cells") %>%
+#   droplevels()
+#
+# print(bcells$Run)
+#
+# print(all_PS %>%
+# dplyr::select(as.vector(bcells$Run)) %>%
+# dplyr:::filter(row.names(all_PS) %in% c("1:198696909-198699563:-"))
+# )
 
 ###################
 # LM22
 ###################
-# if("LM22" %in% colnames(metadata)){
-#   ls_lm22_cell_types <- unique(metadata[["LM22"]])
-#
-#   print(ls_lm22_cell_types)
-#
-#   # Run MESA compare_sample_sets for each general subtype and make heatmap
-#   sigil_lm22_mesa_comp_res <- sapply(
-#     ls_lm22_cell_types,
-#     runCompareSampleSets_1_vs_all,
-#     meta_col_to_use="LM22",
-#     USE.NAMES = TRUE)
-#
-#   ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
-#   print(length(ls_combined_diff_splice_events))
-#
-# }
+if("LM22" %in% colnames(metadata)){
+  ls_lm22_cell_types <- unique(metadata[["LM22"]])
+
+  print(ls_lm22_cell_types)
+
+  # Run MESA compare_sample_sets for each general subtype and make heatmap
+  sigil_lm22_mesa_comp_res <- sapply(
+    ls_lm22_cell_types,
+    runCompareSampleSets_1_vs_all,
+    meta_col_to_use="LM22",
+    USE.NAMES = TRUE)
+
+  ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
+  print(length(ls_combined_diff_splice_events))
+
+}
 
 ###################
 # LM6
