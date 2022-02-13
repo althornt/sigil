@@ -136,39 +136,39 @@ ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
 # Merging mesa files
 #############################
 # Create manifest listing each inclusion count file
-write.table(as.data.frame(unlist(ls_mesa_inc_count_files)),
-            file=paste0(opt$out_dir,"/manifest_mesa_inclusionCounts_files.tsv"),
-            col.names = FALSE,
-            row.names = FALSE,
-            quote = FALSE)
-# Merge all inclusion count files siwth MESA select_samples command
-# 2>&1 sends standard error standard output
-inc_cmd <- paste0(
-    "mesa select_samples -m ",
-    opt$out_dir,"/manifest_mesa_inclusionCounts_files.tsv -o ",
-    opt$out_dir,"/merged_mesa_inclusionCounts.tsv  --join intersection 2>&1"
-    )
-
-print(inc_cmd)
-system(inc_cmd)
+# write.table(as.data.frame(unlist(ls_mesa_inc_count_files)),
+#             file=paste0(opt$out_dir,"/manifest_mesa_inclusionCounts_files.tsv"),
+#             col.names = FALSE,
+#             row.names = FALSE,
+#             quote = FALSE)
+# # Merge all inclusion count files siwth MESA select_samples command
+# # 2>&1 sends standard error standard output
+# inc_cmd <- paste0(
+#     "mesa select -m ",
+#     opt$out_dir,"/manifest_mesa_inclusionCounts_files.tsv -o ",
+#     opt$out_dir,"/merged_mesa_inclusionCounts.tsv  --join intersection 2>&1"
+#     )
+#
+# print(inc_cmd)
+# system(inc_cmd)
 
 # Create manifest listing each PS file
-write.table(as.data.frame(unlist(ls_mesa_allPS_files)),
-            file=paste0(opt$out_dir,"/manifest_mesa_allPS_files.tsv"),
-            col.names = FALSE,
-            row.names = FALSE,
-            quote = FALSE)
-
-# Merge all PS file siwth MESA select_samples command
-# 2>&1 sends standard error standard output
-PS_cmd <- paste0(
-    "mesa select -m ",
-    opt$out_dir,"/manifest_mesa_allPS_files.tsv -o ",
-    opt$out_dir,"/merged_mesa_allPS.tsv  --join intersection 2>&1"
-    )
-
-print(PS_cmd)
-system(PS_cmd)
+# write.table(as.data.frame(unlist(ls_mesa_allPS_files)),
+#             file=paste0(opt$out_dir,"/manifest_mesa_allPS_files.tsv"),
+#             col.names = FALSE,
+#             row.names = FALSE,
+#             quote = FALSE)
+#
+# # Merge all PS file siwth MESA select_samples command
+# # 2>&1 sends standard error standard output
+# PS_cmd <- paste0(
+#     "mesa select -m ",
+#     opt$out_dir,"/manifest_mesa_allPS_files.tsv -o ",
+#     opt$out_dir,"/merged_mesa_allPS.tsv  --join intersection 2>&1"
+#     )
+#
+# print(PS_cmd)
+# system(PS_cmd)
 
 
 ######################################
@@ -176,48 +176,46 @@ system(PS_cmd)
 ######################################
 
 # Read in merged allPS file
-# df_merged_allPS <- read.table(paste0(opt$out_dir,"/merged_mesa_allPS.tsv"),
-#                               row.names = 1, header=T)
+df_merged_allPS <- read.table(paste0(opt$out_dir,"/merged_mesa_allPS.tsv"),
+                              row.names = 1, header=T)
 # print(head(df_merged_allPS))
-# print(head(rownames(df_merged_allPS)))
-#
-# # Log2 + 1 transform PS
-# log2trans_dat <- as.data.frame(log2(df_merged_allPS +1))
-# print(dim(log2trans_dat))
 
+# Log2 + 1 transform PS
+df_allPS_log2trans <- as.data.frame(log2(df_merged_allPS +1))
+print(dim(df_allPS_log2trans))
 
-# # # Drop genes with low variance.
-# # getVar <- apply(log2trans_dat[, -1], 1, var)
-# print(dim(getVar))
+print("-------------")
+# # Drop genes with low variance.
+allPS_log2trans_var <- apply(df_allPS_log2trans[, -1], 1, var)
+print(length(allPS_log2trans_var))
 
+# For gene I used median (50% quantile) as the cutoff
+# For splicing using 75% due to there being many more rows)
+PS_param <- quantile(allPS_log2trans_var, c(.75), na.rm=T)
+print(PS_param)
 
+df_allPS_log2trans_filt <- df_allPS_log2trans[allPS_log2trans_var > PS_param & !is.na(allPS_log2trans_var), ]
+print(dim(df_allPS_log2trans_filt))
 
-
-
-
-
-
-# # For gene I used median (50% quantile) as the cutoff
-# # For splicing using 75% due to there being many more rows)
-# param <- quantile(getVar, c(.75))
-# log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
-#
 # # Transpose and format
-# log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt))
-# rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)
-#
-# # PCA.
-# prcomp.out = as.data.frame(prcomp(log2trans_dat_filt_t, scale = F)$x)
-#
-# # Making variations of UMAPs with different numbers of neighbors
-# lapply(c(20), make_umap, meta_col="data_source",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="LM22",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="sigil_general",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="LM6",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+df_allPS_log2trans_filt_t <- as.data.frame(t(df_allPS_log2trans_filt))
+rownames(df_allPS_log2trans_filt_t) <- colnames(df_allPS_log2trans_filt)
+
+print(dim(df_allPS_log2trans_filt))
+print(dim(df_allPS_log2trans_filt_t))
+
+# PCA.
+all.ps.prcomp.out = as.data.frame(prcomp(na.omit(df_allPS_log2trans_filt_t), center=T,  scale = T)$x)
+
+# Making variations of UMAPs with different numbers of neighbors
+lapply(c(20), make_umap, meta_col="data_source",
+  df_PCA = all.ps.prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+lapply(c(20), make_umap, meta_col="LM22",
+  df_PCA = all.ps.prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+lapply(c(20), make_umap, meta_col="sigil_general",
+  df_PCA = all.ps.prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
+lapply(c(20), make_umap, meta_col="LM6",
+  df_PCA = all.ps.prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
 
 
 ########################################################
