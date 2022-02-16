@@ -34,7 +34,8 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, ls_gen_cell_types,
     dplyr::filter(get(meta_col_to_use) == cell_type_val) %>%
     dplyr::select(Run)
 
-  write.table(x = df_m1_main_cell_type,row.names = FALSE, quote=FALSE,col.names=FALSE,
+  write.table(x = df_m1_main_cell_type,
+            row.names = FALSE, quote=FALSE,col.names=FALSE,
             file = paste0(opt$out_dir, "/manifests/",
             paste0(str_cell_type_val),".tsv"))
 

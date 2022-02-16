@@ -43,6 +43,8 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
   file_css_out <- paste0(opt$out_dir, "/compare_",meta_col_to_use,"/mesa_css_outputs/",
                                str_cell_type_val,".tsv")
 
+
+
   # If enough samples, compare groups
   if ((nrow(df_m1_main_cell_type)>2) & (nrow(df_m2_others)>2)){
 
@@ -142,6 +144,8 @@ write.table(x = all_PS_nan_filt,na="nan", row.names = TRUE, quote=FALSE,
           file = paste0(opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"))
 print("Number of junctions removed for having over 75% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
+
+# print(sum(rowSums(is.na(all_PS))))
 
 # print(head(metadata))
 #

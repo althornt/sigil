@@ -63,24 +63,27 @@ println "Output directory: $params.outdir \n"
 workflow {
   main:
 
-  // kallisto PAIRED END
-  if (params.paired_end && params.kallisto_idx){
-    dir =  params.reads +"*{1,2}.fastq.gz"
-    read_ch = channel.fromFilePairs(dir, checkIfExists: true ).view()
-    KALLISTO_PE(params.kallisto_idx, read_ch)
-    POST_KALLISTO(params.metadata, KALLISTO_PE.out.collect())
-  }
-
-  // kallisto SINGLE END
-  if (params.single_end && params.kallisto_idx) {
-    dir =  params.reads +"*.fastq.gz"
-    read_ch = channel.fromPath( dir, checkIfExists: true ).map { it -> [it.name.replace(".fastq.gz", ""), file(it)]}.view()
-    KALLISTO_SE(params.kallisto_idx, read_ch)
-    POST_KALLISTO(params.metadata, KALLISTO_SE.out.collect())
-  }
+  // // kallisto PAIRED END
+  // if (params.paired_end && params.kallisto_idx){
+  //   dir =  params.reads +"*{1,2}.fastq.gz"
+  //   read_ch = channel.fromFilePairs(dir, checkIfExists: true ).view()
+  //   KALLISTO_PE(params.kallisto_idx, read_ch)
+  //   POST_KALLISTO(params.metadata, KALLISTO_PE.out.collect())
+  // }
+  //
+  // // kallisto SINGLE END
+  // if (params.single_end && params.kallisto_idx) {
+  //   dir =  params.reads +"*.fastq.gz"
+  //   read_ch = channel.fromPath( dir, checkIfExists: true ).map { it -> [it.name.replace(".fastq.gz", ""), file(it)]}.view()
+  //   KALLISTO_SE(params.kallisto_idx, read_ch)
+  //   POST_KALLISTO(params.metadata, KALLISTO_SE.out.collect())
+  // }
 
   // STAR and MESA
   if (params.star_index && !params.bed_manifest && !params.cluster && !params.mesa_only ){
+    dir =  params.reads +"*.fastq.gz"
+    read_ch = channel.fromPath( dir, checkIfExists: true ).map { it -> [it.name.replace(".fastq.gz", ""), file(it)]}.view()
+
     STAR_ALIGN(params.star_index, read_ch)
     MESA(params.metadata, STAR_ALIGN.out[1].collect(), params.gtf, params.genome)
     POST_MESA(params.metadata, MESA.out.collect(), params.gtf)
