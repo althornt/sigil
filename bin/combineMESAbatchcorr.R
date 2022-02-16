@@ -13,6 +13,7 @@ library(DESeq2)
 library(pheatmap)
 library(limma)
 library(purrr)
+library(tidyr)
 
 importMetaMESA <- function(row){
   # Read metadata and add column for run
@@ -31,7 +32,7 @@ importMetaMESA <- function(row){
   return(list(
       "ls_mesa_inc_count_files"=res_inc_count_path,
       "ls_mesa_allPS_files"=res_allPS_path,
-      "ls_mesa_cluster_files"=res_cluster_path,
+      "ls_mesa_cluster_files"=res_cluster_path
       "metadata"=df_metadata,
       "ls_samples_run"=df_metadata$Run))
 }
@@ -69,6 +70,16 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
          dpi = 300)
 }
 
+plot_PS_hist <- function(df, out_path){
+  data_long <- df %>%
+    tibble::rownames_to_column("event") %>%
+    tidyr::gather(., key="sample", value = "PS", -c(event)) %>%
+    as.data.frame()
+  p <- ggplot( data_long, aes(x = PS)) +
+      geom_histogram() +
+      scale_y_continuous(trans='log2')
+  ggsave(plot = p, filename = out_path)
+}
 ###################
 # MAIN
 ###################
@@ -132,6 +143,47 @@ write.csv(df_merged_metadata_lm22,
 # List of samples with LM22 label
 ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
 
+
+# Open indiviidual count files
+print(ls_mesa_inc_count_files)
+
+# df_Song_allPS <- read.table("/mnt/results/sigil_results_SRP253519_Song_20211114/mesa_out/mesa_allPS.tsv",
+#                               row.names = 1, header=T)
+#
+# print(dim(df_Song_allPS))
+# print(max(df_Song_allPS))
+# plot_PS_hist(df_Song_allPS,  paste0(opt$out_dir,"/df_Song_allPS.png"))
+
+#
+# print(dim(df_Song_inclusionCounts))
+# print(max(df_Song_inclusionCounts))
+
+# df_Song_inclusionCounts <- read.table("/mnt/results/sigil_results_SRP253519_Song_20211114/mesa_out/mesa_inclusionCounts.tsv",
+#                               row.names = 1, header=T)
+#
+# print(dim(df_Song_inclusionCounts))
+# print(max(df_Song_inclusionCounts))
+
+
+# plot_PS_hist(df_Song_inclusionCounts,  paste0(opt$out_dir,"/df_Song_inclusionCounts.png"))
+
+# df_Monaco_inclusionCounts <- read.table("/mnt/results/sigil_results_SRP125125_Monaco_20211109/mesa_out/mesa_inclusionCounts.tsv",
+#                               row.names = 1, header=T)
+#
+# print(dim(df_Monaco_inclusionCounts))
+# print(max(df_Monaco_inclusionCounts))
+
+# plot_PS_hist(df_Monaco_inclusionCounts,  paste0(opt$out_dir,"/df_Monaco_inclusionCounts.png"))
+
+
+# df_Choi_inclusionCounts <- read.table("/mnt/results/sigil_results_SRP150419_Choi_20211124/mesa_out/mesa_inclusionCounts.tsv",
+#                               row.names = 1, header=T)
+#
+# print(dim(df_Choi_inclusionCounts))
+# print(max(df_Choi_inclusionCounts))
+
+# plot_PS_hist(df_Choi_inclusionCounts,  paste0(opt$out_dir,"/df_Choi_inclusionCounts.png"))
+
 ############################
 # Merging mesa files
 #############################
@@ -174,38 +226,35 @@ ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
 ######################################
 # UMAPs of PS before batch correction
 ######################################
-
 # Read in merged allPS file
 df_merged_allPS <- read.table(paste0(opt$out_dir,"/merged_mesa_allPS.tsv"),
                               row.names = 1, header=T)
 # print(head(df_merged_allPS))
+print(dim(df_merged_allPS))
+plot_PS_hist(df_merged_allPS,  paste0(opt$out_dir,"/hist_allPS.png"))
+print("sum")
+print(sum(rowSums(is.na(df_merged_allPS))))
 
-# Log2 + 1 transform PS
-df_allPS_log2trans <- as.data.frame(log2(df_merged_allPS +1))
-print(dim(df_allPS_log2trans))
-
-print("-------------")
-# # Drop genes with low variance.
-allPS_log2trans_var <- apply(df_allPS_log2trans[, -1], 1, var)
-print(length(allPS_log2trans_var))
+# Drop genes with low variance.
+allPS_var <- apply(df_merged_allPS[, -1], 1, var)
+print(length(allPS_var))
 
 # For gene I used median (50% quantile) as the cutoff
 # For splicing using 75% due to there being many more rows)
-PS_param <- quantile(allPS_log2trans_var, c(.75), na.rm=T)
+PS_param <- quantile(allPS_var, c(.75), na.rm=T)
 print(PS_param)
 
-df_allPS_log2trans_filt <- df_allPS_log2trans[allPS_log2trans_var > PS_param & !is.na(allPS_log2trans_var), ]
-print(dim(df_allPS_log2trans_filt))
+df_allPS_filt <- df_merged_allPS[allPS_var > PS_param & !is.na(allPS_var), ]
+print(dim(df_allPS_filt))
 
-# # Transpose and format
-df_allPS_log2trans_filt_t <- as.data.frame(t(df_allPS_log2trans_filt))
-rownames(df_allPS_log2trans_filt_t) <- colnames(df_allPS_log2trans_filt)
+# Transpose and format
+df_allPS_filt_t <- as.data.frame(t(df_allPS_filt))
+rownames(df_allPS_filt_t) <- colnames(df_allPS_filt)
 
-print(dim(df_allPS_log2trans_filt))
-print(dim(df_allPS_log2trans_filt_t))
-
+print(dim(df_allPS_filt))
+print(dim(df_allPS_filt_t))
 # PCA.
-all.ps.prcomp.out = as.data.frame(prcomp(na.omit(df_allPS_log2trans_filt_t), center=T,  scale = T)$x)
+all.ps.prcomp.out = as.data.frame(prcomp(na.omit(df_allPS_filt_t), center=T,  scale = T)$x)
 
 # Making variations of UMAPs with different numbers of neighbors
 lapply(c(20), make_umap, meta_col="data_source",
@@ -226,10 +275,18 @@ lapply(c(20), make_umap, meta_col="LM6",
 df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_inclusionCounts.tsv"),
                                     row.names = 1, header=T)
 
+print("df_merged_inc_counts")
+print(sum((is.na(df_merged_inc_counts))))
+plot_PS_hist(df_merged_inc_counts,  paste0(opt$out_dir,"/merged_inc_counts.png"))
+
 # Log2 + 1 transform counts
 df_log2trans_inc_counts <- as.data.frame(log2(df_merged_inc_counts +1))
 print(dim(df_log2trans_inc_counts))
 
+plot_PS_hist(df_log2trans_inc_counts,  paste0(opt$out_dir,"/hist_inc_counts_log.png"))
+
+print("df_log2trans_inc_counts")
+print(sum((is.na(df_log2trans_inc_counts))))
 
 df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
                                   df_log2trans_inc_counts,
@@ -237,11 +294,17 @@ df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
                                   batch2 = df_merged_metadata$type
                                   )
 
+print("df_mesa_inc_count_merge_log2_batch_corr")
 print(dim(df_mesa_inc_count_merge_log2_batch_corr))
+print(sum((is.na(df_mesa_inc_count_merge_log2_batch_corr))))
 
 # Undo log2(x+1) with 2^x - 1
 df_mesa_inc_count_merge_bc_counts = 2^df_mesa_inc_count_merge_log2_batch_corr -1
 rownames(df_mesa_inc_count_merge_bc_counts) <- rownames(df_merged_inc_counts)
+print(typeof(df_mesa_inc_count_merge_bc_counts))
+
+plot_PS_hist(as.data.frame(df_mesa_inc_count_merge_bc_counts),
+              paste0(opt$out_dir,"/hist_inc_counts_bc.png"))
 
 # print(head(df_merged_inc_counts))
 # print(head(df_mesa_inc_count_merge_bc_counts))
@@ -259,10 +322,12 @@ write.table(
   df_mesa_inc_count_merge_bc_counts,
   file.path(opt$out_dir,"batch_corr_mesa_inclusionCounts.tsv"),
   sep="\t",quote=F, col.names = NA)
+
+
 ########################################################
 # Convert batch corrected counts to PS
 #########################################################
-# Merge all PS file siwth MESA select_samples command
+# Merge all PS files with MESA select_samples command
 # 2>&1 sends standard error standard output
 PS_cmd <- paste0(
     "mesa counts_to_ps -i ",
@@ -278,15 +343,16 @@ system(PS_cmd)
 #########################################################
 df_merged_allPS_bc <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_allPS.tsv"),
                               row.names = 1, header=T)
-
+print("df_merged_allPS_bc")
 print(head(df_merged_allPS_bc))
 print(dim(df_merged_allPS_bc))
-
-
+plot_PS_hist(df_merged_allPS_bc,  paste0(opt$out_dir,"/hist_allPS_bc.png"))
 
 # Log2 + 1 transform PS
 df_allPS_log2trans_bc <- as.data.frame(log2(df_merged_allPS_bc +1))
+print("df_allPS_log2trans_bc")
 print(dim(df_allPS_log2trans_bc))
+plot_PS_hist(df_allPS_log2trans_bc,  paste0(opt$out_dir,"/hist_allPS_bc_log.png"))
 
 print("-------------")
 # # Drop genes with low variance.
@@ -335,178 +401,8 @@ print("df_merged_allPS_bc_lm22")
 print(head(rownames(df_merged_allPS_bc_lm22)))
 print(dim(df_merged_allPS_bc_lm22))
 
-# #######################
-# # Batch correction
-# #######################
-# df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
-#                                   log2trans_dat,
-#                                   batch = df_merged_metadata$data_source,
-#                                   batch2 = df_merged_metadata$type
-#                                   )
-#
-# # Drop genes with low variance.
-# getVar_bc <- apply(df_mesa_inc_count_merge_log2_batch_corr[, -1], 1, var)
-#
-# # For gene I used median (50% quantile) as the cutoff
-# # For splicing using 75% due to therembeing much more rows)
-# param_bc <- quantile(getVar_bc, c(.75))
-# log2trans_dat_filt_bc <- df_mesa_inc_count_merge_log2_batch_corr[getVar_bc > param_bc & !is.na(getVar_bc), ]
-#
-# Transpose and format
-# log2trans_dat_filt_t_bc <- as.data.frame(t(log2trans_dat_filt_bc))
-# rownames(log2trans_dat_filt_t_bc) <- colnames(log2trans_dat_filt_bc)
-#
-# # PCA.
-# prcomp.out.bc = as.data.frame(prcomp(log2trans_dat_filt_t_bc, scale = F)$x)
-#
-# # Making variations of UMAPs with different numbers of neighbors
-# lapply(c(20), make_umap, meta_col="data_source",
-#   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="LM22",
-#   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="sigil_general",
-#   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="LM6",
-#   df_PCA = prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-##############################################
-# Undo log2(x+1) with 2^x - 1
-##############################################
-# df_mesa_inc_count_merge_bc_counts = 2^df_mesa_inc_count_merge_log2_batch_corr -1
-# rownames(df_mesa_inc_count_merge_bc_counts) <- rownames(df_mesa_inc_count_merge)
-#
-# # print(head(df_mesa_inc_count_merge))
-# # print(head(df_mesa_inc_count_merge_bc_counts))
-#
-#
-# df_mesa_inc_count_merge_bc_counts_r <- round(df_mesa_inc_count_merge_bc_counts, digits=0)
-#
-# # print(head(df_mesa_inc_count_merge_bc_counts))
-# # print(head(df_mesa_inc_count_merge_bc_counts_r))
-# #
-# # print(dim(df_mesa_inc_count_merge_bc_counts))
-# # print(dim(df_mesa_inc_count_merge_bc_counts_r))
-#
-# write.table(
-#   df_mesa_inc_count_merge_bc_counts_r,
-#   file.path(opt$out_dir,"batch_corr_mesa_inclusionCounts.tsv"),
-#   sep="\t",quote=F, col.names = NA)
-# ##############################################
-# # MESA quant on batch corrected counts
-# ##############################################
-#
-# # MESA counts_to_ps command, 2>&1 sends standard error standard output
-# cmd <- paste0(
-#     "mesa counts_to_ps -i ",
-#     opt$out_dir,"/batch_corr_mesa_inclusionCounts.tsv -c ",
-#     opt$out_dir,"/mesa_allClusters.tsv -o ",
-#     opt$out_dir,"/batch_corr_mesa_allPS.tsv  2>&1"
-# )
-#
-# print(cmd)
-# system(cmd)
-#
-#
-#
-# df_bc_allPS <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_allPS.tsv"))
-# print(dim(df_bc_allPS))
-
-#
-# # Remove samples without LM22 labels from metadata
-# df_merged_metadata_lm22 <- df_merged_metadata %>%
-#    dplyr::filter(LM22 != "")
-# write.csv(df_merged_metadata_lm22,
-#             file.path(file.path(opt$out_dir,"lm22_metadata.csv")),
-#             row.names = FALSE, quote=F)
-#
-# # List of samples with LM22 lab
-# ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
-#
-# # Drop non LM22 samples from mesa counts
-# df_mesa_inc_count_merge_lm22 <- df_mesa_inc_count_merge %>%
-#   dplyr::select(ls_smpls_lm22)
-# rownames(df_mesa_inc_count_merge_lm22) <- df_mesa_inc_count_merge$cluster
-# write.table(
-#   df_mesa_inc_count_merge_lm22,
-#   file.path(opt$out_dir,"LM22_mesa_inclusionCounts.tsv"),quote=F,sep="\t", col.names = NA)
-# #
-# # print("df_mesa_inc_count_merge_lm22")
-# # print(dim(df_mesa_inc_count_merge_lm22))
-#
-#
-# # # Drop non LM22 samples from mesa PS
-# df_mesa_allPS_merge_lm22 <- df_mesa_allPS_merge %>%
-#   dplyr::select(ls_smpls_lm22)
-# rownames(df_mesa_allPS_merge_lm22) <- df_mesa_allPS_merge$cluster
-# write.table(
-#   df_mesa_allPS_merge_lm22,
-#   file.path(opt$out_dir,"LM22_mesa_allPS.tsv"), quote=F,sep="\t", na="nan", col.names = NA)
-#
-# # print("df_mesa_allPS_merge_lm22")
-# # print(dim(df_mesa_allPS_merge_lm22))
 
 
-
-######### old
-
-
-# # Merge mesa PS files by common clusters
-# df_mesa_allPS_merge <- unlist(ls_mesa_allPS_files) %>%
-#   lapply(read.csv, sep = "\t") %>%
-#   purrr::reduce(inner_join, by = "cluster")
-# write.table(
-#   df_mesa_allPS_merge,
-#   file.path(opt$out_dir,"mesa_allPS.tsv"), quote=F,sep="\t", na="nan", col.names = NA)
-# print("df_mesa_allPS_merge")
-# print(dim(df_mesa_allPS_merge))
-#
-# # Merge mesa inclusion count files
-# df_mesa_inc_count_merge <- unlist(ls_mesa_inc_count_files) %>%
-#   lapply(read.csv, sep = "\t") %>%
-#   purrr::reduce(inner_join, by = "cluster")
-# write.table(
-#   df_mesa_inc_count_merge,
-#   file.path(opt$out_dir,"mesa_inclusionCounts.tsv"),quote=F, sep="\t", col.names = NA)
-# print("df_mesa_inc_count_merge")
-# print(dim(df_mesa_inc_count_merge))
-
-
-# Merge mesa cluster files and remove duplicate clusters
-# AND filter out of first fol and secold column which is a list
-# ls_df_mesa_clusters <- unlist(ls_mesa_cluster_files) %>%
-#   lapply(read.table, sep = "\t", header= F)
-#
-# df_mesa_clusters_merge <- do.call("rbind", ls_df_mesa_clusters) %>%
-#   distinct(.)
-#
-#
-# print(head(df_mesa_clusters_merge))
-# print(dim(df_mesa_clusters_merge))
-#
-# df_mesa_clusters_merge <- df_mesa_clusters_merge %>%
-#   dplyr::filter(V1 %in% df_mesa_inc_count_merge$cluster)
-#
-# print(head(df_mesa_clusters_merge))
-#
-# df_mesa_clusters_merge <- df_mesa_clusters_merge %>%
-#   dplyr::mutate(V2 = map(V2, ~ purrr::keep(.x, .x %in% df_mesa_inc_count_merge$cluster)))
-#
-# print(head(df_mesa_clusters_merge))
-# print(dim(df_mesa_clusters_merge))
-#
-# print("-------")
-#
-# print(head(df_mesa_inc_count_merge$cluster))
-#
-# write.table(
-#   df_mesa_clusters_merge,
-#   file.path(opt$out_dir,"mesa_allClusters.tsv"),
-#   quote=F,sep="\t", col.names = FALSE, row.names = FALSE)
-#
-# print("df_mesa_clusters_merge")
-# print(dim(df_mesa_clusters_merge))
-
-
-# Format merged mesa inclusion count files for log2 transformation
-# rownames(df_mesa_inc_count_merge) <- df_mesa_inc_count_merge$cluster
-# df_mesa_inc_count_merge <- df_mesa_inc_count_merge %>%
-#   dplyr::select( -one_of(c("cluster")))
+#################################
+# Compare PS before and after
+################################
