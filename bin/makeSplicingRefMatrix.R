@@ -7,6 +7,8 @@ library(ggplot2)
 library(tidyverse)
 library(tidyr)
 library(dplyr)
+library(uwot)
+library(RColorBrewer)
 
 # This script ...
 # (1) Reads and plots the results from runMESAcompare.R , which does 1 vs all
@@ -307,6 +309,10 @@ if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/within_type"))){
    recursive = TRUE, showWarnings = TRUE)
 }
 
+if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/UMAPs"))){
+  dir.create(paste0(opt$out_dir,"/ref_matrix/UMAPs"),
+   recursive = TRUE, showWarnings = TRUE)
+}
 
 ########################################
 # Import LM22 1 vs all comparisons
@@ -522,3 +528,85 @@ print("ls_lm6_lm22_withincelltype_top_events")
 # print(head(ls_lm6_lm22_withincelltype_top_events))
 print(length(ls_lm6_lm22_withincelltype_top_events))
 make_pheatmap(ls_lm6_lm22_withincelltype_top_events, "LM6_LM22_and_combined_within_cell_type_diff_splicing_heatmap", metadata, all_PS )
+
+
+###############################
+# UMAPs
+################################
+
+
+make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
+
+  set.seed(123)
+
+  # Make color palette
+  n <- length(unique(metadata[[meta_col]]))
+  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+  # Run UMAP
+  umap.out <- umap(df_PCA, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
+  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
+  umap.out$Run <- rownames(df_PCA)
+
+  # Merge UMAP results with metadata
+  umap.out.merge = merge(umap.out, metadata)
+
+  # Plot UMAP
+  ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="bottom",legend.title = element_blank()) +
+    scale_color_manual(values=pal) +
+    labs(title= paste("UMAP MESA: Cell types, n_neighbors =",num_neighbor, sep = ' '))
+
+  # Save UMAP plot
+  ggsave(file.path(opt$out_dir,
+                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
+         device = "png",
+         width = 12,
+         dpi = 300)
+}
+
+
+######################################
+# UMAPs of PS before batch correction
+######################################
+# Read in merged allPS file
+
+print(dim(all_PS))
+all_PS_top_junctioins <- all_PS %>%
+  dplyr::filter(rownames(all_PS) %in% ls_lm6_lm22_withincelltype_top_events)
+
+print(dim(all_PS_top_junctioins))
+
+# Drop genes with low variance.
+allPS_var <- apply(all_PS_top_junctioins[, -1], 1, var)
+print(length(allPS_var))
+
+# For gene I used median (50% quantile) as the cutoff
+# For splicing using 75% due to there being many more rows)
+PS_param <- quantile(allPS_var, c(.75), na.rm=T)
+print(PS_param)
+
+df_allPS_filt <- all_PS_top_junctioins[allPS_var > PS_param & !is.na(allPS_var), ]
+print(dim(df_allPS_filt))
+
+# Transpose and format
+df_allPS_filt_t <- as.data.frame(t(df_allPS_filt))
+rownames(df_allPS_filt_t) <- colnames(df_allPS_filt)
+
+print(dim(df_allPS_filt))
+print(dim(df_allPS_filt_t))
+# PCA.
+all.ps.prcomp.out = as.data.frame(prcomp(na.omit(df_allPS_filt_t), center=T,  scale = T)$x)
+
+# Making variations of UMAPs with different numbers of neighbors
+lapply(c(15,20,25,30), make_umap, meta_col="data_source",
+  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
+lapply(c(15,20,25,30), make_umap, meta_col="LM22",
+  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
+lapply(c(15,20,25,30), make_umap, meta_col="sigil_general",
+  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
+lapply(c(15,20,25,30), make_umap, meta_col="LM6",
+  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
