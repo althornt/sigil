@@ -26,7 +26,8 @@ process MESA {
 
     # Make MESA manifest of bams
     sed 's/\r//' $srafile  |
-    awk -F, '{print \$1",${params.outdir}/star_out/STAR_"\$1"/"\$1"Aligned.sortedByCoord.out.bam,"\$NF","\$NF}' OFS=  |     #rearrange columns, add file path
+    # awk -F, '{print \$1",${params.outdir}/star_out/STAR_"\$1"/"\$1"Aligned.sortedByCoord.out.bam,"\$NF","\$NF}' OFS=  |     #rearrange columns, add file path
+    awk -F, '{print \$1",${params.outdir}/star_out/STAR_"\$1"/"\$1"Aligned.sortedByCoord.out.bam,NA,NA"}' OFS=  |     #rearrange columns, add metadata columns as NA, add file path
     sed '1d' |                                                                                             #remove first line
     sed -E 's/("([^"]*)")?,/\2\t/g'|                                                                       #csv to tab
     tr -cd '\11\12\15\40-\176' >  mesa_manifest_bams.txt
@@ -41,6 +42,17 @@ process MESA {
     mesa quant -m mesa_manifest.txt -o mesa --drim --maxLength  50000 \
         --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
         --minEntropy 1 2> error.txt
+
+    # Run MESA intron coverage
+    mkdir -p mesa_intron_coverage
+    mesa intron_coverage -b mesa_manifest_bams.txt -m mesa_allPS.tsv \
+        -j mesa_junctions.bed -n $task.cpus -o mesa_intron_coverage
+
+    mkdir -p ${params.outdir}/mesa_out/mesa_intron_coverage
+    cp *_intron_coverage.txt ${params.outdir}/mesa_out/mesa_intron_coverage
+
+    mesa ir_table -i mesa_inclusionCounts.tsv -c mesa_allClusters.tsv \
+        -d ${params.outdir}/mesa_out/mesa_intron_coverage -o mesa_ir_table -r
 
     cp -r mesa* ${params.outdir}/mesa_out
 
@@ -72,8 +84,7 @@ process MESA_ONLY {
     """
     mkdir -p ${params.outdir}/mesa_out
 
-    sed 's/\r//' $srafile | head
-
+    #sed 's/\r//' $srafile | head
 
     # Make MESA manifest of bams
     sed 's/\r//' $srafile  |
@@ -93,6 +104,17 @@ process MESA_ONLY {
     mesa quant -m mesa_manifest.txt -o mesa --drim --maxLength  50000 \
         --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
         --minEntropy 1 2> error.txt
+
+    # Run MESA intron coverage
+    mkdir -p mesa_intron_coverage
+    mesa intron_coverage -b mesa_manifest_bams.txt -m mesa_allPS.tsv \
+        -j mesa_junctions.bed -n $task.cpus -o mesa_intron_coverage
+
+    mkdir -p ${params.outdir}/mesa_out/mesa_intron_coverage
+    cp *_intron_coverage.txt ${params.outdir}/mesa_out/mesa_intron_coverage
+
+    mesa ir_table -i mesa_inclusionCounts.tsv -c mesa_allClusters.tsv \
+        -d ${params.outdir}/mesa_out/mesa_intron_coverage -o mesa_ir_table -r
 
     cp -r mesa* ${params.outdir}/mesa_out
 
