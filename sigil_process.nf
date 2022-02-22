@@ -20,14 +20,20 @@ def helpMessage() {
         --outdir                       Output directory to place outputs
         --reads                        Input directory of fastq.gz files
         --single_end                   Indicate reads are single end for kallisto
-        --paired_end                   Indicate reads are paired end for kallis
+        --paired_end                   Indicate reads are paired end for kallisto
         --kallisto_idx                 Kallisto index
         --star_index                   STAR index
+
+
         --gtf                          gtf file needed for MESA
         --metadata                     csv file needed for MESA (usually SRA run table)
-        --skip_QC                      Dont run fastQC or multiQC
-        --bed_manifest                 manifest with .bed files to run MESA quant
+        --mesa_only                    Run  all mesa steps on bams in the star_out directory
+        --mesa_quant_only              Run  the mesa quant steps ; requires --bed_manifest
+        --bed_manifest                 Manifest of .beds made by mesa bam_to_junc_bed ("mesa_manifest.txt") needed to run MESA quant
+
         --cluster                      Just run kallisto cluster step, requires kallisto directory and MESA PS
+        --skip_QC                      Dont run fastQC or multiQC
+
 
         """
 }
@@ -63,26 +69,27 @@ println "Output directory: $params.outdir \n"
 workflow {
   main:
 
-  // // kallisto PAIRED END
-  // if (params.paired_end && params.kallisto_idx){
-  //   dir =  params.reads +"*{1,2}.fastq.gz"
-  //   read_ch = channel.fromFilePairs(dir, checkIfExists: true ).view()
-  //   KALLISTO_PE(params.kallisto_idx, read_ch)
-  //   POST_KALLISTO(params.metadata, KALLISTO_PE.out.collect())
-  // }
-  //
-  // // kallisto SINGLE END
-  // if (params.single_end && params.kallisto_idx) {
-  //   dir =  params.reads +"*.fastq.gz"
-  //   read_ch = channel.fromPath( dir, checkIfExists: true ).map { it -> [it.name.replace(".fastq.gz", ""), file(it)]}.view()
-  //   KALLISTO_SE(params.kallisto_idx, read_ch)
-  //   POST_KALLISTO(params.metadata, KALLISTO_SE.out.collect())
-  // }
+  // kallisto PAIRED END
+  if (params.paired_end && params.kallisto_idx){
+    dir =  params.reads +"*{1,2}.fastq.gz"
+    read_ch = channel.fromFilePairs(dir, checkIfExists: true ).view()
+    KALLISTO_PE(params.kallisto_idx, read_ch)
+    POST_KALLISTO(params.metadata, KALLISTO_PE.out.collect())
+  }
 
-  // STAR and MESA
-  if (params.star_index && !params.bed_manifest && !params.cluster && !params.mesa_only ){
+  // kallisto SINGLE END
+  if (params.single_end && params.kallisto_idx) {
     dir =  params.reads +"*.fastq.gz"
     read_ch = channel.fromPath( dir, checkIfExists: true ).map { it -> [it.name.replace(".fastq.gz", ""), file(it)]}.view()
+    KALLISTO_SE(params.kallisto_idx, read_ch)
+    POST_KALLISTO(params.metadata, KALLISTO_SE.out.collect())
+  }
+
+  // STAR and MESA
+  if (params.star_index && !params.bed_manifest && !params.cluster && !params.mesa_only && !params.mesa_quant_only ){
+    // remove these two lines
+    dir =  params.reads +"*{1,2}.fastq.gz"
+    read_ch = channel.fromFilePairs(dir, checkIfExists: true ).view()
 
     STAR_ALIGN(params.star_index, read_ch)
     MESA(params.metadata, STAR_ALIGN.out[1].collect(), params.gtf, params.genome)
@@ -90,12 +97,12 @@ workflow {
   }
 
   // Just MESA to generate beds from bams and quantify
-  if (params.mesa_only && params.metadata && !params.cluster){
+  if (params.mesa_only && params.metadata && !params.cluster && !params.bed_manifest){
     MESA_ONLY(params.metadata, params.gtf, params.genome)
   }
 
   // Just MESA QUANT from MESA generated beds
-  if (params.metadata && params.bed_manifest  && !params.mesa_only && !params.cluster){
+  if (params.metadata && params.bed_manifest  && !params.mesa_only && !params.cluster && params.mesa_quant_only){
     MESA_QUANT_ONLY(params.bed_manifest)
   }
 

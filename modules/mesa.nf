@@ -84,8 +84,6 @@ process MESA_ONLY {
     """
     mkdir -p ${params.outdir}/mesa_out
 
-    #sed 's/\r//' $srafile | head
-
     # Make MESA manifest of bams
     sed 's/\r//' $srafile  |
     #awk -F, '{print \$1",${params.outdir}/star_out/STAR_"\$1"/"\$1"Aligned.sortedByCoord.out.bam,"\$NF","\$NF}' OFS=  |     #rearrange columns, add metadata columns,  add file path
@@ -140,6 +138,7 @@ process MESA_QUANT_ONLY {
         --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
         --minEntropy 1 2> error.txt
 
+    rm mesa_manifest.txt #need to rm to avoid cp error 
     cp -r mesa* ${params.outdir}/mesa_out
     """
 }
