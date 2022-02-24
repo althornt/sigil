@@ -139,30 +139,32 @@ all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.75), ]
 print("all_PS_nan_filt")
 print(dim(all_PS_nan_filt))
 
-write.table(x = all_PS_nan_filt,na="nan", row.names = TRUE, quote=FALSE,
-          col.names=NA, sep = "\t",
+# Write table and add name rownames "cluster"
+write.table(x = data.frame("cluster"=rownames(all_PS_nan_filt),all_PS_nan_filt),
+          na="nan", row.names = FALSE, quote=FALSE,
+           sep = "\t",
           file = paste0(opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"))
 print("Number of junctions removed for having over 75% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
 
-# print(sum(rowSums(is.na(all_PS))))
 
-# print(head(metadata))
-#
-# bcells <- metadata %>%
-#   dplyr::filter(LM6  == "B cells") %>%
-#   droplevels()
-#
-# print(bcells$Run)
-#
-# print(all_PS %>%
-# dplyr::select(as.vector(bcells$Run)) %>%
-# dplyr:::filter(row.names(all_PS) %in% c("1:198696909-198699563:-"))
-# )
+print(sum(rowSums(is.na(all_PS))))
+print(sum(rowSums(is.na(all_PS_nan_filt))))
 
-###################
-# LM22
-###################
+
+read_in_all_PS_nan_filt = read.table(file = paste0(
+      opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"),
+       sep="\t", row.names = 1, header = TRUE)
+
+
+print("read_in_all_PS_nan_filt after read in ")
+print(head(read_in_all_PS_nan_filt))
+print(dim(read_in_all_PS_nan_filt))
+
+
+# ###################
+# # LM22
+# ###################
 if("LM22" %in% colnames(metadata)){
   ls_lm22_cell_types <- unique(metadata[["LM22"]])
 
@@ -180,9 +182,9 @@ if("LM22" %in% colnames(metadata)){
 
 }
 
-###################
+##################
 # LM6
-###################
+##################
 if("LM6" %in% colnames(metadata)){
   ls_lm6_cell_types <- unique(metadata[["LM6"]])
   ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]

@@ -145,13 +145,17 @@ call_run_css_cell_type <- function(ls_cell_types, label){
     tibble::rownames_to_column(., "Run") %>%
     dplyr::filter(Run %in% ls_events_keep) %>%
     tibble::column_to_rownames(., "Run") %>%
-    dplyr::select(as.vector(ls_samples_types$Run))
+    dplyr::select(as.vector(ls_samples_types$Run)) %>%
+    tibble::rownames_to_column(., "cluster")
+
+  print(head(df_all_PS_nan_filt_subset))
 
   # Write to file to be used by MESA compare
   path_all_PS_filt_out <- paste0(opt$out_dir, "/celltype_subset_dfs/",
                 "mesa_allPS_nan_filt_",label,".tsv")
-  write.table(x = df_all_PS_nan_filt_subset, na="nan", row.names = TRUE,
-              quote=FALSE, col.names=NA, sep = "\t",
+
+  write.table(x = df_all_PS_nan_filt_subset,
+              na="nan", row.names = FALSE, quote=FALSE, sep = "\t",
               file = path_all_PS_filt_out)
 
   # Run MESA compare_sample_sets using new reduced df (nan and sample filtered)
@@ -253,64 +257,64 @@ T_cell_types <- list(
 # Do 1 vs all comparsino within T cell cell types
 call_run_css_cell_type(T_cell_types, "Tcell" )
 
-######################################################
-# Monocytes and macrophages
-######################################################
-
-# Get samples with this cell type
+# ######################################################
+# # Monocytes and macrophages
+# ######################################################
+#
+# # Get samples with this cell type
+# # mon_mac_cell_types <- list(
+# #   "Monocytes",
+# #   "Macrophages M0",
+# #   "Macrophages M1",
+# #   "Macrophages M2")
+#
+# # dont include ones without samples or else nan filtering will break
+#
 # mon_mac_cell_types <- list(
-#   "Monocytes",
-#   "Macrophages M0",
-#   "Macrophages M1",
-#   "Macrophages M2")
-
-# dont include ones without samples or else nan filtering will break
-
-mon_mac_cell_types <- list(
-    "Monocytes",
-    "Macrophages M0",
-    "Macrophages M1")
-
-# Do 1 vs all comparsino within cell types
-call_run_css_cell_type(mon_mac_cell_types, "Mon_Mac" )
-
-##########################
-# B-cells
-##########################
-# Get samples with this cell type
-B_cell_types <- list(
-  "B cells naive",
-  "B cells memory")
-
-# Do 1 vs all comparsino within cell types
-call_run_css_cell_type(B_cell_types, "Bcell" )
-
-##########################
-# Dendritic cells
-##########################
-dendritic_cell_types <- list(
-  "Dendritic cells resting",
-  "Dendritic cells activated")
-
-# Do 1 vs all comparsino within cell types
-call_run_css_cell_type(dendritic_cell_types, "Dendritic" )
-
-# ##########################
-# # Mast cells
-# ##########################
-# mast_cell_types <- list(
-#   "Mast cells resting",
-#   "Mast cells activated")
+#     "Monocytes",
+#     "Macrophages M0",
+#     "Macrophages M1")
 #
 # # Do 1 vs all comparsino within cell types
-# call_run_css_cell_type(mast_cell_types, "Mast" )
+# call_run_css_cell_type(mon_mac_cell_types, "Mon_Mac" )
 #
 # ##########################
-# # NK cells
+# # B-cells
 # ##########################
-# NK_cell_types <- list(
-#   "NK cells resting",
-#   "NK cells activated")
+# # Get samples with this cell type
+# B_cell_types <- list(
+#   "B cells naive",
+#   "B cells memory")
 #
 # # Do 1 vs all comparsino within cell types
-# call_run_css_cell_type(NK_cell_types, "NK" )
+# call_run_css_cell_type(B_cell_types, "Bcell" )
+#
+# ##########################
+# # Dendritic cells
+# ##########################
+# dendritic_cell_types <- list(
+#   "Dendritic cells resting",
+#   "Dendritic cells activated")
+#
+# # Do 1 vs all comparsino within cell types
+# call_run_css_cell_type(dendritic_cell_types, "Dendritic" )
+#
+# # ##########################
+# # # Mast cells
+# # ##########################
+# # mast_cell_types <- list(
+# #   "Mast cells resting",
+# #   "Mast cells activated")
+# #
+# # # Do 1 vs all comparsino within cell types
+# # call_run_css_cell_type(mast_cell_types, "Mast" )
+# #
+# # ##########################
+# # # NK cells
+# # ##########################
+# # NK_cell_types <- list(
+# #   "NK cells resting",
+# #   "NK cells activated")
+# #
+# # # Do 1 vs all comparsino within cell types
+# # call_run_css_cell_type(NK_cell_types, "NK" )
