@@ -2,8 +2,11 @@
 library(optparse)
 library(magrittr)
 library(dplyr)
-library(pheatmap)
-
+# library(pheatmap)
+library(foreach)
+library(doParallel)
+cl <- makeCluster(detectCores() - 1)
+registerDoParallel(cl)
 
 runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
   #' Run MESA compare_sample_sets comparing the given cell_type_val and
@@ -13,7 +16,6 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
   #' usually either "sigil_general" or "sigil_cell_type"
   #' @param cell_type_val - cell type name that is in the meta_col_to_use to
   #' compare to all other cell types
-  #' @return List of differentially spliced events
 
   # Convert the given cell type to string with no spaces
   str_cell_type_val <- paste(unlist(strsplit(
@@ -26,7 +28,7 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
   #############################################################################
   # Get samples with this given cell type
   df_samples <- metadata  %>%
-    dplyr::filter(LM22 == cell_type_val)
+    dplyr::filter(get(meta_col_to_use) == cell_type_val)
 
   all_PS_nan_filt_sub <- all_PS_nan_filt %>%
     dplyr::select(as.vector(unlist(df_samples$Run)))
@@ -95,7 +97,7 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
       opt$gtf, " 2>&1")
 
     system(cmd)
-    print(cmd)
+    # print(cmd)
   }
 
 }
@@ -200,6 +202,7 @@ print(nrow(all_PS)- nrow(all_PS_nan_filt))
 # print(head(read_in_all_PS_nan_filt))
 # print(dim(read_in_all_PS_nan_filt))
 
+print(cl)
 
 ###################
 # LM22
@@ -207,17 +210,13 @@ print(nrow(all_PS)- nrow(all_PS_nan_filt))
 if("LM22" %in% colnames(metadata)){
   ls_lm22_cell_types <- unique(metadata[["LM22"]])
 
-  # Run MESA compare_sample_sets for each general subtype and make heatmap
-  sigil_lm22_mesa_comp_res <- sapply(
-    ls_lm22_cell_types,
-    runCompareSampleSets_1_vs_all,
-    meta_col_to_use="LM22",
-    USE.NAMES = TRUE)
-
-  ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
-  print(length(ls_combined_diff_splice_events))
+  foreach(i=ls_lm22_cell_types, .packages='magrittr') %dopar% {
+    runCompareSampleSets_1_vs_all(
+        cell_type_val = i,
+        meta_col_to_use="LM22")}
 
 }
+
 
 ##################
 # LM6
@@ -226,14 +225,44 @@ if("LM6" %in% colnames(metadata)){
   ls_lm6_cell_types <- unique(metadata[["LM6"]])
   ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
 
-  # Run MESA compare_sample_sets for each general subtype and make heatmap
-  sigil_lm6_mesa_comp_res <- sapply(
-    ls_lm6_cell_types,
-    runCompareSampleSets_1_vs_all,
-    meta_col_to_use="LM6",
-    USE.NAMES = TRUE)
-
-  ls_lm6_combined_diff_splice_events <- unlist(sigil_lm6_mesa_comp_res)
-  print(length(ls_lm6_combined_diff_splice_events))
-
+  foreach(i=ls_lm6_cell_types, .packages='magrittr') %dopar% {
+    runCompareSampleSets_1_vs_all(
+        cell_type_val = i,
+        meta_col_to_use="LM6")}
 }
+
+
+###################
+# LM22
+###################
+# if("LM22" %in% colnames(metadata)){
+#   ls_lm22_cell_types <- unique(metadata[["LM22"]])
+#
+#   # Run MESA compare_sample_sets for each general subtype and make heatmap
+#   sigil_lm22_mesa_comp_res <- sapply(
+#     ls_lm22_cell_types,
+#     runCompareSampleSets_1_vs_all,
+#     meta_col_to_use="LM22",
+#     USE.NAMES = TRUE)
+#
+#   ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
+#   print(length(ls_combined_diff_splice_events))
+#
+# }
+
+##################
+# LM6
+##################
+# if("LM6" %in% colnames(metadata)){
+#   ls_lm6_cell_types <- unique(metadata[["LM6"]])
+#   ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
+#
+#   # Run MESA compare_sample_sets for each general subtype and make heatmap
+#   sigil_lm6_mesa_comp_res <- sapply(
+#     ls_lm6_cell_types,
+#     runCompareSampleSets_1_vs_all,
+#     meta_col_to_use="LM6",
+#     USE.NAMES = TRUE)
+#
+#
+# }
