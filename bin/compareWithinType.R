@@ -62,7 +62,8 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, ls_gen_cell_types,
       opt$out_dir, "/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
       opt$gtf, " 2>&1")
 
-    system(cmd)
+    # system(cmd)
+    print(cmd)
 
   } else {
     print("Not running MESA compare_sample_sets because not at least 3 samples in each group...")
@@ -75,80 +76,44 @@ call_run_css_cell_type <- function(ls_cell_types, label){
   #' @params ls_cell_types - list of cell type names within category
   #' @params label - string to use iin naming outputs
 
-  # Get samples with this cell type
+  print(label)
+  print(ls_cell_types )
+
+  # Get samples with this given cell type
   ls_samples_types <- metadata %>%
     dplyr::filter(LM22 %in% ls_cell_types)
 
   # Keep events with over 75% samples with data in EACH subset type
-  # ls_events_keep <- list()
+  # Loop through subsets to get the passing events and find intersect
   n <- 0
   for (val in ls_cell_types){
-    print(val)
-    print(n)
-
+    # Filter metadata and PS df to samples of this type
     df_samples <- metadata  %>%
       dplyr::filter(LM22 %in% val)
-
-    # Fitler PS df to samples of this type
     all_PS_nan_filt_sub <- all_PS_nan_filt %>%
       dplyr::select(as.vector(unlist(df_samples$Run)))
 
     # Keep events with atleast 75% of data not missing in this cell type
     all_PS_nan_filt_sub_nans <- all_PS_nan_filt_sub[which(
                               rowMeans(!is.na(all_PS_nan_filt_sub)) >= 0.75), ]
-    # Add list to list
-    # print(length(ls_events_keep))
-
-    # ls_events_keep <- append(
-    #                   ls_events_keep,
-    #                   rownames(all_PS_nan_filt_sub_nans)
-    #                   )
-
-    print("this type")
-    print(length(rownames(all_PS_nan_filt_sub_nans)))
 
     if (n >0){
-      print("intersect")
-      print("before add")
-      print(length(ls_events_keep))
       ls_events_keep <- Reduce(
-                            intersect,
-                            list(ls_events_keep, rownames(all_PS_nan_filt_sub_nans)))
+                          intersect,
+                          list(ls_events_keep, rownames(all_PS_nan_filt_sub_nans)))
     } else{
-      print("else")
       ls_events_keep <-  rownames(all_PS_nan_filt_sub_nans)
     }
-
-
-    print("after add")
-    print(length(ls_events_keep))
-
     n <- n+ 1
-
     }
 
-    print("final:")
-    print(length(ls_events_keep))
-
-
-    # print("intersection")
-    # # Get intersection of events in each list
-    # ls_events_keep_intersect <- Reduce(intersect,  ls_events_keep)
-    #
-    # print(length(ls_events_keep_intersect))
-    # print(ls_events_keep_intersect)
-
-
-  # Keep events that pass NAN filtering in ALL cell types within this category
-
+  # Filter to events that pass NAN filtering in ALL cell types within this category
   df_all_PS_nan_filt_subset <- all_PS_nan_filt %>%
     tibble::rownames_to_column(., "Run") %>%
     dplyr::filter(Run %in% ls_events_keep) %>%
     tibble::column_to_rownames(., "Run") %>%
     dplyr::select(as.vector(ls_samples_types$Run)) %>%
     tibble::rownames_to_column(., "cluster")
-
-  print(head(df_all_PS_nan_filt_subset))
 
   # Write to file to be used by MESA compare
   path_all_PS_filt_out <- paste0(opt$out_dir, "/celltype_subset_dfs/",
@@ -169,7 +134,6 @@ call_run_css_cell_type <- function(ls_cell_types, label){
     USE.NAMES = TRUE)
 
 }
-
 
 # Arguments
 option_list <- list(
@@ -229,11 +193,6 @@ write.table(x = all_PS_nan_filt,na="nan", row.names = TRUE, quote=FALSE,
 print("Number of junctions removed for having over 50% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
 
-# print(head(all_PS_nan_filt))
-
-
-ls_lm22_cell_types <- unique(metadata[["LM22"]])
-print(ls_lm22_cell_types)
 
 ##########################
 # T-cells
@@ -257,64 +216,64 @@ T_cell_types <- list(
 # Do 1 vs all comparsino within T cell cell types
 call_run_css_cell_type(T_cell_types, "Tcell" )
 
-# ######################################################
-# # Monocytes and macrophages
-# ######################################################
-#
-# # Get samples with this cell type
-# # mon_mac_cell_types <- list(
-# #   "Monocytes",
-# #   "Macrophages M0",
-# #   "Macrophages M1",
-# #   "Macrophages M2")
-#
-# # dont include ones without samples or else nan filtering will break
-#
+######################################################
+# Monocytes and macrophages
+######################################################
+
+# Get samples with this cell type
 # mon_mac_cell_types <- list(
-#     "Monocytes",
-#     "Macrophages M0",
-#     "Macrophages M1")
+#   "Monocytes",
+#   "Macrophages M0",
+#   "Macrophages M1",
+#   "Macrophages M2")
+
+# dont include ones without samples or else nan filtering will break
+
+mon_mac_cell_types <- list(
+    "Monocytes",
+    "Macrophages M0",
+    "Macrophages M1")
+
+# Do 1 vs all comparsino within cell types
+call_run_css_cell_type(mon_mac_cell_types, "Mon_Mac" )
+
+##########################
+# B-cells
+##########################
+# Get samples with this cell type
+B_cell_types <- list(
+  "B cells naive",
+  "B cells memory")
+
+# Do 1 vs all comparsino within cell types
+call_run_css_cell_type(B_cell_types, "Bcell" )
+
+##########################
+# Dendritic cells
+##########################
+dendritic_cell_types <- list(
+  "Dendritic cells resting",
+  "Dendritic cells activated")
+
+# Do 1 vs all comparsino within cell types
+call_run_css_cell_type(dendritic_cell_types, "Dendritic" )
+
+# ##########################
+# # Mast cells
+# ##########################
+# mast_cell_types <- list(
+#   "Mast cells resting",
+#   "Mast cells activated")
 #
 # # Do 1 vs all comparsino within cell types
-# call_run_css_cell_type(mon_mac_cell_types, "Mon_Mac" )
+# call_run_css_cell_type(mast_cell_types, "Mast" )
 #
 # ##########################
-# # B-cells
+# # NK cells
 # ##########################
-# # Get samples with this cell type
-# B_cell_types <- list(
-#   "B cells naive",
-#   "B cells memory")
+# NK_cell_types <- list(
+#   "NK cells resting",
+#   "NK cells activated")
 #
 # # Do 1 vs all comparsino within cell types
-# call_run_css_cell_type(B_cell_types, "Bcell" )
-#
-# ##########################
-# # Dendritic cells
-# ##########################
-# dendritic_cell_types <- list(
-#   "Dendritic cells resting",
-#   "Dendritic cells activated")
-#
-# # Do 1 vs all comparsino within cell types
-# call_run_css_cell_type(dendritic_cell_types, "Dendritic" )
-#
-# # ##########################
-# # # Mast cells
-# # ##########################
-# # mast_cell_types <- list(
-# #   "Mast cells resting",
-# #   "Mast cells activated")
-# #
-# # # Do 1 vs all comparsino within cell types
-# # call_run_css_cell_type(mast_cell_types, "Mast" )
-# #
-# # ##########################
-# # # NK cells
-# # ##########################
-# # NK_cell_types <- list(
-# #   "NK cells resting",
-# #   "NK cells activated")
-# #
-# # # Do 1 vs all comparsino within cell types
-# # call_run_css_cell_type(NK_cell_types, "NK" )
+# call_run_css_cell_type(NK_cell_types, "NK" )

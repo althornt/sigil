@@ -18,11 +18,48 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
   # Convert the given cell type to string with no spaces
   str_cell_type_val <- paste(unlist(strsplit(
                                     as.character(cell_type_val), split=" ")),
-                                     collapse="_")
-
+                                    collapse="_")
   print(str_cell_type_val)
 
-  # Make manifest 1 - given cell type
+  #############################################################################
+  # Filter out events where the main cell type has < 75% samples with data
+  #############################################################################
+  # Get samples with this given cell type
+  df_samples <- metadata  %>%
+    dplyr::filter(LM22 == cell_type_val)
+
+  all_PS_nan_filt_sub <- all_PS_nan_filt %>%
+    dplyr::select(as.vector(unlist(df_samples$Run)))
+
+  # Keep events with atleast 75% of data not missing in this cell type
+  all_PS_nan_filt_sub_nans <- all_PS_nan_filt_sub[which(
+                            rowMeans(!is.na(all_PS_nan_filt_sub)) >= 0.75), ]
+
+  print("Number of events removed:")
+  print(nrow(all_PS_nan_filt_sub)- nrow(all_PS_nan_filt_sub_nans))
+
+  ls_events_keep <- rownames(all_PS_nan_filt_sub_nans)
+
+  # Filter to PS file events that pass NAN filtering in main cell type
+  df_all_PS_nan_filt_subset <- all_PS_nan_filt %>%
+    tibble::rownames_to_column(., "Run") %>%
+    dplyr::filter(Run %in% ls_events_keep) %>%
+    tibble::column_to_rownames(., "Run") %>%
+    tibble::rownames_to_column(., "cluster")
+
+  # Write to file to be used as input by MESA compare
+  path_all_PS_filt_out <- paste0(opt$out_dir,"/compare_",meta_col_to_use,
+                                "/celltype_subset_dfs/mesa_allPS_nan_filt_",
+                                str_cell_type_val,".tsv")
+
+  write.table(x = df_all_PS_nan_filt_subset,
+              na="nan", row.names = FALSE, quote=FALSE, sep = "\t",
+              file = path_all_PS_filt_out)
+
+  #############################################################################
+  # Make sample manifests
+  #############################################################################
+  # Make manifest 1 - given main cell type
   df_m1_main_cell_type <- metadata %>%
     dplyr::filter(get(meta_col_to_use) == cell_type_val) %>%
     dplyr::select(Run)
@@ -40,11 +77,9 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
             file = paste0(opt$out_dir, "/compare_",meta_col_to_use,"/manifests/not_",
             paste0(str_cell_type_val),".tsv"))
 
-  file_css_out <- paste0(opt$out_dir, "/compare_",meta_col_to_use,"/mesa_css_outputs/",
-                               str_cell_type_val,".tsv")
-
-
-
+  #############################################################################
+  # Run compare sample sets
+  #############################################################################
   # If enough samples, compare groups
   if ((nrow(df_m1_main_cell_type)>2) & (nrow(df_m2_others)>2)){
 
@@ -53,11 +88,12 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
     # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
     # Can use batch_corr_mesa_allPS_LM22_nan_filt for both LM6 and LM22 comparisons
     cmd <- paste0(
-      "mesa compare_sample_sets --psiMESA ",opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv",
+      "mesa compare_sample_sets --psiMESA ",path_all_PS_filt_out,
       " -m1 ",opt$out_dir,"/compare_",meta_col_to_use,"/manifests/",str_cell_type_val,".tsv",
       " -m2 ",opt$out_dir, "/compare_",meta_col_to_use,"/manifests/not_",str_cell_type_val,".tsv  -o ",
       opt$out_dir, "/compare_",meta_col_to_use,"/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
       opt$gtf, " 2>&1")
+
     system(cmd)
     print(cmd)
   }
@@ -115,6 +151,11 @@ if (!dir.exists(paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/"))){
    recursive = TRUE, showWarnings = TRUE)
 }
 
+if (!dir.exists(paste0(opt$out_dir,"/compare_LM22/celltype_subset_dfs/"))){
+  dir.create(paste0(opt$out_dir,"/compare_LM22/celltype_subset_dfs/"),
+   recursive = TRUE, showWarnings = TRUE)
+}
+
 if (!dir.exists(paste0(opt$out_dir,"/compare_LM6/manifests/"))){
   dir.create(paste0(opt$out_dir,"/compare_LM6/manifests/"),
    recursive = TRUE, showWarnings = TRUE)
@@ -124,16 +165,19 @@ if (!dir.exists(paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/"))){
   dir.create(paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/"),
    recursive = TRUE, showWarnings = TRUE)
 }
-
+if (!dir.exists(paste0(opt$out_dir,"/compare_LM6/celltype_subset_dfs/"))){
+  dir.create(paste0(opt$out_dir,"/compare_LM6/celltype_subset_dfs/"),
+   recursive = TRUE, showWarnings = TRUE)
+}
 # Open files
 metadata = read.csv(file = opt$metadata)
 all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
 
 print("all_PS")
-print(head(all_PS))
+# print(head(all_PS))
 print(dim(all_PS))
 
-# Remove rows with less than 25% NA
+# Remove rows with more than 25% NA
 all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.75), ]
 
 print("all_PS_nan_filt")
@@ -147,28 +191,21 @@ write.table(x = data.frame("cluster"=rownames(all_PS_nan_filt),all_PS_nan_filt),
 print("Number of junctions removed for having over 75% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
 
-
-print(sum(rowSums(is.na(all_PS))))
-print(sum(rowSums(is.na(all_PS_nan_filt))))
-
-
-read_in_all_PS_nan_filt = read.table(file = paste0(
-      opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"),
-       sep="\t", row.names = 1, header = TRUE)
-
-
-print("read_in_all_PS_nan_filt after read in ")
-print(head(read_in_all_PS_nan_filt))
-print(dim(read_in_all_PS_nan_filt))
+# read_in_all_PS_nan_filt = read.table(file = paste0(
+#       opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"),
+#        sep="\t", row.names = 1, header = TRUE)
+#
+#
+# print("read_in_all_PS_nan_filt after read in ")
+# print(head(read_in_all_PS_nan_filt))
+# print(dim(read_in_all_PS_nan_filt))
 
 
-# ###################
-# # LM22
-# ###################
+###################
+# LM22
+###################
 if("LM22" %in% colnames(metadata)){
   ls_lm22_cell_types <- unique(metadata[["LM22"]])
-
-  print(ls_lm22_cell_types)
 
   # Run MESA compare_sample_sets for each general subtype and make heatmap
   sigil_lm22_mesa_comp_res <- sapply(

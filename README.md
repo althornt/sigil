@@ -12,7 +12,7 @@ sigil_combine.nf merges all data sets
 
 # SRA download
 
-`bash bin/fastqDumpFromMeta.sh sra_manifest.csv`
+`bash bin/fasterqDumpFromMeta.sh /mnt/sra-manifest/SraRunTable.csv /mnt/fastq/sra-fastq 8`
 
 # sigil_process.nf
 `nextflow run sigil_process.nf`
@@ -243,7 +243,7 @@ sudo nextflow run sigil_combine.nf \
 
 sudo nextflow run sigil_combine.nf \
     --manifest /mnt/files/sigil_res_manifest.txt \
-    --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_splicing_20220103
+    --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_splicing_updatedSongMonaco_20220218
 
 
 ```

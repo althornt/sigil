@@ -28,11 +28,11 @@ dependencies:
   - bioconductor-EnsDb.Hsapiens.v86
   - bioconductor-rhdf5
   - bioconductor-limma
-  # - bioconductor-BiocParallel
   - r-optparse
   - r-uwot
   - r-ggplot2
   - r-RColorBrewer
   - r-pheatmap
   - r-tidyverse
-  # - r-ComBat
+  - r-doParallel
+  - r-foreach
