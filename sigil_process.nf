@@ -6,7 +6,7 @@ nextflow.enable.dsl = 2
 // import modules
 include { KALLISTO_SE; KALLISTO_PE } from './modules/kallisto'
 include { STAR_ALIGN } from './modules/star_align'
-include { MESA; MESA_ONLY; MESA_QUANT_ONLY } from './modules/mesa'
+include { MESA; MESA_ONLY; MESA_QUANT_ONLY; MESA_IR_ONLY } from './modules/mesa'
 include { FASTQC; MULTIQC } from './modules/qc'
 include { POST_KALLISTO; POST_KALLISTO_ONLY } from './modules/post_kallisto'
 include { POST_MESA; POST_MESA_ONLY } from './modules/post_mesa'
@@ -29,6 +29,7 @@ def helpMessage() {
         --metadata                     csv file needed for MESA (usually SRA run table)
         --mesa_only                    Run  all mesa steps on bams in the star_out directory
         --mesa_quant_only              Run  the mesa quant steps ; requires --bed_manifest
+        --mesa_ir_only                 Run  the mesa quant and IR steps
         --bed_manifest                 Manifest of .beds made by mesa bam_to_junc_bed ("mesa_manifest.txt") needed to run MESA quant
 
         --cluster                      Just run kallisto cluster step, requires kallisto directory and MESA PS
@@ -86,7 +87,7 @@ workflow {
   }
 
   // STAR and MESA
-  if (params.star_index && !params.bed_manifest && !params.cluster && !params.mesa_only && !params.mesa_quant_only ){
+  if (params.star_index && !params.bed_manifest && !params.cluster && !params.mesa_only && !params.mesa_quant_only && !params.mesa_ir_only ){
     // remove these two lines
     dir =  params.reads +"*{1,2}.fastq.gz"
     read_ch = channel.fromFilePairs(dir, checkIfExists: true ).view()
@@ -104,6 +105,11 @@ workflow {
   // Just MESA QUANT from MESA generated beds
   if (params.metadata && params.bed_manifest  && !params.mesa_only && !params.cluster && params.mesa_quant_only){
     MESA_QUANT_ONLY(params.bed_manifest)
+  }
+
+  // Just MESA IR from bams and quant from MESA generated beds
+  if (params.metadata && params.bed_manifest && params.junctions_bed && params.bam_manifest && !params.mesa_only && !params.cluster && !params.mesa_quant_only && params.mesa_ir_only){
+    MESA_IR_ONLY(params.bed_manifest, params.junctions_bed, params.bam_manifest)
   }
 
   // fastQC
