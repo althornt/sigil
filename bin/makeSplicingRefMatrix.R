@@ -31,6 +31,28 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   dev.off()
 }
 
+volcano <- function(df_css, plot_out_dir, cell_type){
+
+  df_css$gg_label <- NA
+  df_css <- df_css %>%
+    dplyr::arrange() %>%
+    dplyr::mutate(gglabel = case_when(((p.value < .01  ) & (abs(delta) > .4 ))~ overlapping))
+
+
+  p <- ggplot(data=df_css, aes(x=delta, y=-log10(p.value) )) +
+        geom_point(alpha = .7) +
+        theme_minimal() + geom_vline(xintercept=c(-0.1, 0.1), col="red") +
+        geom_hline(yintercept=-log10(0.05), col="red") +
+        geom_text(
+          label= df_css$gglabel,
+          nudge_x = 0.05, nudge_y = 0.05,
+          check_overlap =F, col = "darkgreen", size = 2
+        )
+
+  ggsave(plot = p, filename = paste0(plot_out_dir,cell_type,"_volcano.png"))
+
+}
+
 import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
   #' Import results from MESA compare sample set script to get the top N
   #' significant events into lists
@@ -56,6 +78,9 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
             file = paste0(css_dir, filename),
             sep="\t", header = TRUE)
 
+  # Make volcano plot
+  volcano(df, plot_out_dir,LM22_type)
+
   # Get top negative delta events
   top_sig_by_pval_negdelta <- df %>%
       dplyr::filter(p.value <= .01 ) %>%
@@ -64,8 +89,8 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
       head(topN) %>%
       pull(event)
 
-  print("top_sig_by_pval_negdelta:")
-  print(top_sig_by_pval_negdelta)
+  # print("top_sig_by_pval_negdelta:")
+  # print(top_sig_by_pval_negdelta)
 
   # Make plots for top negative events
   lapply(top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
@@ -80,8 +105,8 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
     pull(event)
 
 
-  print("top_sig_by_pval_posdelta:")
-  print(top_sig_by_pval_posdelta)
+  # print("top_sig_by_pval_posdelta:")
+  # print(top_sig_by_pval_posdelta)
 
   # Make plots for top positive events
   lapply(top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
@@ -121,11 +146,13 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
 
   p <- ggplot( df_, aes(x = get(LM_type), y = PS, color=data_source)) +
       # geom_violin() +
-      geom_jitter(position=position_jitter(0.2), alpha = 0.5) +
+      geom_jitter(position=position_jitter(0.15), alpha = 0.5, size = 2) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
       theme(legend.position = "right") +
       scale_y_continuous(limits = c(0, 1)) +
       labs(x = "cell type")
+      # geom_text(stat='count', aes(label=after_stat(count)), nudge_y = -2)
+
 
   ggsave(plot = p, filename = paste0(out_dir,cell_type,"/",sig_event,".png"))
 
@@ -262,6 +289,12 @@ option_list <- list(
     help = " `mesa_allPS.tsv` input file "),
 
   optparse::make_option(
+    c("-c", "--mesa_cluster"),
+    type = "character",
+    default = NULL,
+    help = "full path to mesa cluster file"),
+
+  optparse::make_option(
     c("-o", "--out_dir"),
     type = "character",
     default = NULL,
@@ -289,9 +322,13 @@ print(head(df_sample_annotations))
 all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1)
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
 
-print(head(all_PS))
-print(dim(all_PS))
-print(sum(rowSums(is.na(all_PS))))
+df_clusters <- read.table(file = opt$mesa_cluster, sep="\t", header = TRUE, row.names=1)
+# print(df_clusters)
+# print(head(all_PS))
+# print(dim(all_PS))
+# print(sum(rowSums(is.na(all_PS))))
+
+# quit()
 
 # Make output directories
 if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM22"))){
