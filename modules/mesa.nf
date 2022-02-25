@@ -1,8 +1,19 @@
+// Each process has different combinatons of MESA steps to make it easy to rerun
+// individual subsets. The MESA bam_to_junc_bed command takes the longest and is
+// not includes in any of the "only" processes. All commands and parameters
+// should be identical.
+
+// MESA: Runs MESA directly after STAR alignment
+// MESA_ONLY: Runs MESA in a new run with existing bams from STAR
+// MESA_QUANT_ONLY: Runs only MESA quant step in a new run with existing bams from STAR
+// MESA_IR_ONLY: Runs only MESA quant intron retention analysis step in a new run with existing bams from STAR
+
+
 process MESA {
   echo true
   publishDir "${params.outdir}/mesa_out", mode: 'copy'
 
-  cpus 5
+  // cpus 15
 
   input:
   path srafile
@@ -63,7 +74,7 @@ process MESA_ONLY {
   echo true
   publishDir "${params.outdir}/mesa_out", mode: 'copy'
 
-  cpus 5
+  cpus 10
 
   input:
   path srafile
@@ -97,6 +108,7 @@ process MESA_ONLY {
     # Run MESA bam_to_junc_bed
     mesa bam_to_junc_bed -m mesa_manifest_bams.txt --output_prefix mesa \
         --annotation $gtf --genome $genome --number_threads $task.cpus
+
 
     # Run MESA quant
     mesa quant -m mesa_manifest.txt -o mesa --drim --maxLength  50000 \
@@ -138,7 +150,54 @@ process MESA_QUANT_ONLY {
         --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
         --minEntropy 1 2> error.txt
 
-    rm mesa_manifest.txt #need to rm to avoid cp error 
+    rm mesa_manifest.txt #need to rm to avoid cp error
     cp -r mesa* ${params.outdir}/mesa_out
+    """
+}
+
+process MESA_IR_ONLY {
+  echo true
+  publishDir "${params.outdir}/mesa_out", mode: 'copy'
+
+  cpus 15
+
+  input:
+  path bed_manifest
+  path junctions_bed
+  path bam_manifest
+
+
+  output:
+
+  path 'error.txt'
+
+  script:
+  //run MESA quant, mesa_intron_coverage, ir_table
+  //move mesa outputs to the output dir
+
+    """
+    mkdir -p ${params.outdir}/mesa_out
+
+    mesa quant -m $bed_manifest -o mesa --drim --maxLength  50000 \
+        --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
+        --minEntropy 1 2> error.txt
+
+    # Run MESA intron coverage
+    mkdir -p mesa_intron_coverage
+
+    mesa intron_coverage -b $bam_manifest -m mesa_allPS.tsv \
+        -j $junctions_bed -n $task.cpus -o mesa_intron_coverage
+
+    mkdir -p ${params.outdir}/mesa_out/mesa_intron_coverage
+    cp *_intron_coverage.txt ${params.outdir}/mesa_out/mesa_intron_coverage
+
+
+    mesa ir_table -i mesa_inclusionCounts.tsv -c mesa_allClusters.tsv \
+        -d ${params.outdir}/mesa_out/mesa_intron_coverage -o mesa_ir_table -r
+
+    #need to rm to avoid cp error
+    rm mesa_junctions.bed mesa_manifest.txt mesa_manifest_bams.txt
+    cp -r mesa* ${params.outdir}/mesa_out
+
     """
 }
