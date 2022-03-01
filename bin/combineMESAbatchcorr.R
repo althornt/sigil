@@ -1,5 +1,7 @@
 #!/usr/bin/env Rscript
 
+# Combine mesa files from different mesa runs and perform batch correction
+
 library(optparse)
 library(EnsDb.Hsapiens.v86)
 library(tximport)
@@ -63,7 +65,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
   umap.out.merge = merge(umap.out, df_merged_metadata_lm22)
 
   # Plot UMAP
-  ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
+  plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
     geom_point(size = 2) +
     theme_classic() +
     theme(legend.position="bottom",legend.title = element_blank()) +
@@ -78,6 +80,32 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
          dpi = 300)
 }
 
+df_to_UMAP <- function(input_df, output_path){
+
+  # Only keep events over .75 variance cut off
+  var <- apply(input_df[, -1], 1, var)
+  param <- quantile(var, c(.75), na.rm=T)
+  input_df_filt <- input_df[var > param & !is.na(var), ]
+
+  # Transpose and format
+  input_df_filt_t <- as.data.frame(t(input_df_filt))
+  rownames(input_df_filt_t) <- colnames(input_df)
+
+  # PCA
+  prcomp.out = as.data.frame(prcomp(na.omit(input_df_filt_t), center=T,  scale = T)$x)
+
+  # Making variations of UMAPs with different numbers of neighbors
+  lapply(c(20), make_umap, meta_col="data_source",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+  lapply(c(20), make_umap, meta_col="LM22",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+  lapply(c(20), make_umap, meta_col="sigil_general",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+  lapply(c(20), make_umap, meta_col="LM6",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+}
+
+
 plot_PS_hist <- function(df, out_path){
   data_long <- df %>%
     tibble::rownames_to_column("event") %>%
@@ -88,6 +116,36 @@ plot_PS_hist <- function(df, out_path){
       scale_y_continuous(trans='log2')
   ggsave(plot = p, filename = out_path)
 }
+
+plot_before_after <- function(df_before, df_after, filename, val){
+
+  before_long <- df_before %>%
+  # dplyr::filter(rownames(df_before) %in% c("21:33432871-33436827:+","21:33432871-33436827:-")) %>%
+    tibble::rownames_to_column("event") %>%
+    tidyr::gather(., key="sample", value = val, -c(event)) %>%
+    as.data.frame()
+
+  after_long <- df_after %>%
+    # dplyr::filter(rownames(df_after) %in% c("21:33432871-33436827:+","21:33432871-33436827:-")) %>%
+    tibble::rownames_to_column("event") %>%
+    tidyr::gather(., key="sample", value = val, -c(event)) %>%
+    as.data.frame()
+
+  p <- ggplot() +
+      geom_freqpoly(data = before_long, aes(x = val), colour =  "orange") +
+      geom_freqpoly(data = after_long, aes(x = val), colour =  "blue") +
+      scale_y_continuous(trans='log2') +
+      scale_colour_manual(name = '',
+          values =c('orange'='orange','blue'='blue'),
+          labels = c('before','after')) +
+      xlab(paste(val))
+
+
+  ggsave(plot = p, filename = paste0(opt$out_dir,"/",filename,"_IFNGR2.png"))
+
+
+}
+
 ###################
 # MAIN
 ###################
@@ -124,6 +182,10 @@ if (!dir.exists(file.path(opt$out_dir,"/UMAPs_post_batch_correction/"))){
 df_manifest <- read.csv(file = opt$manifest, sep = "\t", header=TRUE)
 print(df_manifest)
 
+#############################################
+# Read in mesa files from different sources
+#############################################
+
 # Import and combine source metadata files
 ls_mesa_meta = apply(df_manifest, 1, importMetaMESA)
 
@@ -153,15 +215,17 @@ write.csv(df_merged_metadata_lm22,
 # List of samples with LM22 label
 ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
 
-############################
-# Merging mesa files
-#############################
+#########################################
+# Merge mesa files
+#########################################
 
 mesa_file_names <- list(
-              list(ls_mesa_inc_count_files, "manifest_mesa_inclusionCounts_files.tsv","merged_mesa_inclusionCounts.tsv" ),
-              list(ls_mesa_allPS_files, "manifest_mesa_allPS_files.tsv","merged_mesa_allPS.tsv" ),
-              list(ls_mesa_IR_files, "manifest_mesa_IR_files.tsv","merged_mesa_ir_table_intron_retention.tsv" ))
-
+              list(ls_mesa_inc_count_files,
+                  "manifest_mesa_inclusionCounts_files.tsv","merged_mesa_inclusionCounts.tsv" ),
+              list(ls_mesa_allPS_files,
+                 "manifest_mesa_allPS_files.tsv","merged_mesa_allPS.tsv" ),
+              list(ls_mesa_IR_files,
+                 "manifest_mesa_IR_files.tsv","merged_mesa_ir_table_intron_retention.tsv" ))
 
 merge <- foreach(i=mesa_file_names ) %dopar% {
 
@@ -181,104 +245,34 @@ merge <- foreach(i=mesa_file_names ) %dopar% {
 
         print(cmd)
         # system(cmd)
-
     }
 
-  # quit()
-
-
-# Import all files
-# PS
-# cluster
-# IR
-# check they have same number of columns
-
-# For all 3
-    # Make UMAP of before batch correction
-
-# Batch correction on counts  + conversion to PS
-# UMAPs PS after batch correction
-
-# Batch correction of IR
-# UMAPs of IR after batch correction
-
-
-# For all 3
-    # Compare distribution after batch correction
-
-
-
-######################################
-# UMAPs of PS before batch correction
-######################################
-# Read in merged allPS file
-df_merged_allPS <- read.table(paste0(opt$out_dir,"/merged_mesa_allPS.tsv"),
-                              row.names = 1, header=T)
-
-# print(head(df_merged_allPS))
-# print(dim(df_merged_allPS))
-# plot_PS_hist(df_merged_allPS,  paste0(opt$out_dir,"/hist_allPS.png"))
-# print("sum")
-# print(sum(rowSums(is.na(df_merged_allPS))))
-
-print("df_merged_allPS__________________________________")
-df_merged_allPS %>%
-  dplyr::filter(rownames(df_merged_allPS) %in% c("21:33432871-33436827:+","21:33432871-33436827:-"))
-
-# Drop genes with low variance.
-# allPS_var <- apply(df_merged_allPS[, -1], 1, var)
-# print(length(allPS_var))
-#
-# # For gene I used median (50% quantile) as the cutoff
-# # For splicing using 75% due to there being many more rows)
-# PS_param <- quantile(allPS_var, c(.75), na.rm=T)
-# print(PS_param)
-#
-# df_allPS_filt <- df_merged_allPS[allPS_var > PS_param & !is.na(allPS_var), ]
-# print(dim(df_allPS_filt))
-#
-# # Transpose and format
-# df_allPS_filt_t <- as.data.frame(t(df_allPS_filt))
-# rownames(df_allPS_filt_t) <- colnames(df_allPS_filt)
-#
-# print(dim(df_allPS_filt))
-# print(dim(df_allPS_filt_t))
-# # PCA.
-# all.ps.prcomp.out = as.data.frame(prcomp(na.omit(df_allPS_filt_t), center=T,  scale = T)$x)
-#
-# # Making variations of UMAPs with different numbers of neighbors
-# lapply(c(20), make_umap, meta_col="data_source",
-#   df_PCA = all.ps.prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="LM22",
-#   df_PCA = all.ps.prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="sigil_general",
-#   df_PCA = all.ps.prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(20), make_umap, meta_col="LM6",
-#   df_PCA = all.ps.prcomp.out, out_path = "UMAPs_pre_batch_correction/mesa_incl_count_PCA_UMAP")
-
-
-# ########################################################
-# # Batch correction of inclusion counts
-# #########################################################
-#
-# Read in merged inclusion count file
+# Import each merged MESA file and check they have same number of samples
 df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_inclusionCounts.tsv"),
                                     row.names = 1, header=T)
+df_merged_allPS <- read.table(paste0(opt$out_dir,"/merged_mesa_allPS.tsv"),
+                              row.names = 1, header=T)
+df_merged_IR <- read.table(paste0(opt$out_dir,"/merged_mesa_ir_table_intron_retention.tsv"),
+                                    row.names = 1, header=T)
+if(all.equal(ncol(df_merged_allPS),
+            ncol(df_merged_inc_counts),
+            ncol(df_merged_IR)) != TRUE)
+  stop("Error: Number of columns across PS, inclusion counts, and intron retention files are not equal")
 
+######################################
+# UMAPs before batch correction
+######################################
+df_to_UMAP(df_merged_inc_counts, "UMAPs_pre_batch_correction/inclusionCounts_PCA_UMAP")
+df_to_UMAP(df_merged_allPS, "UMAPs_pre_batch_correction/allPS_PCA_UMAP")
+df_to_UMAP(df_merged_IR, "UMAPs_pre_batch_correction/IR_PCA_UMAP")
 
-print("df_merged_inc_counts_____________________________")
-df_merged_inc_counts %>%
-  dplyr::filter(rownames(df_merged_inc_counts) %in% c("21:33432871-33436827:+","21:33432871-33436827:-"))
-
-# print("df_merged_inc_counts")
-# print(dim(df_merged_inc_counts))
-# print(sum((is.na(df_merged_inc_counts))))
-# plot_PS_hist(df_merged_inc_counts,  paste0(opt$out_dir,"/merged_inc_counts.png"))
-
+########################################################
+# Batch correction of inclusion counts
+#########################################################
 # Log2 + 1 transform counts
 df_log2trans_inc_counts <- as.data.frame(log2(df_merged_inc_counts +1))
-print(dim(df_log2trans_inc_counts))
-plot_PS_hist(df_log2trans_inc_counts,  paste0(opt$out_dir,"/hist_inc_counts_log.png"))
+plot_PS_hist(df_merged_inc_counts,  paste0(opt$out_dir,"/hist_merged_inc_counts.png"))
+plot_PS_hist(df_log2trans_inc_counts,  paste0(opt$out_dir,"/hist_merged_inc_counts_log.png"))
 
 # Limma remove batch effect
 df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
@@ -287,171 +281,107 @@ df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
                                   batch2 = df_merged_metadata$type
                                   )
 
-print("df_mesa_inc_count_merge_log2_batch_corr")
-print(dim(df_mesa_inc_count_merge_log2_batch_corr))
-#
-# # Undo log2(x+1) with 2^x - 1
-df_mesa_inc_count_merge_bc_counts = 2^df_mesa_inc_count_merge_log2_batch_corr -1
-rownames(df_mesa_inc_count_merge_bc_counts) <- rownames(df_merged_inc_counts)
-# # Round all counts below 1 to 0
-df_mesa_inc_count_merge_bc_counts[df_mesa_inc_count_merge_bc_counts < 1 ] <- 0
+# Undo log2(x+1) with 2^x - 1
+df_merged_inc_counts_batch_corr = 2^df_mesa_inc_count_merge_log2_batch_corr -1
+rownames(df_merged_inc_counts_batch_corr) <- rownames(df_merged_inc_counts)
 
-# print("batch_corr_mesa_inclusionCounts before ")
-# print(dim(df_mesa_inc_count_merge_bc_counts))
-#
-# plot_PS_hist(as.data.frame(df_mesa_inc_count_merge_bc_counts),
-#               paste0(opt$out_dir,"/hist_inc_counts_bc.png"))
-#
-# write.table(
-#   df_mesa_inc_count_merge_bc_counts,
-#   file.path(opt$out_dir,"batch_corr_mesa_inclusionCounts.tsv"),
-#   sep="\t",quote=F, col.names = NA)
+# Round all counts below 1 to 0
+df_merged_inc_counts_batch_corr[df_merged_inc_counts_batch_corr < 1 ] <- 0
 
-#Check file  was written properly
-# read_in_df_mesa_inc_count_merge_bc_counts <- read.table(
-#       paste0(opt$out_dir,"/batch_corr_mesa_inclusionCounts.tsv"),
-#                                       row.names = 1, header=T)
-# print("batch_corr_mesa_inclusionCounts  after writing and reading in ")
-# print(dim(read_in_df_mesa_inc_count_merge_bc_counts))
+plot_PS_hist(as.data.frame(df_merged_inc_counts_batch_corr),
+              paste0(opt$out_dir,"/hist_merged_inc_counts_bc.png"))
+
+write.table(
+  df_merged_inc_counts_batch_corr,
+  file.path(opt$out_dir,"batch_corr_mesa_inclusionCounts.tsv"),
+  sep="\t",quote=F, col.names = NA)
 
 ########################################################
 # Convert batch corrected counts to PS
 #########################################################
 # Merge all PS files with MESA select_samples command
 # 2>&1 sends standard error standard output
-# PS_cmd <- paste0(
-#     "mesa counts_to_ps -i ",
-#     opt$out_dir,"/batch_corr_mesa_inclusionCounts.tsv -o ",
-#     opt$out_dir,"/batch_corr_mesa  --recluster 2>&1"
-#     )
-# print(PS_cmd)
-# system(PS_cmd)
+PS_cmd <- paste0(
+    "mesa counts_to_ps -i ",
+    opt$out_dir,"/batch_corr_mesa_inclusionCounts.tsv -o ",
+    opt$out_dir,"/batch_corr_mesa  --recluster 2>&1"
+    )
+print(PS_cmd)
+system(PS_cmd)
 
 
 ########################################################
 # UMAPs of PS after batch correction
 #########################################################
-df_merged_allPS_bc <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_allPS.tsv"),
+df_merged_allPS_batch_corr <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_allPS.tsv"),
                               row.names = 1, header=T)
-print("df_merged_allPS_bc__________________________")
-df_merged_allPS_bc %>%
-  dplyr::filter(rownames(df_merged_allPS_bc) %in% c("21:33432871-33436827:+","21:33432871-33436827:-"))
 
+plot_PS_hist(df_merged_allPS_batch_corr,  paste0(opt$out_dir,"/hist_allPS_bc.png"))
 
-# print("df_merged_allPS_bc")
-# # print(head(df_merged_allPS_bc))
-# print(dim(df_merged_allPS_bc))
-# plot_PS_hist(df_merged_allPS_bc,  paste0(opt$out_dir,"/hist_allPS_bc.png"))
-#
-# # Log2 + 1 transform PS
-# df_allPS_log2trans_bc <- as.data.frame(log2(df_merged_allPS_bc +1))
-# print("df_allPS_log2trans_bc")
-# print(dim(df_allPS_log2trans_bc))
-# plot_PS_hist(df_allPS_log2trans_bc,  paste0(opt$out_dir,"/hist_allPS_bc_log.png"))
-#
-# # Drop genes with low variance.
-# allPS_log2trans_var_bc <- apply(df_allPS_log2trans_bc[, -1], 1, var)
-# print(length(allPS_log2trans_var_bc))
-#
-# # For gene I used median (50% quantile) as the cutoff
-# # For splicing using 75% due to there being many more rows)
-# PS_param_bc <- quantile(allPS_log2trans_var_bc, c(.75), na.rm=T)
-# print(PS_param_bc)
-#
-# df_allPS_log2trans_bc_filt <- df_allPS_log2trans_bc[allPS_log2trans_var_bc > PS_param_bc & !is.na(allPS_log2trans_var_bc), ]
-# print(dim(df_allPS_log2trans_bc_filt))
-#
-# # Transpose and format
-# df_allPS_log2trans_bc_filt_t <- as.data.frame(t(df_allPS_log2trans_bc_filt))
-# rownames(df_allPS_log2trans_bc_filt_t) <- colnames(df_allPS_log2trans_bc_filt)
-#
-# print(dim(df_allPS_log2trans_bc_filt))
-# print(dim(df_allPS_log2trans_bc_filt_t))
-#
-# # PCA.
-# all.ps.prcomp.out.bc = as.data.frame(prcomp(na.omit(df_allPS_log2trans_bc_filt_t), center=T,  scale = T)$x)
-#
-# # Making variations of UMAPs with different numbers of neighbors
-# lapply(c(10,20,30), make_umap, meta_col="data_source",
-#   df_PCA = all.ps.prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(10,20,30), make_umap, meta_col="LM22",
-#   df_PCA = all.ps.prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(10,20,30), make_umap, meta_col="sigil_general",
-#   df_PCA = all.ps.prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-# lapply(c(10,20,30), make_umap, meta_col="LM6",
-#   df_PCA = all.ps.prcomp.out.bc, out_path = "UMAPs_post_batch_correction/mesa_incl_count_PCA_UMAP")
-#
-# # Drop non LM22 samples from mesa PS
-# df_merged_allPS_bc_lm22 <- df_merged_allPS_bc %>%
-#   dplyr::select(ls_smpls_lm22)
-# rownames(df_merged_allPS_bc_lm22) <- rownames(df_merged_allPS_bc)
-# print(head(df_merged_allPS_bc_lm22))
-# write.table(
-#   df_merged_allPS_bc_lm22,
-#   file.path(opt$out_dir,"batch_corr_mesa_allPS_LM22.tsv"), quote=F,sep="\t", na="nan",
-#   col.names = NA, row.names= TRUE)
-#
-# print("df_merged_allPS_bc_lm22")
-# print(head(rownames(df_merged_allPS_bc_lm22)))
-# print(dim(df_merged_allPS_bc_lm22))
+# Drop non LM22 samples from mesa PS
+df_merged_allPS_batch_corr_lm22 <- df_merged_allPS_batch_corr %>%
+  dplyr::select(ls_smpls_lm22)
+rownames(df_merged_allPS_batch_corr_lm22) <- rownames(df_merged_allPS_batch_corr)
 
-#Check file  was written properly
-# print("df_merged_allPS_bc_lm22 after write and read")
-#
-# read_in_batch_corr_mesa_allPS_LM22 <- read.table(
-#       paste0(opt$out_dir,"/batch_corr_mesa_allPS_LM22.tsv"),
-#                                       row.names = 1, header=T)
-# print(dim(read_in_batch_corr_mesa_allPS_LM22))
+write.table(
+  df_merged_allPS_batch_corr_lm22,
+  file.path(opt$out_dir,"batch_corr_mesa_allPS_LM22.tsv"), quote=F,sep="\t", na="nan",
+  col.names = NA, row.names= TRUE)
+
+######################################
+# Intron Retention batch correction
+######################################
+# Log2 + 1 transform IR
+df_merged_IR_log2 <- as.data.frame(log2(df_merged_IR +1))
+
+# Limma remove batch effect
+df_merged_IR_log2_batch_corr <- limma::removeBatchEffect(
+                                  df_merged_IR_log2,
+                                  batch = df_merged_metadata$data_source,
+                                  batch2 = df_merged_metadata$type
+                                  )
+
+# Undo log2(x+1) with 2^x - 1
+df_merged_IR_batch_corr = 2^df_merged_IR_log2_batch_corr -1
+rownames(df_merged_IR_batch_corr) <- rownames(df_merged_IR)
+
+######################################
+# UMAPs after batch correction
+######################################
+df_to_UMAP(df_merged_inc_counts_batch_corr, "UMAPs_post_batch_correction/inclusionCounts_PCA_UMAP")
+df_to_UMAP(df_merged_allPS_batch_corr, "UMAPs_post_batch_correction/allPS_PCA_UMAP")
+df_to_UMAP(df_merged_IR_batch_corr, "UMAPs_post_batch_correction/IR_PCA_UMAP")
+
+#################################################
+# Compare distributions before and after BC
+#################################################
+plot_before_after(df_merged_inc_counts, as.data.frame(df_merged_inc_counts_batch_corr), "hist_inclusionCounts_before_after_bc.png", "Inclusion count")
+plot_before_after(df_merged_allPS, as.data.frame(df_merged_allPS_batch_corr), "hist_PS_before_after_bc.png","PS")
+plot_before_after(df_merged_IR, as.data.frame(df_merged_IR_batch_corr), "hist_IR_before_after_bc.png","Intron coverage")
 
 #################################
-# Compare PS before and after BC
+# IFNGR2 example
 ################################
-#
-# Plot distribution of PS values before and after
-# PS_long <- df_merged_allPS %>%
+
+# inc_count_long <- df_merged_inc_counts %>%
+#   dplyr::filter(rownames(df_merged_inc_counts) %in% c("21:33432871-33436827:+","21:33432871-33436827:-")) %>%
 #   tibble::rownames_to_column("event") %>%
-#   tidyr::gather(., key="sample", value = "PS", -c(event)) %>%
+#   tidyr::gather(., key="sample", value = "Inc_counts", -c(event)) %>%
 #   as.data.frame()
 #
-# bc_PS_long <- df_merged_allPS_bc %>%
+# bc_inc_count_long <- data.frame(df_merged_inc_counts_batch_corr) %>%
+#   dplyr::filter(rownames(df_merged_inc_counts_batch_corr) %in% c("21:33432871-33436827:+","21:33432871-33436827:-")) %>%
 #   tibble::rownames_to_column("event") %>%
-#   tidyr::gather(., key="sample", value = "PS", -c(event)) %>%
+#   tidyr::gather(., key="sample", value = "Inc_counts", -c(event)) %>%
 #   as.data.frame()
+#
 #
 # p <- ggplot() +
-#     geom_freqpoly(data = PS_long, aes(x = PS), colour =  "orange") +
-#     geom_freqpoly(data = bc_PS_long, aes(x = PS), colour =  "blue") +
+#     geom_freqpoly(data = inc_count_long, aes(x = Inc_counts), colour =  "orange") +
+#     geom_freqpoly(data = bc_inc_count_long, aes(x = Inc_counts), colour =  "blue") +
 #     scale_y_continuous(trans='log2') +
 #     scale_colour_manual(name = '',
 #         values =c('orange'='orange','blue'='blue'),
 #         labels = c('before','after'))
 #
-# ggsave(plot = p, filename = paste0(opt$out_dir,"/hist_PS_before_after_bc.png"))
-
-#################################
-# Compare counts before and after BC
-################################
-
-inc_count_long <- df_merged_inc_counts %>%
-  dplyr::filter(rownames(df_merged_inc_counts) %in% c("21:33432871-33436827:+","21:33432871-33436827:-")) %>%
-  tibble::rownames_to_column("event") %>%
-  tidyr::gather(., key="sample", value = "Inc_counts", -c(event)) %>%
-  as.data.frame()
-
-bc_inc_count_long <- data.frame(df_mesa_inc_count_merge_bc_counts) %>%
-  dplyr::filter(rownames(df_mesa_inc_count_merge_bc_counts) %in% c("21:33432871-33436827:+","21:33432871-33436827:-")) %>%
-  tibble::rownames_to_column("event") %>%
-  tidyr::gather(., key="sample", value = "Inc_counts", -c(event)) %>%
-  as.data.frame()
-
-
-p <- ggplot() +
-    geom_freqpoly(data = inc_count_long, aes(x = Inc_counts), colour =  "orange") +
-    geom_freqpoly(data = bc_inc_count_long, aes(x = Inc_counts), colour =  "blue") +
-    scale_y_continuous(trans='log2') +
-    scale_colour_manual(name = '',
-        values =c('orange'='orange','blue'='blue'),
-        labels = c('before','after'))
-
-ggsave(plot = p, filename = paste0(opt$out_dir,"/hist_PS_before_after_bc_ifngr2_count.png"))
-# ggsave(plot = p, filename = paste0(opt$out_dir,"/hist_inc_counts_before_after_bc.png"))
+# ggsave(plot = p, filename = paste0(opt$out_dir,"/hist_PS_before_after_bc_ifngr2_count.png"))
