@@ -1,7 +1,6 @@
 #!/usr/bin/env Rscript
 library(optparse)
 library(magrittr)
-library(dplyr)
 library(pheatmap)
 library(ggplot2)
 library(tidyverse)
@@ -26,6 +25,40 @@ registerDoParallel(cl)
 ##########################
 # Functions
 ##########################
+
+make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
+
+  set.seed(123)
+
+  # Make color palette
+  n <- length(unique(metadata[[meta_col]]))
+  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+  # Run UMAP
+  umap.out <- umap(df_PCA, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
+  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
+  umap.out$Run <- rownames(df_PCA)
+
+  # Merge UMAP results with metadata
+  umap.out.merge = merge(umap.out, metadata)
+
+  # Plot UMAP
+  gg <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="bottom",legend.title = element_blank()) +
+    scale_color_manual(values=pal) +
+    labs(title= paste("UMAP MESA: Cell types, n_neighbors =",num_neighbor, sep = ' '))
+
+  # Save UMAP plot
+  ggsave(file.path(opt$out_dir,
+                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
+         device = "png",
+         width = 12,
+         dpi = 300)
+}
+
 save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   #' Function to save pheatmaps to a pdf file
   stopifnot(!missing(x))
@@ -58,6 +91,12 @@ volcano <- function(df_css, plot_out_dir, cell_type){
 
 }
 
+# filter_top_junction <-  (css_df, ls_clusters){
+#
+# For each item in each cluster
+#
+# }
+
 import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
   #' Import results from MESA compare sample set script to get the top N
   #' significant events into lists
@@ -83,8 +122,14 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
             file = paste0(css_dir, filename),
             sep="\t", header = TRUE)
 
-  # Make volcano plot
+  # Make volcano plot before filtering
   volcano(df, plot_out_dir,LM22_type)
+
+  # Filter to most significant junction per cluster
+
+
+  # Make volcano plot after filtering
+
 
   # Get top negative delta events
   top_sig_by_pval_negdelta <- df %>%
@@ -196,34 +241,41 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   # Filter MESA all PS file to events of interest
   df_all_PS_sig_events <- df_PS %>%
     tibble::rownames_to_column('event') %>%
-    # dplyr::filter(event %in% ls_events[[3]]) %>%
     dplyr::filter(event %in% ls_events) %>%
     dplyr::select(noquote(order(colnames(.)))) %>%
     tibble::column_to_rownames('event')
 
   for (val in list("LM22", "LM6")){
-    # DF to label samples(columns) with labels
-    df_sample_annotations <- df_meta %>%
-      dplyr::filter(paste0(val) != "") %>%
-      dplyr::select(Run, val, data_source) %>%
-      dplyr::arrange(Run) %>%
-      tibble::column_to_rownames("Run")
+      if (nrow(df_all_PS_sig_events) < 50){
+        rowname_on_off = "T"
+      } else { rowname_on_off = "F"}
 
-    stopifnot(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
+      print(rowname_on_off)
+      print(get(rowname_on_off))
+      print(paste0(rowname_on_off))
 
-    heatmap_res <- pheatmap(
-      main = paste0(" "),
-      df_all_PS_sig_events,
-      # scale = "row",
-      show_rownames=F,
-      show_colnames=F,
-      na_col = "grey",
-      annotation_col = df_sample_annotations)
+      # DF to label samples(columns) with labels
+      df_sample_annotations <- df_meta %>%
+        dplyr::filter(paste0(val) != "") %>%
+        dplyr::select(Run, val, data_source) %>%
+        dplyr::arrange(Run) %>%
+        tibble::column_to_rownames("Run")
 
-    save_pheatmap_pdf(
-      heatmap_res,
-      paste0(opt$out_dir,"/ref_matrix/",label,"_",val,".pdf"))
-}
+      stopifnot(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
+
+      heatmap_res <- pheatmap(
+        main = paste0(" "),
+        df_all_PS_sig_events,
+        # scale = "row",
+        show_rownames=get(rowname_on_off),
+        show_colnames=F,
+        na_col = "grey",
+        annotation_col = df_sample_annotations)
+
+      save_pheatmap_pdf(
+        heatmap_res,
+        paste0(opt$out_dir,"/ref_matrix/",label,"_",val,"_rowname",rowname_on_off,".pdf"))
+      }
 }
 
 import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir, meta_col){
@@ -328,13 +380,20 @@ print(head(df_sample_annotations))
 all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1)
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
 
-df_clusters <- read.table(file = opt$mesa_cluster, sep="\t", header = TRUE, row.names=1)
-# print(df_clusters)
-# print(head(all_PS))
-# print(dim(all_PS))
-# print(sum(rowSums(is.na(all_PS))))
+df_clusters <- read.table(file = opt$mesa_cluster, sep="\t", header = FALSE)
+# Remove rows where second column is empty (no ME Junction) and format
+df_clusters_filter <- df_clusters %>% dplyr::filter(V2 != "")
+df_clusters_filter$V2 <-  strsplit(as.character(df_clusters_filter$V2), ",")
 
-# quit()
+# Make list of clusters by combining first col and the list in the second col
+ls_clusters <- list()
+for (row in 1:nrow(df_clusters_filter)) {
+    event_main <- df_clusters_filter[row, "V1"]
+    event_others  <- df_clusters_filter[row, "V2"]
+    row_clusters <- list(unlist(append(as.vector(event_others),
+                                      as.character(event_main))))
+    ls_clusters <- append(ls_clusters, row_clusters )
+}
 
 # Make output directories
 if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM22"))){
@@ -356,6 +415,7 @@ if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/UMAPs"))){
   dir.create(paste0(opt$out_dir,"/ref_matrix/UMAPs"),
    recursive = TRUE, showWarnings = TRUE)
 }
+
 
 ########################################
 # Import LM22 1 vs all comparisons
@@ -413,9 +473,9 @@ ls_lm6_top_events <- unpack_import_css_res(ls_lm6_res)
 # Make heatmap using top events
 make_pheatmap(ls_lm6_top_events[[3]], "LM6_diff_splicing_heatmap", metadata, all_PS )
 
-########################################
-# Import within cell type comparisons
 #######################################
+# Import within cell type comparisons
+######################################
 T_cell_types <- list(
   "T cells CD8",
   "T cells CD4 naive",
@@ -512,45 +572,6 @@ print("ls_lm6_lm22_withincelltype_top_events")
 # print(head(ls_lm6_lm22_withincelltype_top_events))
 print(length(ls_lm6_lm22_withincelltype_top_events))
 make_pheatmap(ls_lm6_lm22_withincelltype_top_events, "LM6_LM22_and_combined_within_cell_type_diff_splicing_heatmap", metadata, all_PS )
-
-
-###############################
-# UMAPs
-################################
-
-
-make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
-
-  set.seed(123)
-
-  # Make color palette
-  n <- length(unique(metadata[[meta_col]]))
-  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
-  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
-
-  # Run UMAP
-  umap.out <- umap(df_PCA, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
-  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
-  umap.out$Run <- rownames(df_PCA)
-
-  # Merge UMAP results with metadata
-  umap.out.merge = merge(umap.out, metadata)
-
-  # Plot UMAP
-  ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
-    geom_point(size = 2) +
-    theme_classic() +
-    theme(legend.position="bottom",legend.title = element_blank()) +
-    scale_color_manual(values=pal) +
-    labs(title= paste("UMAP MESA: Cell types, n_neighbors =",num_neighbor, sep = ' '))
-
-  # Save UMAP plot
-  ggsave(file.path(opt$out_dir,
-                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
-         device = "png",
-         width = 12,
-         dpi = 300)
-}
 
 
 ######################################
