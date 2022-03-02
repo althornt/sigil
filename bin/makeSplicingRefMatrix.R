@@ -10,7 +10,7 @@ library(uwot)
 library(RColorBrewer)
 library(foreach)
 library(doParallel)
-cl <- makeCluster(detectCores() - 1)
+cl <- makeCluster(detectCores() - 1, outfile = "")
 registerDoParallel(cl)
 
 
@@ -69,33 +69,63 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   dev.off()
 }
 
-volcano <- function(df_css, plot_out_dir, cell_type){
+volcano <- function(df_css, plot_out_dir, cell_type, tag){
 
   df_css$gg_label <- NA
   df_css <- df_css %>%
     dplyr::arrange() %>%
-    dplyr::mutate(gglabel = case_when(((p.value < .01  ) & (abs(delta) > .4 ))~ overlapping))
-
+    dplyr::mutate(gglabel = case_when(((p.value<.00001) | ((p.value < .01  ) & (abs(delta) > .3 )))~ overlapping))
 
   p <- ggplot(data=df_css, aes(x=delta, y=-log10(p.value) )) +
         geom_point(alpha = .7) +
         theme_minimal() + geom_vline(xintercept=c(-0.1, 0.1), col="red") +
         geom_hline(yintercept=-log10(0.05), col="red") +
+        xlim(-1.0, 1.0) +
         geom_text(
           label= df_css$gglabel,
           nudge_x = 0.05, nudge_y = 0.05,
           check_overlap =F, col = "darkgreen", size = 2
         )
 
-  ggsave(plot = p, filename = paste0(plot_out_dir,cell_type,"_volcano.png"))
+  ggsave(plot = p, filename = paste0(plot_out_dir,cell_type,tag,"_volcano.png"))
 
 }
 
-# filter_top_junction <-  (css_df, ls_clusters){
-#
-# For each item in each cluster
-#
-# }
+filter_top_junction <-  function(css_df){
+
+  print("filter function.................")
+
+  ls_keep_junctions <- list()
+
+  for (c in ls_clusters) {
+      # print("-------------------------------")
+      # print(c)
+      #
+      #
+      # print(css_df %>%
+      #     dplyr::filter(event %in% c) %>%
+      #     dplyr:::arrange(p.value))
+
+      top_junc  <- css_df %>%
+          dplyr::filter(event %in% c) %>%
+          dplyr:::arrange(p.value) %>%
+          head(1) %>%
+          pull(event) %>%
+          droplevels()
+
+      # print("top_junc:")
+      # print(top_junc)
+      ls_keep_junctions <- append(ls_keep_junctions, as.character(top_junc))
+    }
+
+  print("final_list")
+  print(length(unique(unlist(ls_keep_junctions))))
+  # Filter df to top junctions
+  filt_css_df <-css_df %>%
+    dplyr::filter(event %in% unique(unlist(ls_keep_junctions)))
+  return(filt_css_df)
+
+}
 
 import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
   #' Import results from MESA compare sample set script to get the top N
@@ -123,16 +153,20 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
             sep="\t", header = TRUE)
 
   # Make volcano plot before filtering
-  volcano(df, plot_out_dir,LM22_type)
+  volcano(df, plot_out_dir,LM22_type,"_all_junctions")
 
   # Filter to most significant junction per cluster
+  df_filtered <- filter_top_junction(df)
+  print(dim(df))
+  print(dim(df_filtered))
 
+  write.table(df_filtered, file=paste0(nchar(filename)-4,"_top_junc_per_cluster.tsv"),sep = "\t")
 
   # Make volcano plot after filtering
-
+  volcano(df_filtered, plot_out_dir,LM22_type,"_filtered_junctions")
 
   # Get top negative delta events
-  top_sig_by_pval_negdelta <- df %>%
+  top_sig_by_pval_negdelta <- df_filtered %>%
       dplyr::filter(p.value <= .01 ) %>%
       dplyr::filter(delta < -.2 ) %>%
       dplyr::arrange(p.value) %>%
@@ -147,7 +181,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
         LM_type=meta_col, out_dir = plot_out_dir)
 
   # Get top positive delta events
-  top_sig_by_pval_posdelta <- df %>%
+  top_sig_by_pval_posdelta <- df_filtered %>%
     dplyr::filter(p.value <= .01) %>%
     dplyr::filter(delta > .2 ) %>%
     dplyr::arrange(p.value) %>%
@@ -375,8 +409,6 @@ df_sample_annotations <- metadata %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
-print(head(df_sample_annotations))
-
 all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1)
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
 
@@ -394,6 +426,11 @@ for (row in 1:nrow(df_clusters_filter)) {
                                       as.character(event_main))))
     ls_clusters <- append(ls_clusters, row_clusters )
 }
+
+# Reduce to unique clusters; remove A:B , B:A
+# To DO - doesnt work ls_clusters <- unique(ls_clusters)
+
+print(length(ls_clusters))
 
 # Make output directories
 if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM22"))){
@@ -420,31 +457,31 @@ if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/UMAPs"))){
 ########################################
 # Import LM22 1 vs all comparisons
 #######################################
-
-# Get all outputs from compare sample sets 1 vs all comparisons
-ls_lm22_css_file_names <- list.files(
-                                  paste0(opt$out_dir,
-                                  "/compare_LM22/mesa_css_outputs/"),
-                                  pattern = ".tsv")
-ls_lm22_css_file_names <- ls_lm22_css_file_names[!ls_lm22_css_file_names %in% c("heatmaps")]
-
-# Import, find signficant events and plot each one
-ls_lm22_res <- foreach(i=ls_lm22_css_file_names, .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
-    import_mesa_css(
-      filename = i,
-      topN = 10,
-      meta_col="LM22",
-      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/"),
-      css_dir=paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/")
-    )
-    }
-
-# Unpack top events into lists
-ls_lm22_top_events <- unpack_import_css_res(ls_lm22_res)
-# print(ls_lm22_top_events)
-
-# Make heatmap using top events
-make_pheatmap(ls_lm22_top_events[[3]], "LM22_diff_splicing_heatmap", metadata, all_PS )
+#
+# # Get all outputs from compare sample sets 1 vs all comparisons
+# ls_lm22_css_file_names <- list.files(
+#                                   paste0(opt$out_dir,
+#                                   "/compare_LM22/mesa_css_outputs/"),
+#                                   pattern = ".tsv")
+# ls_lm22_css_file_names <- ls_lm22_css_file_names[!ls_lm22_css_file_names %in% c("heatmaps")]
+#
+# # Import, find signficant events and plot each one
+# ls_lm22_res <- foreach(i=ls_lm22_css_file_names, .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
+#     import_mesa_css(
+#       filename = i,
+#       topN = 10,
+#       meta_col="LM22",
+#       plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/"),
+#       css_dir=paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/")
+#     )
+#     }
+#
+# # Unpack top events into lists
+# ls_lm22_top_events <- unpack_import_css_res(ls_lm22_res)
+# # print(ls_lm22_top_events)
+#
+# # Make heatmap using top events
+# make_pheatmap(ls_lm22_top_events[[3]], "LM22_diff_splicing_heatmap", metadata, all_PS )
 
 ########################################
 # Import LM6 1 vs all comparisons
@@ -453,7 +490,7 @@ make_pheatmap(ls_lm22_top_events[[3]], "LM22_diff_splicing_heatmap", metadata, a
 ls_lm6_css_file_names <- list.files(
                         paste0(opt$out_dir,
                         "/compare_LM6/mesa_css_outputs/"),
-                      pattern = ".tsv")
+                      pattern = ".tsv")[1]
 ls_lm6_css_file_names <- ls_lm6_css_file_names[!ls_lm6_css_file_names %in% c("heatmaps")]
 
 # Import, find signficant events and plot each one
@@ -466,12 +503,16 @@ ls_lm6_res <- foreach(i=ls_lm6_css_file_names, .packages=c('magrittr','dplyr','g
       css_dir=paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/")
     )}
 
-# Unpack top events into lists
-ls_lm6_top_events <- unpack_import_css_res(ls_lm6_res)
-# print(ls_lm6_top_events)
 
-# Make heatmap using top events
-make_pheatmap(ls_lm6_top_events[[3]], "LM6_diff_splicing_heatmap", metadata, all_PS )
+#
+# # Unpack top events into lists
+# ls_lm6_top_events <- unpack_import_css_res(ls_lm6_res)
+# # print(ls_lm6_top_events)
+#
+# # Make heatmap using top events
+# make_pheatmap(ls_lm6_top_events[[3]], "LM6_diff_splicing_heatmap", metadata, all_PS )
+
+quit()
 
 #######################################
 # Import within cell type comparisons
