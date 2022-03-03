@@ -69,27 +69,58 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   dev.off()
 }
 
-volcano <- function(df_css, plot_out_dir, cell_type, tag){
+volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
 
   for (col4label in list("overlapping","event")){
 
-  df_css$gg_label <- NA
-  df_css <- df_css %>%
-    dplyr::arrange() %>%
-    dplyr::mutate(gglabel = case_when(((p.value<.00001) | ((p.value < .01  ) & (abs(delta) > .3 )))~ get(col4label)))
+    # For junctions under certain thresholds label with their overlapping gene or the event
+    # df_css$gg_label <- NA
+    df_css <- df_css %>%
+      dplyr::arrange(p.value) %>%
+      dplyr::mutate(gglabel = case_when(((p.value<.00001) | ((p.value < .01  ) & (abs(delta) > .3 )))~ get(col4label)))
 
-  p <- ggplot(data=df_css, aes(x=delta, y=-log10(p.value) )) +
-        geom_point(alpha = .7) +
-        theme_minimal() + geom_vline(xintercept=c(-0.1, 0.1), col="red") +
-        geom_hline(yintercept=-log10(0.05), col="red") +
-        xlim(-1.0, 1.0) +
-        geom_text(
-          label= df_css$gglabel,
-          nudge_x = 0.05, nudge_y = 0.05,
-          check_overlap =F, col = "darkgreen", size = 2
-        )
+    # If given ls_point_color, make those points blue
+    df_css$point_color <- NA
+    print(ls_point_color)
+    if (length(ls_point_color) > 0) {
+      df_css <- df_css %>%
+        dplyr::arrange(p.value) %>%
+        dplyr::mutate(point_color = case_when(event %in% as.vector(ls_point_color)  ~ "Event in the reference matrix",
+                                              TRUE ~ "Event not in the reference matrix"))
 
-  ggsave(plot = p, filename = paste0(plot_out_dir,cell_type,tag,"_",col4label,"_volcano.png"))
+    p <- ggplot(data=df_css, aes(x=delta, y=-log10(p.value), color = point_color )) +
+          geom_point(alpha = .7  ) +
+          theme_minimal() + geom_vline(xintercept=c(-0.1, 0.1), col="red") +
+          geom_hline(yintercept=-log10(0.05), col="red") +
+          xlim(-1.0, 1.0) +
+          geom_text(
+            label= df_css$gglabel,
+            nudge_x = 0.05, nudge_y = 0.05,
+            check_overlap =F, col = "darkgreen", size = 2
+          ) +
+          scale_color_manual(name = "",
+            values = c("Event in the reference matrix" = "red",
+                      "Event not in the reference matrix" = "black"),
+            labels = c("Event in the reference matrix",
+                      "Event not in the reference matrix"))+
+           theme(legend.position="bottom")
+
+    } else {
+      p <- ggplot(data=df_css, aes(x=delta, y=-log10(p.value) )) +
+          geom_point(alpha = .7  ) +
+          theme_minimal() + geom_vline(xintercept=c(-0.1, 0.1), col="red") +
+          geom_hline(yintercept=-log10(0.05), col="red") +
+          xlim(-1.0, 1.0) +
+          geom_text(
+            label= df_css$gglabel,
+            nudge_x = 0.05, nudge_y = 0.05,
+            check_overlap =F, col = "darkgreen", size = 2
+          )
+
+    }
+
+
+    ggsave(plot = p, filename = paste0(plot_out_dir,cell_type,tag,"_",col4label,"_volcano.png"))
 
   }
 
@@ -140,7 +171,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
             sep="\t", header = TRUE)
 
   # Make volcano plot before filtering
-  volcano(df, plot_out_dir,LM22_type,"_all_junctions")
+  volcano(df, plot_out_dir,LM22_type,"_all_junctions", list())
 
   # Filter to most significant junction per cluster
   df_filtered <- filter_top_junction(df)
@@ -148,10 +179,12 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
   print(dim(df))
   print(dim(df_filtered))
 
-  write.table(df_filtered, file=paste0(plot_out_dir,LM22_type,"_css_output_top_junc_per_cluster.tsv"),sep = "\t")
+  write.table(df_filtered,
+              file=paste0(plot_out_dir,LM22_type,"_css_output_top_junc_per_cluster.tsv"),
+              sep = "\t",row.names = FALSE, quote=F)
 
   # Make volcano plot after filtering
-  volcano(df_filtered, plot_out_dir,LM22_type,"_filtered_junctions")
+  volcano(df_filtered, plot_out_dir,LM22_type,"_filtered_junctions", list())
 
   # Get top negative delta events
   top_sig_by_pval_negdelta <- df_filtered %>%
@@ -160,9 +193,6 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
       dplyr::arrange(p.value) %>%
       head(topN) %>%
       pull(event)
-
-  # print("top_sig_by_pval_negdelta:")
-  # print(top_sig_by_pval_negdelta)
 
   # Make plots for top negative events
   lapply(top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
@@ -176,9 +206,11 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
     head(topN) %>%
     pull(event)
 
+  # Combine lists
+  top_sig_neg_and_pos <- unlist(list(top_sig_by_pval_negdelta,top_sig_by_pval_posdelta))
 
-  # print("top_sig_by_pval_posdelta:")
-  # print(top_sig_by_pval_posdelta)
+  # Make volcano plot labeling top_neg_and_pos
+  volcano(df_filtered, plot_out_dir,LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
 
   # Make plots for top positive events
   lapply(top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
@@ -188,7 +220,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
   return(list(
               "top_pos" = top_sig_by_pval_posdelta,
               "top_neg" = top_sig_by_pval_negdelta,
-              "top_neg_and_pos" = unlist(list(top_sig_by_pval_negdelta,top_sig_by_pval_posdelta)))
+              "top_neg_and_pos" = top_sig_neg_and_pos )
               )
 
 }
@@ -480,7 +512,7 @@ make_pheatmap(ls_lm22_top_events[[3]], "LM22_diff_splicing_heatmap", metadata, a
 ls_lm6_css_file_names <- list.files(
                         paste0(opt$out_dir,
                         "/compare_LM6/mesa_css_outputs/"),
-                      pattern = ".tsv")
+                      pattern = ".tsv")[1]
 ls_lm6_css_file_names <- ls_lm6_css_file_names[!ls_lm6_css_file_names %in% c("heatmaps")]
 
 # Import, find signficant events and plot each one
