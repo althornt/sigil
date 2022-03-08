@@ -6,7 +6,10 @@ library(ggplot2)
 library(tidyverse)
 library(tidyr)
 library(dplyr)
-
+library(foreach)
+library(doParallel)
+cl <- makeCluster(detectCores() - 1, outfile = "")
+registerDoParallel(cl)
 
 #############################
 # Functions
@@ -62,7 +65,7 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, ls_gen_cell_types,
       opt$out_dir, "/mesa_css_outputs/",str_cell_type_val,".tsv --annotation ",
       opt$gtf, " 2>&1")
 
-    # system(cmd)
+    system(cmd)
     print(cmd)
 
   } else {
@@ -76,7 +79,10 @@ call_run_css_cell_type <- function(ls_cell_types, label){
   #' @params ls_cell_types - list of cell type names within category
   #' @params label - string to use iin naming outputs
 
+  print("____Call Func")
   print(label)
+  
+  ls_cell_types <- unlist(ls_cell_types)
   print(ls_cell_types )
 
   # Get samples with this given cell type
@@ -104,7 +110,7 @@ call_run_css_cell_type <- function(ls_cell_types, label){
     } else{
       ls_events_keep <-  rownames(all_PS_nan_filt_sub_nans)
     }
-    n <- n+ 1
+      n <- n+ 1
     }
 
   # Filter to events that pass NAN filtering in ALL cell types within this category
@@ -187,16 +193,18 @@ all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
 
 # Remove rows with more than 50% NA
 all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.5), ]
-write.table(x = all_PS_nan_filt,na="nan", row.names = TRUE, quote=FALSE,
+write.table(x = all_PS_nan_filt, na="nan", row.names = TRUE, quote=FALSE,
           col.names=NA, sep = "\t",
           file = paste0(opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"))
 print("Number of junctions removed for having over 50% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
 
 
-##########################
-# T-cells
-##########################
+######################
+# Cell type lists
+######################
+# Dont yet include types without samples or else nan filtering will break
+
 # T_cell_types <- list(
 #   "T cells CD8",
 #   "T cells CD4 naive",
@@ -205,7 +213,6 @@ print(nrow(all_PS)- nrow(all_PS_nan_filt))
 #   "T cells follicular helper",
 #   "T cells regulatory (Tregs)",
 #   "T cells gamma delta")
-
 T_cell_types <- list(
   "T cells CD8",
   "T cells CD4 naive",
@@ -213,67 +220,55 @@ T_cell_types <- list(
   "T cells regulatory (Tregs)",
   "T cells gamma delta")
 
-# Do 1 vs all comparsino within T cell cell types
-call_run_css_cell_type(T_cell_types, "Tcell" )
-
-######################################################
-# Monocytes and macrophages
-######################################################
-
-# Get samples with this cell type
 # mon_mac_cell_types <- list(
 #   "Monocytes",
 #   "Macrophages M0",
 #   "Macrophages M1",
 #   "Macrophages M2")
-
-# dont include ones without samples or else nan filtering will break
-
 mon_mac_cell_types <- list(
     "Monocytes",
     "Macrophages M0",
     "Macrophages M1")
 
-# Do 1 vs all comparsino within cell types
-call_run_css_cell_type(mon_mac_cell_types, "Mon_Mac" )
-
-##########################
-# B-cells
-##########################
-# Get samples with this cell type
 B_cell_types <- list(
   "B cells naive",
   "B cells memory")
 
-# Do 1 vs all comparsino within cell types
-call_run_css_cell_type(B_cell_types, "Bcell" )
-
-##########################
-# Dendritic cells
-##########################
 dendritic_cell_types <- list(
   "Dendritic cells resting",
   "Dendritic cells activated")
 
-# Do 1 vs all comparsino within cell types
-call_run_css_cell_type(dendritic_cell_types, "Dendritic" )
-
-# ##########################
-# # Mast cells
-# ##########################
 # mast_cell_types <- list(
 #   "Mast cells resting",
 #   "Mast cells activated")
-#
-# # Do 1 vs all comparsino within cell types
-# call_run_css_cell_type(mast_cell_types, "Mast" )
-#
-# ##########################
-# # NK cells
-# ##########################
+
 # NK_cell_types <- list(
 #   "NK cells resting",
 #   "NK cells activated")
-#
-# # Do 1 vs all comparsino within cell types
-# call_run_css_cell_type(NK_cell_types, "NK" )
+
+####################################################
+# Run within cell type for each category
+####################################################
+# ls_within_cell_types <- list(
+#   "T_cell_types" = T_cell_types,
+#   "mon_mac_cell_types" = mon_mac_cell_types,
+#   "Bcell" = B_cell_types,
+#   "Dendritic" = dendritic_cell_types,
+#   "Mast" = mast_cell_types,
+#   "NK" = NK_cell_types)
+
+ls_within_cell_types <- list(
+  list("Tcell", T_cell_types),
+  list("Mon_Mac", mon_mac_cell_types),
+  list("Bcell", B_cell_types),
+  list("Dendritic" ,dendritic_cell_types)
+)
+
+# Run in parallel
+foreach(i=ls_within_cell_types, .packages=c('magrittr','dplyr')
+  )%dopar%{
+          call_run_css_cell_type(
+            ls_cell_types = i[2] , 
+            label = i[1]
+            )
+      }
