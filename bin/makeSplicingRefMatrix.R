@@ -82,7 +82,7 @@ volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
 
     # If given ls_point_color, make those points red
     df_css$point_color <- NA
-    print(ls_point_color)
+    # print(ls_point_color)
     if (length(ls_point_color) > 0) {
       df_css <- df_css %>%
         dplyr::arrange(p.value) %>%
@@ -132,7 +132,7 @@ volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
 filter_top_junction <-  function(css_df){
   ls_keep_junctions <- list()
   for (c in ls_clusters) {
-      # This base R version is faster than using dplyr
+      # This base R version is much faster than using dplyr
       # Find junction with lowest p.value in the given cluster
       css_df_events <- css_df[css_df$event  %in% as.list(c),]
       css_df_top_junc <- css_df_events[order(css_df_events$p.value),][1,]
@@ -148,7 +148,7 @@ filter_top_junction <-  function(css_df){
 }
 
 
-import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
+import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, comparison_label){
   #' Import results from MESA compare sample set script to get the top N
   #' significant events into lists
   #' @param filename -
@@ -174,7 +174,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
             sep="\t", header = TRUE)
 
   # Make volcano plot before filtering
-  volcano(df_css, paste0(plot_out_dir,"/volcanos/"),
+  volcano(df_css, paste0(plot_out_dir,"volcanos/"),
               LM22_type,"_all_junctions", list())
 
   # Filter to most significant junction per cluster
@@ -184,7 +184,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
               sep = "\t",row.names = FALSE, quote=F)
 
   # Make volcano plot after filtering
-  volcano(df_filtered, paste0(plot_out_dir,"/volcanos/"),
+  volcano(df_filtered, paste0(plot_out_dir,"volcanos/"),
               LM22_type,"_filtered_junctions", list())
 
   # Get top negative delta events
@@ -193,10 +193,9 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
       dplyr::filter(delta < -.2 ) %>%
       dplyr::arrange(p.value) %>%
       head(topN) %>%
-      droplevels()
+      select(event,overlapping)
 
   ls_top_sig_by_pval_negdelta <- top_sig_by_pval_negdelta$event
-  names(ls_top_sig_by_pval_negdelta) <- top_sig_by_pval_negdelta$overlapping
 
   # Make plots for top negative events
   lapply(ls_top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
@@ -208,30 +207,28 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col){
     dplyr::filter(delta > .2 ) %>%
     dplyr::arrange(p.value) %>%
     head(topN) %>%
-    droplevels()
+    select(event,overlapping)
 
   ls_top_sig_by_pval_posdelta <- top_sig_by_pval_posdelta$event
-  names(ls_top_sig_by_pval_posdelta) <- top_sig_by_pval_posdelta$overlapping
-
-  # Combine lists
-  top_sig_neg_and_pos <- unlist(list(ls_top_sig_by_pval_negdelta,ls_top_sig_by_pval_posdelta))
-  print(top_sig_neg_and_pos)
-
-  # Make volcano plot labeling top_neg_and_pos
-  volcano(df_filtered, paste0(plot_out_dir,"/volcanos/"),
-          LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
-
   # Make plots for top positive events
   lapply(ls_top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
           LM_type=meta_col,
           out_dir = plot_out_dir )
 
-  return(list(
-              "top_pos" = top_sig_by_pval_posdelta,
-              "top_neg" = top_sig_by_pval_negdelta,
-              "top_neg_and_pos" = top_sig_neg_and_pos )
-              )
+  # Combine lists
+  top_sig_neg_and_pos <- unlist(list(ls_top_sig_by_pval_negdelta,
+                                    ls_top_sig_by_pval_posdelta))
 
+  # Make volcano plot labeling top_neg_and_pos
+  volcano(df_filtered, paste0(plot_out_dir,"volcanos/"),
+          LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
+
+  df_top_sig_neg_and_pos <- rbind(top_sig_by_pval_negdelta, top_sig_by_pval_posdelta)
+
+  df_top_sig_neg_and_pos$group <- comparison_label
+  df_top_sig_neg_and_pos$cell_type <- LM22_type
+
+  return(df_top_sig_neg_and_pos)
 }
 
 plot_event <- function(sig_event, cell_type, out_dir, LM_type){
@@ -264,33 +261,10 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
       theme(legend.position = "right") +
       scale_y_continuous(limits = c(0, 1)) +
       labs(x = "cell type")
-      # geom_text(stat='count', aes(label=after_stat(count)), nudge_y = -2)
-
 
   ggsave(plot = p, filename = paste0(out_dir,cell_type,"/",sig_event,".png"))
 
 }
-
-unpack_import_css_res <- function(ls_res){
-  #' Unpack the results from the import_mesa_css() into lists
-  #'
-  #' @param ls_res output from
-  #' @param list of top positive evnet, top negative events, top negative and positive
-
-  ls_top_pos <- ls_top_neg <- ls_top_neg_and_pos  <- c()
-  for (item in ls_res) {
-       ls_top_pos <- append(ls_top_pos, item[1])
-       ls_top_neg <- append(ls_top_neg, item[2])
-       ls_top_neg_and_pos <- append(ls_top_neg_and_pos, item[3])
-     }
-
-  ls_top_pos<- unlist(ls_top_pos)
-  ls_top_neg<- unlist(ls_top_neg)
-  ls_top_neg_and_pos<- unlist(ls_top_neg_and_pos)
-
-  return(list(ls_top_pos,ls_top_neg,ls_top_neg_and_pos))
-  }
-
 
 make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   #' Make heatmap using the pheatmap package using the given events
@@ -307,8 +281,6 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
     dplyr::filter(event %in% ls_events) %>%
     dplyr::select(noquote(order(colnames(.)))) %>%
     tibble::column_to_rownames('event')
-
-  print(df_all_PS_sig_events)
 
   for (val in list("LM22", "LM6")){
       if (nrow(df_all_PS_sig_events) < 50){
@@ -339,7 +311,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
       }
 }
 
-import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir, meta_col){
+import_mesa_css_within<- function(ls_cell_types, top_n,  label, css_dir, meta_col){
   #' Import results from MESA compare_sample_sets runs within a broader cell type
   #' (e.g. within T-cells). Find the top signficant events, make event level
   #' plots, make heatmaps of the events. This function calls import_mesa_css(),
@@ -370,13 +342,22 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir, meta_co
   ls_res <- lapply(
                     ls_css_file_names_cell_type,
                     topN=top_n,
-                    import_mesa_css, meta_col =meta_col,
+                    import_mesa_css,
+                    meta_col =meta_col,
                     plot_out_dir =  paste0(opt$out_dir,"/ref_matrix/within_type/"),
-                    css_dir =  css_dir)
+                    css_dir =  css_dir,
+                    comparison_label = "withinType")
 
+  # If only 2 CSS files, they should have identical resuls
+  # (comparing A vs B then B) , so only return the results of one
+  if (length(ls_css_file_names_cell_type) <= 2) {
+      #only keep first result
+      df_res <- ls_res[[1]]
+  } else {
+      df_res <- dplyr::bind_rows(ls_res)
+  }
 
-  # Unpack top events into lists
-  ls_top_events <- unpack_import_css_res(ls_res)
+  ls_top_events <- df_res$event
 
   # Filter metadata
   df_metadata_subset <- metadata %>%
@@ -389,14 +370,14 @@ import_mesa_to_heatmap<- function(ls_cell_types, top_n,  label, css_dir, meta_co
     dplyr::select(as.vector(unlist(df_metadata_subset$Run)))
 
   # Make heatmap with this cell types events only within this cell types samples
-  make_pheatmap(ls_top_events[[3]], paste0(label, "_diff_splicing_heatmap"),
+  make_pheatmap(ls_top_events, paste0(label, "_diff_splicing_heatmap"),
           df_metadata_subset, df_all_PS )
 
   # Make heatmap with this cell types events and ALL samples
-  make_pheatmap(ls_top_events[[3]], paste0(label,"_diff_splicing_heatmap_all_samples"),
+  make_pheatmap(ls_top_events, paste0(label,"_diff_splicing_heatmap_all_samples"),
           metadata, all_PS )
 
-  return(ls_top_events)
+  return(df_res)
 }
 
 # Arguments
@@ -456,6 +437,7 @@ for (row in 1:nrow(df_clusters_filter)) {
 
 # Reduce to unique clusters; remove A:B , B:A
 ls_clusters <- unique(ls_clusters)
+print("list of all clusters:")
 print(length(ls_clusters))
 print(tail(ls_clusters))
 
@@ -470,8 +452,8 @@ if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM6/volcanos"))){
    recursive = TRUE, showWarnings = TRUE)
 }
 
-if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/within_type"))){
-  dir.create(paste0(opt$out_dir,"/ref_matrix/within_type"),
+if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/within_type/volcanos"))){
+  dir.create(paste0(opt$out_dir,"/ref_matrix/within_type/volcanos"),
    recursive = TRUE, showWarnings = TRUE)
 }
 
@@ -500,195 +482,124 @@ ls_lm22_res <- foreach(i=ls_lm22_css_file_names,
       topN = 10,
       meta_col="LM22",
       plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/"),
-      css_dir=paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/")
-    )
-    }
+      css_dir=paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/"),
+      comparison_label = "LM22"
+      )
+  }
 
-# Unpack top events into lists (top up and down)
-ls_lm22_top_events <- unpack_import_css_res(ls_lm22_res)[[3]]
+df_lm22_res <- dplyr::bind_rows(ls_lm22_res)
+print(head(df_lm22_res))
+print(dim(df_lm22_res))
 
 # Make heatmap using top events
-make_pheatmap(ls_lm22_top_events, "LM22_diff_splicing_heatmap", metadata, all_PS )
+make_pheatmap(df_lm22_res$event, "LM22_diff_splicing_heatmap", metadata, all_PS )
 
-# Get gene names of top LM22 events
-ls_lm22_top_events_names <- names(ls_lm22_top_events)
-ls_lm22_top_events_genes <- list()
-for (i in ls_lm22_top_events_names){
-    gene <- unlist(str_split(i, fixed(".")))[2]
-    ls_lm22_top_events_genes <- append(ls_lm22_top_events_genes, gene)
-    }
-ls_lm22_top_events_genes <- unlist(ls_lm22_top_events_genes)
+########################################
+# Import LM6 1 vs all comparisons
+#######################################
 
-print(head(ls_lm22_top_events_genes))
-print(length(ls_lm22_top_events_genes))
-print(length(ls_lm22_top_events))
-print(length(names(ls_lm22_top_events)))
+# Get all outputs from compare sample sets 1 vs all comparisons
+ls_lm6_css_file_names <- list.files(
+                                  paste0(opt$out_dir,
+                                  "/compare_LM6/mesa_css_outputs/"),
+                                  pattern = ".tsv")
+ls_lm6_css_file_names <- ls_lm6_css_file_names[!ls_lm6_css_file_names %in% c("heatmaps")]
 
-print("-------  CD ")
-# Find junctions from genes that contain CD
-ls_cd_junctions <- ls_lm22_top_events[grep("CD", names(ls_lm22_top_events))]
-print(ls_cd_junctions)
+# Import, find signficant events and plot each one
+ls_lm6_res <- foreach(i=ls_lm6_css_file_names,
+                      .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
+    import_mesa_css(
+      filename = i,
+      topN = 10,
+      meta_col="LM6",
+      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM6/"),
+      css_dir=paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/"),
+      comparison_label = "LM22"
+      )
+  }
 
-# make heat map with CD
-# Make plots for top negative events
-# Make output directories
-if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM22/CD_genes"))){
-  dir.create(paste0(opt$out_dir,"/ref_matrix/LM22/CD_genes"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-lapply(ls_cd_junctions,  plot_event, cell_type = "",
-      LM_type="LM22", out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/CD_genes/"))
+df_lm6_res <- dplyr::bind_rows(ls_lm6_res)
+print(head(df_lm6_res))
+print(dim(df_lm6_res))
+
+# Make heatmap using top events
+make_pheatmap(df_lm6_res$event, "LM6_diff_splicing_heatmap", metadata, all_PS)
+
+########################################
+# Import within comparisons
+#######################################
+# mast_cell_types <- list(
+#   "Mast cells resting",
+#   "Mast cells activated")
+
+# NK_cell_types <- list(
+#   "NK cells resting",
+#   "NK cells activated")
+
+ls_within_cell_types <- list(
+  "Tcell" = list(
+    "T cells CD8",
+    "T cells CD4 naive",
+    #   "T cells CD4 memory resting",
+    #   "T cells CD4 memory  activated",
+    "T cells follicular helper",
+    "T cells regulatory (Tregs)",
+    "T cells gamma delta"),
+  "Mon_Mac" = list(
+      "Monocytes",
+      "Macrophages M0",
+      "Macrophages M1"
+      # "Macrophages M2"
+      ),
+  "Bcell" = list(
+    "B cells naive",
+    "B cells memory"),
+  "Dendritic" = list(
+    "Dendritic cells resting",
+    "Dendritic cells activated"))
 
 
-quit()
+ls_within_res <- foreach(i=names(ls_within_cell_types),
+                        .packages=c('magrittr','dplyr','ggplot2','pheatmap')) %dopar% {
 
+      import_mesa_css_within(
+        ls_cell_types = ls_within_cell_types[[i]],
+        top_n = 10,
+        label = i,
+        css_dir = paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"),
+        meta_col = "LM22")
 
+      }
 
+df_within_res <- dplyr::bind_rows(ls_within_res, .id = "column_label")
+print(df_within_res)
 
-# ########################################
-# # Import LM6 1 vs all comparisons
-# # #######################################
-# # Get all outputs from compare sample sets 1 vs all comparisons
-# ls_lm6_css_file_names <- list.files(
-#                         paste0(opt$out_dir,
-#                         "/compare_LM6/mesa_css_outputs/"),
-#                       pattern = ".tsv")
-# ls_lm6_css_file_names <- ls_lm6_css_file_names[!ls_lm6_css_file_names %in% c("heatmaps")]
-#
-# # Import, find signficant events and plot each one
-# ls_lm6_res <- foreach(i=ls_lm6_css_file_names, .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
-#     import_mesa_css(
-#       filename = i,
-#       topN = 10,
-#       meta_col="LM22",
-#       plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM6/"),
-#       css_dir=paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/")
-#     )}
-#
-#
-#
-# # Unpack top events into lists
-# ls_lm6_top_events <- unpack_import_css_res(ls_lm6_res)
-# # print(ls_lm6_top_events)
-#
-# # Make heatmap using top events
-# make_pheatmap(ls_lm6_top_events[[3]], "LM6_diff_splicing_heatmap", metadata, all_PS )
-#
-#
-# #######################################
-# # Import within cell type comparisons
-# ######################################
-# T_cell_types <- list(
-#   "T cells CD8",
-#   "T cells CD4 naive",
-#   "T cells CD4 memory resting",
-#   "T cells CD4 memory  activated",
-#   "T cells follicular helper",
-#   "T cells regulatory (Tregs)",
-#   "T cells gamma delta")
-# mon_mac_cell_types <- list(
-#   "Monocytes",
-#   "Macrophages M0",
-#   "Macrophages M1",
-#   "Macrophages M2")
-# B_cell_types <- list(
-#   "B cells naive",
-#   "B cells memory")
-# dendritic_cell_types <- list(
-#   "Dendritic cells resting",
-#   "Dendritic cells activated")
-# # mast_cell_types <- list(
-# #   "Mast cells resting",
-# #   "Mast cells activated")
-# # NK_cell_types <- list(
-# #   "NK cells resting",
-# #   "NK cells activated")
-#
-# ls_within_cell_types <- list(
-#   "T_cell_types" = T_cell_types,
-#   "mon_mac_cell_types" = mon_mac_cell_types,
-#   "B_cell_types" = B_cell_types,
-#   "dendritic_cell_types" = dendritic_cell_types)
-#
-# ls_within_res <- foreach(i=names(ls_within_cell_types),
-#                         .packages=c('magrittr','dplyr','ggplot2','pheatmap')
-#                         )%dopar%{
-#
-#     import_mesa_to_heatmap(
-#       ls_cell_types = ls_within_cell_types[[i]],
-#       top_n = 10,
-#       label=i,
-#       css_dir=paste0(opt$out_dir,"/compare_within_type/mesa_css_outputs/"),
-#       meta_col = "LM22")
-#     }
-#
-# names(ls_within_res) <- names(ls_within_cell_types)
-# print(ls_within_res[1])
-# print(length(ls_within_res))
-#
-#
-# ##############################################
-# # Make reference matrices combining analysis
-# #############################################
-#
-# # LM6 and LM22 heatmap
-# ls_lm6_lm22_top_events <- unique(unlist(append(
-#     as.list(droplevels(unname(ls_lm6_top_events[[3]]))),
-#     as.list(droplevels(unname(ls_lm22_top_events[[3]])))
-#   )))
-#
-# print("ls_lm6_lm22_top_events")
-# # print(head(ls_lm6_lm22_top_events))
-# print(length(ls_lm6_lm22_top_events))
-#
-# # LM6 and LM22 heatmap
-# make_pheatmap(ls_lm6_lm22_top_events, "LM6_and_LM22_diff_splicing_heatmap", metadata, all_PS )
-#
-# # LM6 and LM22 intersection heatmap
-# ls_lm6_lm22_intersect <- ls_lm6_lm22_top_events <- unlist(intersect(
-#     as.list(droplevels(unname(ls_lm6_top_events[[3]]))),
-#     as.list(droplevels(unname(ls_lm22_top_events[[3]])))
-#   ))
-# print("ls_lm6_lm22_intersect")
-# # print(head(ls_lm6_lm22_intersect))
-# print(length(ls_lm6_lm22_intersect))
-# make_pheatmap(ls_lm6_lm22_intersect, "LM6_and_LM22_intersection_diff_splicing_heatmap", metadata, all_PS )
-#
-# # Combined within cell type comparisons heatma
-# ls_within_cell_top_events <-  c()
-# for (item in ls_within_res) {
-#     # ls_top_pos<- append(, item[1])
-#     # ls_top_neg <- append(, item[2])
-#     ls_within_cell_top_events <- append(ls_within_cell_top_events, item[3])
-#    }
-#
-# ls_all_within_cell_top_events <- droplevels(unname(unlist(lapply(ls_within_cell_top_events, unlist))))
-# print("ls_all_within_cell_top_events")
-# print(length(ls_all_within_cell_top_events))
-# make_pheatmap(ls_all_within_cell_top_events, "combined_within_cell_type_diff_splicing_heatmap", metadata, all_PS )
-#
-# # LM6 and LM22 and within cell type comparisons heatmap
-# ls_lm6_lm22_withincelltype_top_events <- c(as.character(ls_lm6_lm22_top_events), as.character(ls_all_within_cell_top_events) )
-#
-# print("ls_lm6_lm22_withincelltype_top_events")
-# # print(head(ls_lm6_lm22_withincelltype_top_events))
-# print(length(ls_lm6_lm22_withincelltype_top_events))
-# make_pheatmap(ls_lm6_lm22_withincelltype_top_events, "LM6_LM22_and_combined_within_cell_type_diff_splicing_heatmap", metadata, all_PS )
-#
-#
+# Make heatmap using top events
+make_pheatmap(df_within_res$event, "withinType_splicing_heatmap", metadata, all_PS)
+
+########################################
+# Combined reference matrix
+######################################
+df_combined_res <- dplyr::bind_rows(list("lm6"  = df_lm6_res,
+                                        "lm22"= df_lm22_res,
+                                        "within" = df_within_res),
+                                        .id = "column_label2")
+print(df_combined_res)
+
+write.table(df_combined_res,
+            file=paste0(opt$out_dir,"/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
+            sep = "\t",row.names = FALSE, quote=F)
+
+# Make heatmap using top events
+make_pheatmap(df_combined_res$event, "LM6_LM22_withinType_splicing_heatmap", metadata, all_PS)
+
 # ######################################
 # # UMAPs of PS using top events
 # ######################################
-# # Read in merged allPS file
-#
-# print(dim(all_PS))
-# all_PS_top_junctioins <- all_PS %>%
-#   dplyr::filter(rownames(all_PS) %in% ls_lm6_lm22_withincelltype_top_events)
-#
-# print(dim(all_PS_top_junctioins))
+
 #
 # # Drop genes with low variance.
-# allPS_var <- apply(all_PS_top_junctioins[, -1], 1, var)
+# allPS_var <- apply(all_PS_top_junctions[, -1], 1, var)
 # print(length(allPS_var))
 #
 # # For gene I used median (50% quantile) as the cutoff
@@ -697,7 +608,7 @@ quit()
 # PS_param <- quantile(allPS_var, c(.25), na.rm=T)
 # print(PS_param)
 #
-# df_allPS_filt <- all_PS_top_junctioins[allPS_var > PS_param & !is.na(allPS_var), ]
+# df_allPS_filt <- all_PS_top_junctions[allPS_var > PS_param & !is.na(allPS_var), ]
 # print(dim(df_allPS_filt))
 #
 # # Transpose and format
