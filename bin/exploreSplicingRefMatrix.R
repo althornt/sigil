@@ -159,62 +159,112 @@ print(tail(df_all_PS_ref_events))
 
 # ########################################################
 # # RefMat with medians
-# ####################################################
-df_t <- df_all_PS_ref_events %>%
-  rownames_to_column("rowname") %>% 
-  gather(var, value, -rowname) %>% 
-  spread(rowname, value) 
-  # %>%
-  # column_to_rownames("var") 
+# # ####################################################
+# df_t <- df_all_PS_ref_events %>%
+#   rownames_to_column("rowname") %>% 
+#   gather(var, value, -rowname) %>% 
+#   spread(rowname, value) %>%
+#   select(c("LM6","var",df_spliceRefMatrix$event ))
 
-head(df_t)
+#   # %>%
+#   # column_to_rownames("var") 
 
-# Get median
-df_t_med <- df_t %>%
-  mutate_at(df_spliceRefMatrix$event, as.numeric) %>%
-  group_by(LM22) %>%
-  summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
-  column_to_rownames("LM22")
+# head(df_t)
+# sum(is.na(df_t))
+# print(dim(df_t))
+# print("----------------------")
+
+
+# # Get median
+# df_t_med <- df_t %>%
+#   mutate_at(df_spliceRefMatrix$event, as.numeric) %>%
+#   group_by(LM6) %>%
+#   summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
+#   column_to_rownames("LM6") %>%
+#   as.data.frame(.) %>%
+#   select_if(~ !any(is.na(.)))
  
-head(df_t_med)
-tail(df_t_med)
-sum(is.na(df_t_med))
+# head(df_t_med)
+# tail(df_t_med)
+# sum(is.na(df_t_med))
+# print(dim(df_t_med))
 
-#!!!  Figure out why there are NAN
-df_med <- df_t_med  %>%
-  rownames_to_column("rowname") %>% 
-  gather(var, value, -rowname)  %>% 
-  spread(rowname, value) %>% 
-  column_to_rownames("var") %>%
-  as.data.frame(.) %>%
-  # select(-V1) %>%
-  na.omit(.)
+# # #!!!  Figure out why there are NAN
+# df_med <- df_t_med  %>%
+#   rownames_to_column("rowname") %>% 
+#   gather(var, value, -rowname)  %>% 
+#   spread(rowname, value) %>% 
+#   as.data.frame(.) %>%
+#   column_to_rownames("var")   %>%
+#   select(-V1) 
 
+# head(df_med)
+# # sum(is.na(df_med))
+# # is.na(df_med) %>% table()
 
-head(df_med)
-tail(df_med)
+# # options(dplyr.width = Inf)
+# # df_med %>% tbl_df %>% print(n=386)
+# dim(df_med)
 
-
-
-sum(is.na(df_med))
-
-# new_DF <- as.data.frame(df_t_med[rowSums(is.na(df_t_med)) > 0,])
-# print(new_DF)
-
-heatmap_res <- pheatmap(
-        main = paste0(" "),
-        df_med,
-        # scale = "row",
-        show_rownames=F,
-        show_colnames=T,
-        na_col = "grey")
-
-save_pheatmap_pdf(
-        heatmap_res,
-        paste0(opt$out_dir,"/LM6_med.pdf"))
-      
+# df_med <- df_med[apply(df_med, 1, var) != 0, ]
+# dim(df_med)
 
 
+
+
+
+
+
+calcGroupMed <- function(df_PS, LM_type){
+  str_LM <- as.character(LM_type)
+
+  #transpose df, summarize to median of each group
+  df_t_med <- df_all_PS_ref_events %>%
+    rownames_to_column("rowname") %>%   #transpose
+    gather(var, value, -rowname) %>% 
+    spread(rowname, value) %>%
+    filter(get(LM_type) != "") %>%     #remove samples without a LM grouping
+    select(c(paste0(str_LM),"var",df_spliceRefMatrix$event )) %>% #keep LM col and junctions
+    mutate_at(df_spliceRefMatrix$event, as.numeric) %>% # convert to numeric
+    group_by_at(LM_type) %>%
+    summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
+    column_to_rownames(paste(str_LM)) %>%
+    as.data.frame(.) %>%
+    select_if(~ !any(is.na(.))) #remove NA
+
+  df_med <-  df_t_med  %>%
+    rownames_to_column("rowname") %>% 
+    gather(var, value, -rowname)  %>% 
+    spread(rowname, value) %>% 
+    as.data.frame(.) %>%
+    column_to_rownames("var")
+    
+  #Remove junctions with 0 variance which break scaling
+  df_med <- df_med[apply(df_med, 1, var) != 0, ]
+
+  heatmap_res <- pheatmap(
+          main = paste0(" "),
+          df_med,
+          scale = "row",
+          show_rownames=F,
+          show_colnames=T,
+          na_col = "grey"
+          )
+
+  save_pheatmap_pdf(
+          heatmap_res,
+          paste0(opt$out_dir,"/",paste(LM_type),"_med.pdf")
+          )
+
+  return(df_med)
+}
+
+# Calculate group medians and make heatmap
+df_LM6_med <- calcGroupMed(df_all_PS_ref_events, "LM6")
+df_LM22_med <- calcGroupMed(df_all_PS_ref_events, "LM22")
+
+print(dim(df_LM6_med))
+print(dim(df_LM22_med))
 
 
 ########################################################
