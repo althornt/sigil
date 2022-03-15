@@ -30,6 +30,16 @@ junc2bed <- function(junction){
   return(bed_str)
 }
 
+save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
+  #' Function to save pheatmaps to a pdf file
+  stopifnot(!missing(x))
+  stopifnot(!missing(filename))
+  pdf(filename, width=width, height=height)
+  grid::grid.newpage()
+  grid::grid.draw(x$gtable)
+  dev.off()
+}
+
 make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   #' Make heatmap using the pheatmap package using the given events
   #' and data
@@ -73,7 +83,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
 
       save_pheatmap_pdf(
         heatmap_res,
-        paste0(opt$out_dir,"/ref_matrix/",label,"_",val,"_rowname",rowname_on_off,".pdf"))
+        paste0(opt$out_dir,"/",label,"_",val,"_rowname",rowname_on_off,".pdf"))
       }
 }
 
@@ -119,9 +129,12 @@ df_spliceRefMatrix <- readr::read_tsv(file = opt$spliceRefMatrix)
 print(head(df_spliceRefMatrix))
 print(dim(df_spliceRefMatrix))
 
-df_all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1)
-print(head(df_all_PS))
+df_all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1) 
+# df_all_PS <- df_all_PS %>% mutate_if(is.character,as.numeric)
 
+print(head(df_all_PS))
+# print(str(df_all_PS))
+# quit()
 
 metadata <- read.csv(file = opt$metadata)
 df_sample_annotations <- metadata %>%
@@ -129,123 +142,177 @@ df_sample_annotations <- metadata %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
-# # Add metadata to splice ref matrix
-# df_all_PS_meta <- rbind(df_all_PS, df_sample_annotations)
+# Add metadata to splice ref matrix
+df_all_PS_meta <- rbind(df_all_PS, df_sample_annotations)
 
-# print(head(df_all_PS_meta))
-# # print(rownames(df_all_PS_meta))
+print(head(df_all_PS_meta))
+# print(rownames(df_all_PS_meta))
 
-# df_all_PS_ref_events <- df_all_PS_meta %>%
-#   rownames_to_column("col") %>%
-#   filter((col %in% df_spliceRefMatrix$event)|(col %in% rownames(df_sample_annotations))) %>%
-#   column_to_rownames("col")
+df_all_PS_ref_events <- df_all_PS_meta %>%
+  rownames_to_column("col") %>%
+  filter((col %in% df_spliceRefMatrix$event)|(col %in% rownames(df_sample_annotations))) %>%
+  column_to_rownames("col")
 
-# print(dim(df_all_PS_ref_events))
-# # print(tail(df_all_PS_ref_events))
+print(dim(df_all_PS_ref_events))
+print(tail(df_all_PS_ref_events))
 
 
 # ########################################################
 # # RefMat with medians
 # ####################################################
-# df_med <- df_all_PS_ref_events %>%
-#   rownames_to_column("rowname") %>% 
-#   gather(var, value, -rowname) %>% 
-#   spread(rowname, value) %>%
-#   group_by(LM22)  
-  
-#   # %>%
-#   # summarize(med_PS = median(LM22, na.rm = TRUE))
-#   # summarise(A = median(A[!is.na(a)]), B = median(B[!is.na(b)]))
+df_t <- df_all_PS_ref_events %>%
+  rownames_to_column("rowname") %>% 
+  gather(var, value, -rowname) %>% 
+  spread(rowname, value) 
+  # %>%
+  # column_to_rownames("var") 
 
-# head(df_med)
+head(df_t)
+
+# Get median
+df_t_med <- df_t %>%
+  mutate_at(df_spliceRefMatrix$event, as.numeric) %>%
+  group_by(LM22) %>%
+  summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
+  column_to_rownames("LM22")
+ 
+head(df_t_med)
+tail(df_t_med)
+sum(is.na(df_t_med))
+
+#!!!  Figure out why there are NAN
+df_med <- df_t_med  %>%
+  rownames_to_column("rowname") %>% 
+  gather(var, value, -rowname)  %>% 
+  spread(rowname, value) %>% 
+  column_to_rownames("var") %>%
+  as.data.frame(.) %>%
+  # select(-V1) %>%
+  na.omit(.)
+
+
+head(df_med)
+tail(df_med)
+
+
+
+sum(is.na(df_med))
+
+# new_DF <- as.data.frame(df_t_med[rowSums(is.na(df_t_med)) > 0,])
+# print(new_DF)
+
+heatmap_res <- pheatmap(
+        main = paste0(" "),
+        df_med,
+        # scale = "row",
+        show_rownames=F,
+        show_colnames=T,
+        na_col = "grey")
+
+save_pheatmap_pdf(
+        heatmap_res,
+        paste0(opt$out_dir,"/LM6_med.pdf"))
+      
+
+
 
 
 ########################################################
 # Count distribution of junctions for each gene
 ########################################################
 
-print("Most common genes in the reference matrix:")
+# print("Most common genes in the reference matrix:")
 
-# Map each gene to cell types the event is present in 
-gene_2_celltypes <- df_spliceRefMatrix %>% 
-  group_by(overlapping) %>% 
-  summarize(context = list(cell_type)) %>%
-  mutate(cell_types = map_chr(context, toString)) %>%
-  select(overlapping,cell_types) 
+# # Map each gene to cell types the event is present in 
+# gene_2_celltypes <- df_spliceRefMatrix %>% 
+#   group_by(overlapping) %>% 
+#   summarize(context = list(cell_type)) %>%
+#   mutate(cell_types = map_chr(context, toString)) %>%
+#   select(overlapping,cell_types) 
 
-print(gene_2_celltypes)
+# print(gene_2_celltypes)
 
-# count genes in matrix
-df_countbygene <- df_spliceRefMatrix %>% 
-  count(overlapping, sort = TRUE) %>%
-  inner_join(gene_2_celltypes, by="overlapping")
-write.csv(df_countbygene, paste0(opt$out_dir,"/countbygene.csv"))
-print(df_countbygene)
+# # count genes in matrix
+# df_countbygene <- df_spliceRefMatrix %>% 
+#   count(overlapping, sort = TRUE) %>%
+#   inner_join(gene_2_celltypes, by="overlapping")
+# write.csv(df_countbygene, paste0(opt$out_dir,"/countbygene.csv"))
+# print(df_countbygene)
 
-# Plot distribution of counts per gene 
-df_hist <- df_spliceRefMatrix %>% 
-  count(overlapping, sort = TRUE) 
-ggplot(df_hist, aes(x=n)) + 
-  geom_histogram() + 
-  scale_x_continuous(breaks = round(seq(min(df_hist$n), max(df_hist$n), by = 1),1)) +
-  ggtitle("Counts per gene in the splicing reference matrix") 
-ggsave( paste0(opt$out_dir,"/hist_count_per_gene.png"))
+# # Plot distribution of counts per gene 
+# df_hist <- df_spliceRefMatrix %>% 
+#   count(overlapping, sort = TRUE) 
+# ggplot(df_hist, aes(x=n)) + 
+#   geom_histogram() + 
+#   scale_x_continuous(breaks = round(seq(min(df_hist$n), max(df_hist$n), by = 1),1)) +
+#   ggtitle("Counts per gene in the splicing reference matrix") 
+# ggsave( paste0(opt$out_dir,"/hist_count_per_gene.png"))
+
+# # print("---------------------------------------------------------------------------------")
+
+
+# # Map each gene to cell types the event is present in 
+# event_2_celltypes <- df_spliceRefMatrix %>% 
+#   group_by(event) %>% 
+#   summarize(context = list(cell_type)) %>%
+#   mutate(cell_types = map_chr(context, toString)) %>%
+#   select(event,cell_types) 
+
+# print(event_2_celltypes)
+
+# # count genes in matrix
+# df_countbyevent <- df_spliceRefMatrix %>% 
+#   count(event, sort = TRUE) %>%
+#   inner_join(event_2_celltypes, by="event")
+# # write.csv(df_countbygene, paste0(opt$out_dir,"/countbygene.csv"))
+
+# print(df_countbyevent)
+
+# # Plot distribution of counts per gene 
+# df_hist_event <- df_spliceRefMatrix %>% 
+#   count(event, sort = TRUE) 
+# ggplot(df_hist_event, aes(x=n)) + 
+#   geom_histogram() + 
+#   scale_x_continuous(breaks = round(seq(min(df_hist$n), max(df_hist$n), by = 1),1)) +
+#   ggtitle("Counts per event in the splicing reference matrix") 
+# ggsave( paste0(opt$out_dir,"/hist_count_per_event.png"))
 
 # print("---------------------------------------------------------------------------------")
 
 
-# Map each gene to cell types the event is present in 
-event_2_celltypes <- df_spliceRefMatrix %>% 
-  group_by(event) %>% 
-  summarize(context = list(cell_type)) %>%
-  mutate(cell_types = map_chr(context, toString)) %>%
-  select(event,cell_types) 
-
-print(event_2_celltypes)
-
-# count genes in matrix
-df_countbyevent <- df_spliceRefMatrix %>% 
-  count(event, sort = TRUE) %>%
-  inner_join(event_2_celltypes, by="event")
-# write.csv(df_countbygene, paste0(opt$out_dir,"/countbygene.csv"))
-
-print(df_countbyevent)
-
-# Plot distribution of counts per gene 
-df_hist_event <- df_spliceRefMatrix %>% 
-  count(event, sort = TRUE) 
-ggplot(df_hist_event, aes(x=n)) + 
-  geom_histogram() + 
-  scale_x_continuous(breaks = round(seq(min(df_hist$n), max(df_hist$n), by = 1),1)) +
-  ggtitle("Counts per event in the splicing reference matrix") 
-ggsave( paste0(opt$out_dir,"/hist_count_per_event.png"))
-
-print("---------------------------------------------------------------------------------")
 
 
+# ########################################################
+# # Make subsets from gene lists
+# ########################################################
 
-
-########################################################
-# Make subsets from gene lists
-########################################################
-
-# Look at all "CD" genes
-# # Find junctions from genes that contain CD
-# ls_cd_junctions <- ls_lm22_top_events[grep("CD", names(ls_lm22_top_events))]
+# ls_cd_junctions <- df_spliceRefMatrix$event[grep("CD", df_spliceRefMatrix$overlapping)]
 # print(ls_cd_junctions)
-#
-# if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM22/CD_genes"))){
-#   dir.create(paste0(opt$out_dir,"/ref_matrix/LM22/CD_genes"),
-#    recursive = TRUE, showWarnings = TRUE)
-# }
-# lapply(ls_cd_junctions,  plot_event, cell_type = "",
-#       LM_type="LM22", out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/CD_genes/"))
+
+# ls_IL_junctions <- df_spliceRefMatrix$overlapping[grep("IL", df_spliceRefMatrix$overlapping)]
+# print(ls_IL_junctions)
+
+# print("List of genes:")
+# print(sort(unique(df_spliceRefMatrix$overlapping)))
+
+# df_spliceRefMatrix %>%
+#   filter(overlapping == "DICER1") %>%
+#   select(event)
+  
 
 
-# Look at "LINC"
+# ls_immune_genes <- c("CD83",  "CD300A", "CD44","IL32" , "IL7R" )
+# ls_immune_junctions <- df_spliceRefMatrix$event[df_spliceRefMatrix$overlapping %in% ls_immune_genes]
+# make_pheatmap(ls_immune_junctions, "CD_IL_genes_heatmap", metadata, df_all_PS )
 
 
-# Look at ""
+# ########################################################
+# # Make bed 
+# ########################################################
+# print("Number of unique events:")
+# print(length(unique(df_spliceRefMatrix$event)))
+# ls_bed <- as.vector(sapply( unique(df_spliceRefMatrix$event), junc2bed))
+# writeLines(ls_bed, paste0(opt$out_dir,"/spliceRefMatrix.bed"))
 
 
 ########################################################
@@ -262,53 +329,3 @@ print("-------------------------------------------------------------------------
 # Get median of each LM6 type
 # Z-score of medians
 # Heatmap of medians
-
-
-
-match('CD',df_spliceRefMatrix$overlapping)
-# any(df_spliceRefMatrix$overlapping %like% 'CD')
-
-
-
-ls_cd_junctions <- df_spliceRefMatrix$overlapping[grep("CD", df_spliceRefMatrix$overlapping)]
-print(ls_cd_junctions)
-
-
-
-ls_IL_junctions <- df_spliceRefMatrix$overlapping[grep("IL", df_spliceRefMatrix$overlapping)]
-print(ls_IL_junctions)
-
-
-print(sort(unique(df_spliceRefMatrix$overlapping)))
-
-df_spliceRefMatrix %>%
-  filter(overlapping == "DICER1") %>%
-  select(event)
-  
-########################################################
-# Make bed 
-########################################################
-
-print(unique(df_spliceRefMatrix$event))
-
-# for (i in unique(df_spliceRefMatrix$event)){  
-
-#   sink(paste0(opt$out_dir,"/spliceRefMatrix.bed"))                                   # Apply sink & cat functions
-
-#   chr = strsplit(i, ":")[[1]][1]
-#   range = strsplit(i, ":")[[1]][2]
-#   range_start = strsplit(range, "-")[[1]][1]
-#   range_end = strsplit(range, "-")[[1]][2]
-  
-#   cat(paste0(chr,"\t",range_start,"\t",range_end))
-#   cat("\n")
-#   close(paste0(opt$out_dir,"/spliceRefMatrix.bed"))                                   # Apply sink & cat functions
-
-
-# }
-
-
-
-
-ls_bed <- as.vector(sapply( unique(df_spliceRefMatrix$event), junc2bed))
-writeLines(ls_bed, paste0(opt$out_dir,"/spliceRefMatrix.bed"))
