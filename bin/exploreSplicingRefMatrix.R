@@ -86,7 +86,49 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
         paste0(opt$out_dir,"/",label,"_",val,"_rowname",rowname_on_off,".pdf"))
       }
 }
+calcGroupMed <- function(df_PS, LM_type){
+  str_LM <- as.character(LM_type)
 
+  #transpose df, summarize to median of each group
+  df_t_med <- df_all_PS_ref_events %>%
+    rownames_to_column("rowname") %>%   #transpose
+    gather(var, value, -rowname) %>% 
+    spread(rowname, value) %>%
+    filter(get(LM_type) != "") %>%     #remove samples without a LM grouping
+    select(c(paste0(str_LM),"var",df_spliceRefMatrix$event )) %>% #keep LM col and junctions
+    mutate_at(df_spliceRefMatrix$event, as.numeric) %>% # convert to numeric
+    group_by_at(LM_type) %>%
+    summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
+    column_to_rownames(paste(str_LM)) %>%
+    as.data.frame(.) %>%
+    select_if(~ !any(is.na(.))) #remove NA
+
+  df_med <-  df_t_med  %>%
+    rownames_to_column("rowname") %>% 
+    gather(var, value, -rowname)  %>% 
+    spread(rowname, value) %>% 
+    as.data.frame(.) %>%
+    column_to_rownames("var")
+    
+  #Remove junctions with 0 variance which break scaling
+  df_med_var<- df_med[apply(df_med, 1, var) != 0, ]
+
+  heatmap_res <- pheatmap(
+          main = paste0(" "),
+          df_med_var,
+          scale = "row",
+          show_rownames=F,
+          show_colnames=T,
+          na_col = "grey"
+          )
+
+  save_pheatmap_pdf(
+          heatmap_res,
+          paste0(opt$out_dir,"/",paste(LM_type),"_med_heatmap.pdf")
+          )
+
+  return(df_med)
+}
 # Arguments
 option_list <- list(
   optparse::make_option(
@@ -145,126 +187,86 @@ df_sample_annotations <- metadata %>%
 # Add metadata to splice ref matrix
 df_all_PS_meta <- rbind(df_all_PS, df_sample_annotations)
 
-print(head(df_all_PS_meta))
-# print(rownames(df_all_PS_meta))
-
 df_all_PS_ref_events <- df_all_PS_meta %>%
   rownames_to_column("col") %>%
   filter((col %in% df_spliceRefMatrix$event)|(col %in% rownames(df_sample_annotations))) %>%
   column_to_rownames("col")
 
 print(dim(df_all_PS_ref_events))
-print(tail(df_all_PS_ref_events))
 
+########################################################
+# Make bed 
+########################################################
+print("Number of unique events:")
+print(length(unique(df_spliceRefMatrix$event)))
+ls_bed <- as.vector(sapply( unique(df_spliceRefMatrix$event), junc2bed))
+writeLines(ls_bed, paste0(opt$out_dir,"/spliceRefMatrix.bed"))
 
-# ########################################################
-# # RefMat with medians
-# # ####################################################
-# df_t <- df_all_PS_ref_events %>%
-#   rownames_to_column("rowname") %>% 
-#   gather(var, value, -rowname) %>% 
-#   spread(rowname, value) %>%
-#   select(c("LM6","var",df_spliceRefMatrix$event ))
-
-#   # %>%
-#   # column_to_rownames("var") 
-
-# head(df_t)
-# sum(is.na(df_t))
-# print(dim(df_t))
-# print("----------------------")
-
-
-# # Get median
-# df_t_med <- df_t %>%
-#   mutate_at(df_spliceRefMatrix$event, as.numeric) %>%
-#   group_by(LM6) %>%
-#   summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
-#   column_to_rownames("LM6") %>%
-#   as.data.frame(.) %>%
-#   select_if(~ !any(is.na(.)))
- 
-# head(df_t_med)
-# tail(df_t_med)
-# sum(is.na(df_t_med))
-# print(dim(df_t_med))
-
-# # #!!!  Figure out why there are NAN
-# df_med <- df_t_med  %>%
-#   rownames_to_column("rowname") %>% 
-#   gather(var, value, -rowname)  %>% 
-#   spread(rowname, value) %>% 
-#   as.data.frame(.) %>%
-#   column_to_rownames("var")   %>%
-#   select(-V1) 
-
-# head(df_med)
-# # sum(is.na(df_med))
-# # is.na(df_med) %>% table()
-
-# # options(dplyr.width = Inf)
-# # df_med %>% tbl_df %>% print(n=386)
-# dim(df_med)
-
-# df_med <- df_med[apply(df_med, 1, var) != 0, ]
-# dim(df_med)
-
-
-
-
-
-
-
-calcGroupMed <- function(df_PS, LM_type){
-  str_LM <- as.character(LM_type)
-
-  #transpose df, summarize to median of each group
-  df_t_med <- df_all_PS_ref_events %>%
-    rownames_to_column("rowname") %>%   #transpose
-    gather(var, value, -rowname) %>% 
-    spread(rowname, value) %>%
-    filter(get(LM_type) != "") %>%     #remove samples without a LM grouping
-    select(c(paste0(str_LM),"var",df_spliceRefMatrix$event )) %>% #keep LM col and junctions
-    mutate_at(df_spliceRefMatrix$event, as.numeric) %>% # convert to numeric
-    group_by_at(LM_type) %>%
-    summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
-    column_to_rownames(paste(str_LM)) %>%
-    as.data.frame(.) %>%
-    select_if(~ !any(is.na(.))) #remove NA
-
-  df_med <-  df_t_med  %>%
-    rownames_to_column("rowname") %>% 
-    gather(var, value, -rowname)  %>% 
-    spread(rowname, value) %>% 
-    as.data.frame(.) %>%
-    column_to_rownames("var")
-    
-  #Remove junctions with 0 variance which break scaling
-  df_med <- df_med[apply(df_med, 1, var) != 0, ]
-
-  heatmap_res <- pheatmap(
-          main = paste0(" "),
-          df_med,
-          scale = "row",
-          show_rownames=F,
-          show_colnames=T,
-          na_col = "grey"
-          )
-
-  save_pheatmap_pdf(
-          heatmap_res,
-          paste0(opt$out_dir,"/",paste(LM_type),"_med.pdf")
-          )
-
-  return(df_med)
-}
-
-# Calculate group medians and make heatmap
+######################################################
+# RefMat with medians + z-score
+######################################################
+# Calculate group medians and make heatmap then z-score
 df_LM6_med <- calcGroupMed(df_all_PS_ref_events, "LM6")
+df_LM6_med_z <- t(scale(t(df_LM6_med)))
+
 df_LM22_med <- calcGroupMed(df_all_PS_ref_events, "LM22")
+df_LM22_med_z <- t(scale(t(df_LM22_med)))
 
 print(dim(df_LM6_med))
+print(dim(df_LM6_med_z))
+
 print(dim(df_LM22_med))
+print(dim(df_LM22_med_z))
+
+# ########################################################
+# # Make subsets from gene lists
+# ########################################################
+
+# ls_cd_junctions <- df_spliceRefMatrix$event[grep("CD", df_spliceRefMatrix$overlapping)]
+# print(ls_cd_junctions)
+
+# ls_IL_junctions <- df_spliceRefMatrix$overlapping[grep("IL", df_spliceRefMatrix$overlapping)]
+# print(ls_IL_junctions)
+
+# # print("List of genes:")
+# # print(sort(unique(df_spliceRefMatrix$overlapping)))
+
+# df_spliceRefMatrix %>%
+#   filter(overlapping == "DICER1") %>%
+#   select(event)
+  
+# ls_immune_genes <- c("CD83","CD300A","CD44","IL32","IL7R")
+# ls_immune_junctions <- df_spliceRefMatrix$event[df_spliceRefMatrix$overlapping %in% ls_immune_genes]
+
+# print(ls_immune_junctions)
+
+# df_LM22_med_immune_junctions <- df_LM22_med %>%
+#   rownames_to_column("col") %>%
+#   filter(col %in% ls_immune_junctions) %>%
+#   column_to_rownames("col")
+
+# print(df_LM22_med_immune_junctions)
+
+# heatmap_res <- pheatmap(
+#         main = paste0(" "),
+#         df_LM22_med_immune_junctions,
+#         scale = "row",
+#         show_rownames=T,
+#         show_colnames=T,
+#         na_col = "grey"
+#         )
+
+# save_pheatmap_pdf(
+#         heatmap_res,
+#         paste0(opt$out_dir,"/CD_IL_genes_heatmap_med.pdf")
+#         )
+
+# print(df_spliceRefMatrix[df_spliceRefMatrix$overlapping %in% ls_immune_genes,])
+
+# print(as.data.frame(df_spliceRefMatrix[df_spliceRefMatrix$event %in% ls_immune_junctions,]))
+
+
+
 
 
 ########################################################
@@ -332,50 +334,3 @@ print(dim(df_LM22_med))
 
 
 
-# ########################################################
-# # Make subsets from gene lists
-# ########################################################
-
-# ls_cd_junctions <- df_spliceRefMatrix$event[grep("CD", df_spliceRefMatrix$overlapping)]
-# print(ls_cd_junctions)
-
-# ls_IL_junctions <- df_spliceRefMatrix$overlapping[grep("IL", df_spliceRefMatrix$overlapping)]
-# print(ls_IL_junctions)
-
-# print("List of genes:")
-# print(sort(unique(df_spliceRefMatrix$overlapping)))
-
-# df_spliceRefMatrix %>%
-#   filter(overlapping == "DICER1") %>%
-#   select(event)
-  
-
-
-# ls_immune_genes <- c("CD83",  "CD300A", "CD44","IL32" , "IL7R" )
-# ls_immune_junctions <- df_spliceRefMatrix$event[df_spliceRefMatrix$overlapping %in% ls_immune_genes]
-# make_pheatmap(ls_immune_junctions, "CD_IL_genes_heatmap", metadata, df_all_PS )
-
-
-# ########################################################
-# # Make bed 
-# ########################################################
-# print("Number of unique events:")
-# print(length(unique(df_spliceRefMatrix$event)))
-# ls_bed <- as.vector(sapply( unique(df_spliceRefMatrix$event), junc2bed))
-# writeLines(ls_bed, paste0(opt$out_dir,"/spliceRefMatrix.bed"))
-
-
-########################################################
-# Make RefMatrix with median of each  LM22 type
-########################################################
-
-
-# Get median of each LM22 type
-# Z-score of medians
-# Heatmap of medians
-# make_pheatmap(ls_lm22_top_events, "LM22_diff_splicing_heatmap", metadata, all_PS )
-
-
-# Get median of each LM6 type
-# Z-score of medians
-# Heatmap of medians
