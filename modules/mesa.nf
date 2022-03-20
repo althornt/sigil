@@ -13,7 +13,7 @@ process MESA {
   echo true
   publishDir "${params.outdir}/mesa_out", mode: 'copy'
 
-  // cpus 15
+  cpus 15
 
   input:
   path srafile
@@ -47,7 +47,8 @@ process MESA {
 
     # Run MESA bam_to_junc_bed
     mesa bam_to_junc_bed -m mesa_manifest_bams.txt --output_prefix mesa \
-        --annotation $gtf --genome $genome --number_threads $task.cpus
+        --annotation $gtf --genome $genome --number_threads $task.cpus \
+        --strand inferCombine
 
     # Run MESA quant
     mesa quant -m mesa_manifest.txt -o mesa --drim --maxLength  50000 \
@@ -74,7 +75,7 @@ process MESA_ONLY {
   echo true
   publishDir "${params.outdir}/mesa_out", mode: 'copy'
 
-  cpus 10
+  cpus 15
 
   input:
   path srafile
@@ -107,7 +108,8 @@ process MESA_ONLY {
 
     # Run MESA bam_to_junc_bed
     mesa bam_to_junc_bed -m mesa_manifest_bams.txt --output_prefix mesa \
-        --annotation $gtf --genome $genome --number_threads $task.cpus
+        --annotation $gtf --genome $genome --number_threads $task.cpus \
+        --strand inferCombine
 
 
     # Run MESA quant
