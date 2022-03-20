@@ -9,11 +9,11 @@ library(magrittr)
 library(dplyr)
 library(ensembldb)
 library(DESeq2)
-library(pheatmap)
+library(tidyverse)
 library(limma)
 library(foreach)
 library(doParallel)
-cl <- makeCluster(detectCores() - 1)
+cl <- makeCluster(detectCores() - 1, outfile = "")
 registerDoParallel(cl)
 
 ##################
@@ -74,35 +74,92 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
 
 # Run Deseq2 for one cell type vs all other samples
 runDE_1_vs_all <- function(meta_col_to_use, cell_type_val) {
-
-  print(cell_type_val)
-
   # Make sample table to compare given cell type vs all other cell types
   sampleTable <- df_merged_metadata_lm22 %>%
     dplyr::select(Run, meta_col_to_use, data_source, type) %>%
     dplyr::mutate(condition = ifelse(get(meta_col_to_use) == cell_type_val, "main", "other"))
 
-  print(head(sampleTable))
-
-  # add input of outdir here, whiich will be diff for LM6 and LM22
-  ls_DE_up_down <- runDEseq2(sampleTable,meta_col_to_use, cell_type_val)
-  print(ls_DE_up_down)
-  print("runDE 1 vs all func done")
-  return(ls_DE_up_down)
+  path_to_deseq2_folder <- paste0(opt$out_dir,"/compare_",meta_col_to_use,"/deseq2_outputs/")
+  runDEseq2(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_folder)
 }
 
-runDEseq2 <- function(sampleTable,meta_col_to_use, cell_type_val){
+runDEseq2 <- function(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_folder){
 
-  print("_____________in runDE function")
-  print(head(sampleTable))
+  if (!dir.exists(file.path(path_to_deseq2_folder))){
+    dir.create(file.path(path_to_deseq2_folder),recursive = TRUE, showWarnings = TRUE)
+    }
 
-  # Run DESEQ2 including the batch effect variables - data_source and sequencing type
-  dds <- DESeqDataSetFromTximport(txi = txi.kallisto,
-                                  colData = sampleTable,
-                                  # design =  ~ data_source + type + condition)
-                                  design =  ~ data_source + condition)
-                                  # design =  ~condition)
+  #Write output to file for checking (not read by script)
+  write.csv(sampleTable,file.path(paste(path_to_deseq2_folder,cell_type_val,"sampletable.csv")))
+  print(sampleTable)
 
+  ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22[rownames(sampleTable)]
+
+  # If all data_source and seq type the same 
+  # If all data_source the same 
+  # If all seq type the same
+
+  print(unique(sampleTable$data_source))
+  print(unique(sampleTable$type))
+
+
+  txi.kallisto <- tximport(ls_kallisto_paths_lm22_, type = "kallisto",tx2gene = tx2gene,
+                    txOut = FALSE,ignoreTxVersion=TRUE,
+                    countsFromAbundance = "scaledTPM")
+
+  # Run DEseq and base the model sequencing type and  data source if possible
+  if ((length(unique(sampleTable$data_source))==1) & (length(unique(sampleTable$type))==1)){
+      print(cell_type_val)
+      print("only condition")
+      dds <- DESeqDataSetFromTximport(
+              txi = txi.kallisto, 
+              colData = sampleTable,
+              design =  ~condition)
+  }  else if ((length(unique(sampleTable$data_source))==1) & (length(unique(sampleTable$type))>1)){
+      print(cell_type_val)
+      print("only condition, type")
+      dds <-  tryCatch({
+        dDESeqDataSetFromTximport(
+                    txi = txi.kallisto, 
+                    colData = sampleTable,
+                    design =  ~type + condition)
+      },error = function(err){
+        DESeqDataSetFromTximport(
+                    txi = txi.kallisto, 
+                    colData = sampleTable,
+                    design =  ~ condition)
+      })
+  }  else if ((length(unique(sampleTable$data_source))>1) & (length(unique(sampleTable$type))==1)){
+      print(cell_type_val)
+      print("only condition, data_source")
+      dds <-  tryCatch({
+        dDESeqDataSetFromTximport(
+                    txi = txi.kallisto, 
+                    colData = sampleTable,
+                    design =  ~ data_source + condition)
+      },error = function(err){
+        DESeqDataSetFromTximport(
+                    txi = txi.kallisto, 
+                    colData = sampleTable,
+                    design =  ~ condition)
+      })
+  }  else if ((length(unique(sampleTable$data_source))>1) & (length(unique(sampleTable$type))>1)){
+      print(cell_type_val)
+      print("condition, type, and data_source")
+      dds <-  tryCatch({
+        dDESeqDataSetFromTximport(
+                    txi = txi.kallisto, 
+                    colData = sampleTable,
+                    design =  ~ data_source + type + condition)
+      },error = function(err){
+        DESeqDataSetFromTximport(
+                    txi = txi.kallisto, 
+                    colData = sampleTable,
+                    design =  ~ condition)
+      })
+  }
+  
+  # run DEseq2 on main cell types vs other
   colData(dds)$condition<-factor(
     colData(dds)$condition,
     levels=c("other", "main"))
@@ -110,46 +167,24 @@ runDEseq2 <- function(sampleTable,meta_col_to_use, cell_type_val){
   res<-results(dds_)
   res<-res[order(res$padj),]
 
-  path_to_deseq2_folder <- paste0(opt$out_dir,"/compare_",meta_col_to_use,"/deseq2_outputs/")
-  print(path_to_deseq2_folder)
-
-  if (!dir.exists(file.path(path_to_deseq2_folder))){
-    dir.create(file.path(path_to_deseq2_folder),recursive = TRUE, showWarnings = TRUE)
-    }
   #Write output to file
   write.csv(as.data.frame(res),file.path(paste(path_to_deseq2_folder,cell_type_val,".csv")))
-
-  print("wrote DE output")
-
-  df_res <- as.data.frame(res) %>%
-    tibble::rownames_to_column(var = "gene")
-
-  # Get top DEG with positive and negative log2FC
-  DEG_up <- df_res %>%
-    dplyr::filter(padj < .001) %>%
-    dplyr::filter(log2FoldChange > 2) %>%
-    dplyr::pull("gene")
-
-  DEG_down <- df_res %>%
-    dplyr::filter(padj < .001) %>%
-    dplyr::filter(log2FoldChange < -2 ) %>%
-    dplyr::pull("gene")
-
-  print("_______________DEseq func done")
-
-  return(list("DEG_down"= DEG_down, "DEG_up"= DEG_up))
 }
 
-# Function to save pheatmaps to a file
-save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
-  stopifnot(!missing(x))
-  stopifnot(!missing(filename))
-  pdf(filename, width=width, height=height)
-  grid::grid.newpage()
-  grid::grid.draw(x$gtable)
-  dev.off()
+runDE_1_vs_all_within_type <- function(ls_cell_types, label) {
+  ls_cell_types <- unlist(ls_cell_types)  
+  print(ls_cell_types)
+  for (cell_type_val in ls_cell_types){
+    # Make sample table to compare given cell type vs all other cell types
+    sampleTable <- df_merged_metadata_lm22 %>%
+      dplyr::filter(LM22 %in% ls_cell_types) %>%
+      dplyr::select(Run, LM22, data_source, type) %>%
+      dplyr::mutate(condition = ifelse(LM22 == cell_type_val, "main", "other")) %>%
+      tibble::column_to_rownames("Run")
+    path_to_deseq2_folder <- paste0(opt$out_dir,"/compare_within_type/deseq2_outputs/")
+    runDEseq2(sampleTable,"LM22", cell_type_val,path_to_deseq2_folder)
+  }  
 }
-
 
 ###################
 # MAIN
@@ -207,8 +242,6 @@ for (item in ls_kallisto_meta) {
 df_merged_metadata <- do.call("rbind", ls_meta)
 rownames(df_merged_metadata) <- c()
 
-print(ls_meta)
-
 # List of samples with LM22 labels
 ls_smpls_lm22 <- df_merged_metadata %>%
    dplyr::filter(LM22 != "") %>%
@@ -257,10 +290,11 @@ write.csv(metadata_summary,
 
 ##################
 # DESEQ2 LM22
-##################
-# Run deseq2 on each LM22 cell type vs all others
+# ##################
+# # Run deseq2 on each LM22 cell type vs all others
 # if("LM22" %in% colnames(df_merged_metadata_lm22)){
-#   ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])
+#   ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])[1]
+#   print(ls_lm22_cell_types)
 #   foreach(i=ls_lm22_cell_types, .packages=  c('magrittr', 'DESeq2')) %dopar% {
 #     runDE_1_vs_all(
 #         cell_type_val = i,
@@ -273,112 +307,88 @@ write.csv(metadata_summary,
 # DESEQ2 LM6
 ##################
 # Run deseq2 on each LM6 cell type vs all others
+# if("LM6" %in% colnames(df_merged_metadata_lm22)){
+#   ls_lm6_cell_types <-  unique(df_merged_metadata_lm22[["LM6"]])[1]
+#   print(ls_lm6_cell_types)
+#   print("-----")
+#   foreach(i=ls_lm6_cell_types, .packages=  c('magrittr', 'DESeq2')) %dopar% {
+#     runDE_1_vs_all(
+#         cell_type_val = i,
+#         meta_col_to_use="LM6"
+#         )
+#     }
+# }
 
+##################
+# Within Cell Type 
+##################
+# Dont yet include types without samples or else nan filtering will break
 
-print("df_merged_metadata_lm22")
-# print(df_merged_metadata_lm22)
-
-if("LM6" %in% colnames(df_merged_metadata_lm22)){
-  ls_lm6_cell_types <-  unique(df_merged_metadata_lm22[["LM6"]])[1]
-  print(ls_lm6_cell_types)
-  print("-----")
-  foreach(i=ls_lm6_cell_types, .packages=  c('magrittr', 'DESeq2')) %dopar% {
-    runDE_1_vs_all(
-        cell_type_val = i,
-        meta_col_to_use="LM6"
-        )
-    }
-}
-
-# ##################
-# # Within Cell Type 
-# ##################
-# # Dont yet include types without samples or else nan filtering will break
-
-# # T_cell_types <- list(
-# #   "T cells CD8",
-# #   "T cells CD4 naive",
-# #   "T cells CD4 memory resting",
-# #   "T cells CD4 memory  activated",
-# #   "T cells follicular helper",
-# #   "T cells regulatory (Tregs)",
-# #   "T cells gamma delta")
 # T_cell_types <- list(
 #   "T cells CD8",
 #   "T cells CD4 naive",
+#   "T cells CD4 memory resting",
+#   "T cells CD4 memory  activated",
 #   "T cells follicular helper",
 #   "T cells regulatory (Tregs)",
 #   "T cells gamma delta")
+T_cell_types <- list(
+  "T cells CD8",
+  "T cells CD4 naive",
+  "T cells follicular helper",
+  "T cells regulatory (Tregs)",
+  "T cells gamma delta")
 
-# # mon_mac_cell_types <- list(
-# #   "Monocytes",
-# #   "Macrophages M0",
-# #   "Macrophages M1",
-# #   "Macrophages M2")
 # mon_mac_cell_types <- list(
-#     "Monocytes",
-#     "Macrophages M0",
-#     "Macrophages M1")
+#   "Monocytes",
+#   "Macrophages M0",
+#   "Macrophages M1",
+#   "Macrophages M2")
+mon_mac_cell_types <- list(
+    "Monocytes",
+    "Macrophages M0",
+    "Macrophages M1")
 
-# B_cell_types <- list(
-#   "B cells naive",
-#   "B cells memory")
+B_cell_types <- list(
+  "B cells naive",
+  "B cells memory")
 
-# dendritic_cell_types <- list(
-#   "Dendritic cells resting",
-#   "Dendritic cells activated")
+dendritic_cell_types <- list(
+  "Dendritic cells resting",
+  "Dendritic cells activated")
 
-# # mast_cell_types <- list(
-# #   "Mast cells resting",
-# #   "Mast cells activated")
+# mast_cell_types <- list(
+#   "Mast cells resting",
+#   "Mast cells activated")
 
-# # NK_cell_types <- list(
-# #   "NK cells resting",
-# #   "NK cells activated")
-
-# # ls_within_cell_types <- list(
-# #   "T_cell_types" = T_cell_types,
-# #   "mon_mac_cell_types" = mon_mac_cell_types,
-# #   "Bcell" = B_cell_types,
-# #   "Dendritic" = dendritic_cell_types,
-# #   "Mast" = mast_cell_types,
-# #   "NK" = NK_cell_types)
+# NK_cell_types <- list(
+#   "NK cells resting",
+#   "NK cells activated")
 
 # ls_within_cell_types <- list(
-#   list("Tcell", T_cell_types),
-#   list("Mon_Mac", mon_mac_cell_types),
-#   list("Bcell", B_cell_types),
-#   list("Dendritic" ,dendritic_cell_types)
-# )
+#   "T_cell_types" = T_cell_types,
+#   "mon_mac_cell_types" = mon_mac_cell_types,
+#   "Bcell" = B_cell_types,
+#   "Dendritic" = dendritic_cell_types,
+#   "Mast" = mast_cell_types,
+#   "NK" = NK_cell_types)
 
-# # Run Deseq2 for one cell type vs all other samples
-# runDE_1_vs_all_within_type <- function(ls_cell_types, label) {
+ls_within_cell_types <- list(
+  list("Tcell", T_cell_types),
+  list("Mon_Mac", mon_mac_cell_types),
+  list("Bcell", B_cell_types),
+  list("Dendritic" ,dendritic_cell_types)
+)
 
-#   print(label)
+# Run Deseq2 for one cell type vs all other samples
 
-#   ls_cell_types <- unlist(ls_cell_types)
-#   print(ls_cell_types )
-  
-#   for (cell_type_val in ls_cell_types) %>%{
-
-#     # Make sample table to compare given cell type vs all other cell types
-#     sampleTable <- df_merged_metadata_lm22 %>%
-#       dplyr::select(Run, LM22, data_source, type) %>%
-#       dplyr::mutate(condition = ifelse(LM22 == cell_type_val, "main", "other"))
-
-#     print(head(sampleTable))
-
-#     runDEseq2(sampleTable,"LM22", cell_type_val)
-#     return(list("DEG_down"= DEG_down, "DEG_up"= DEG_up))
-#   }  
-# }
-
-# foreach(i=ls_within_cell_types, .packages=  c('magrittr', 'DESeq2')) %dopar% {
-#   runDE_1_vs_all_within_type(
-#       ls_gen_cell_types = i[2], 
-#       label= i[1]
-#       )
-#   }
+foreach(i=ls_within_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
+  print("foreach")
+  runDE_1_vs_all_within_type(
+      ls_cell_types = i[2], 
+      label= i[1]
+      )
+  }
 
 ####################################
 # UMAPs before batch correction
