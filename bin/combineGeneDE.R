@@ -74,10 +74,13 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
 
 # Run Deseq2 for one cell type vs all other samples
 runDE_1_vs_all <- function(meta_col_to_use, cell_type_val) {
+
   # Make sample table to compare given cell type vs all other cell types
   sampleTable <- df_merged_metadata_lm22 %>%
+    dplyr::filter(get(meta_col_to_use) != "") %>%
     dplyr::select(Run, meta_col_to_use, data_source, type) %>%
-    dplyr::mutate(condition = ifelse(get(meta_col_to_use) == cell_type_val, "main", "other"))
+    dplyr::mutate(condition = ifelse(get(meta_col_to_use) == cell_type_val, "main", "other")) %>%
+    tibble::column_to_rownames("Run")
 
   path_to_deseq2_folder <- paste0(opt$out_dir,"/compare_",meta_col_to_use,"/deseq2_outputs/")
   runDEseq2(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_folder)
@@ -94,14 +97,8 @@ runDEseq2 <- function(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_
   print(sampleTable)
 
   ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22[rownames(sampleTable)]
-
-  # If all data_source and seq type the same 
-  # If all data_source the same 
-  # If all seq type the same
-
   print(unique(sampleTable$data_source))
   print(unique(sampleTable$type))
-
 
   txi.kallisto <- tximport(ls_kallisto_paths_lm22_, type = "kallisto",tx2gene = tx2gene,
                     txOut = FALSE,ignoreTxVersion=TRUE,
@@ -293,9 +290,9 @@ write.csv(metadata_summary,
 # ##################
 # # Run deseq2 on each LM22 cell type vs all others
 # if("LM22" %in% colnames(df_merged_metadata_lm22)){
-#   ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])[1]
+#   ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])
 #   print(ls_lm22_cell_types)
-#   foreach(i=ls_lm22_cell_types, .packages=  c('magrittr', 'DESeq2')) %dopar% {
+#   foreach(i=ls_lm22_cell_types, .packages=  c('magrittr', 'DESeq2', 'tximport')) %dopar% {
 #     runDE_1_vs_all(
 #         cell_type_val = i,
 #         meta_col_to_use="LM22"
@@ -307,17 +304,19 @@ write.csv(metadata_summary,
 # DESEQ2 LM6
 ##################
 # Run deseq2 on each LM6 cell type vs all others
-# if("LM6" %in% colnames(df_merged_metadata_lm22)){
-#   ls_lm6_cell_types <-  unique(df_merged_metadata_lm22[["LM6"]])[1]
-#   print(ls_lm6_cell_types)
-#   print("-----")
-#   foreach(i=ls_lm6_cell_types, .packages=  c('magrittr', 'DESeq2')) %dopar% {
-#     runDE_1_vs_all(
-#         cell_type_val = i,
-#         meta_col_to_use="LM6"
-#         )
-#     }
-# }
+if("LM6" %in% colnames(df_merged_metadata_lm22)){
+  ls_lm6_cell_types <-  unique(df_merged_metadata_lm22[["LM6"]])
+  ls_lm6_cell_types <- droplevels(ls_lm6_cell_types[ls_lm6_cell_types != ""])
+
+  print(ls_lm6_cell_types)
+  print("-----")
+  foreach(i=ls_lm6_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
+    runDE_1_vs_all(
+        cell_type_val = i,
+        meta_col_to_use="LM6"
+        )
+    }
+}
 
 ##################
 # Within Cell Type 
@@ -382,13 +381,13 @@ ls_within_cell_types <- list(
 
 # Run Deseq2 for one cell type vs all other samples
 
-foreach(i=ls_within_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
-  print("foreach")
-  runDE_1_vs_all_within_type(
-      ls_cell_types = i[2], 
-      label= i[1]
-      )
-  }
+# foreach(i=ls_within_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
+#   print("foreach")
+#   runDE_1_vs_all_within_type(
+#       ls_cell_types = i[2], 
+#       label= i[1]
+#       )
+#   }
 
 ####################################
 # UMAPs before batch correction
