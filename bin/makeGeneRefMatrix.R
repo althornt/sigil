@@ -16,50 +16,6 @@ registerDoParallel(cl)
 ##################
 # Functions
 ##################
-# read_in_deseq2 <- function(file_path, topN) {
-#   df_res <- read.csv(file = file_path, header = TRUE)
-
-#   # Get cell type name from file path
-#   str_cell_type <- tools::file_path_sans_ext(basename(file_path))
-
-#   # Make volcano plot
-#   volcano <- ggplot(data=df_res, aes(x=log2FoldChange, y=-log10(padj))) +
-#     geom_point() + theme_minimal() +
-#     geom_hline(yintercept=-log10(0.05), col="red") +
-#     labs(title=paste(str_cell_type))
-#   ggsave(
-#     plot = volcano,
-#     filename = paste0(opt$in_dir,"/volcano_plots/",str_cell_type,".png")
-#     )
-
-#   # Top N DEG by p-value regardless of log2FC
-#   ls_topN_DEG_by_pval <- df_res %>%
-#     dplyr::filter(padj < .05) %>%
-#     dplyr::arrange(padj) %>%
-#     head(topN) %>%
-#     dplyr::pull(X)
-
-#   # Top N DEG ranked by positive log2FC
-#   ls_topN_DEG_up_reg <- df_res %>%
-#     dplyr::filter(padj < .05) %>%
-#     dplyr::arrange(desc(log2FoldChange)) %>%
-#     head(topN) %>%
-#     dplyr::pull(X)
-
-#   # Top N DEG ranked by negative log2FC
-#   ls_topN_DEG_down_reg <- df_res %>%
-#     dplyr::filter(padj < .05) %>%
-#     dplyr::arrange(desc(log2FoldChange)) %>%
-#     tail(topN) %>%
-#     dplyr::pull(X)
-
-#   return(list("ls_topN_DEG_by_pval"= ls_topN_DEG_by_pval,
-#               "ls_topN_DEG_up_reg" = ls_topN_DEG_up_reg,
-#               "ls_topN_DEG_down_reg" = ls_topN_DEG_down_reg))
-
-# }
-
-
 # Function to save pheatmaps to a file
 save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   stopifnot(!missing(x))
@@ -69,30 +25,71 @@ save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   grid::grid.draw(x$gtable)
   dev.off()
 }
+make_pheatmap <- function(ls_events, label, df_meta, df_PS){
+  #' Make heatmap using the pheatmap package using the given events
+  #' and data
+  #'
+  #' @param ls_events - list of events of interest to use in heatmap
+  #' @param label - label to use in output file path
+  #' @param df_meta - df of metadata with Run, val, and data_source, LM6, LM22 columns
+  #' @param df_PS - df of MESA all PS file
 
-list2heatmap <- function(ls_genes, title, output_name ){
-  df_DEG_log2tpm_batch_corrrected <- df_log2tpm_batch_corrrected %>%
-    dplyr::filter(X %in% ls_genes) %>%
-    tibble::column_to_rownames(var  = "X")
+  # Filter MESA all PS file to events of interest
+  df_all_PS_sig_events <- df_PS %>%
+    tibble::rownames_to_column('event') %>%
+    dplyr::filter(event %in% ls_events) %>%
+    dplyr::select(noquote(order(colnames(.)))) %>%
+    tibble::column_to_rownames('event')
 
-  df_sample_annotations <- df_metadata %>%
-  # dplyr::select(Run,sigil_general, LM22) %>%
-    dplyr::select(Run, LM22, data_source) %>%
-    tibble::column_to_rownames("Run")
+  df_all_PS_sig_events_mat <- as.data.frame(lapply(df_all_PS_sig_events,
+                                          function(x) as.numeric(as.character(x)))) 
+                                          
 
-  up_deg_heatmap <- pheatmap(
-    main = paste0(title),
-    df_DEG_log2tpm_batch_corrrected,
-    scale = "row",
-    show_rownames=F,
-    show_colnames=F,
-    annotation_col=df_sample_annotations)
+  rownames(df_all_PS_sig_events_mat) <- rownames(df_all_PS_sig_events)
 
-  save_pheatmap_pdf(
-    up_deg_heatmap,
-    paste0(opt$out_dir,output_name,".pdf"))
+  print(head(df_all_PS_sig_events))
 
+  for (val in list("LM22", "LM6")){
+      if (nrow(df_all_PS_sig_events) < 50){
+        rowname_on_off = "T"
+      } else { rowname_on_off = "F"}
+
+      # DF to label samples(columns) with labels
+      df_sample_annotations <- df_meta %>%
+        dplyr::filter(paste0(val) != "") %>%
+        dplyr::select(Run, val, data_source) %>%
+        dplyr::arrange(Run) %>%
+        tibble::column_to_rownames("Run")
+
+      # print(head(df_sample_annotations))
+      # print(head(df_all_PS_sig_events))
+      # print(dim(df_sample_annotations))
+      # print(dim(df_all_PS_sig_events))
+      # print(rownames(df_sample_annotations))
+      # print(colnames(df_all_PS_sig_events))
+      # print(class(rownames(df_sample_annotations)))
+      # print(class(colnames(df_all_PS_sig_events)))
+
+      print(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
+
+      # stopifnot(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
+      print(rownames(df_all_PS_sig_events))
+
+      heatmap_res <- pheatmap(
+        main = paste0(" "),
+        df_all_PS_sig_events,
+        # scale = "row",
+        show_rownames=get(rowname_on_off),
+        show_colnames=F,
+        na_col = "grey",
+        annotation_col = df_sample_annotations)
+
+      save_pheatmap_pdf(
+        heatmap_res,
+        paste0(opt$out_dir,"/ref_matrix/",label,"_",val,"_rowname",rowname_on_off,".pdf"))
+      }
 }
+
 
 make_umap <- function(num_neighbor,meta_col,df,out_path) {
 
@@ -152,7 +149,6 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
   #' @param out_dir - path to output directory
   #' @return NA
 
-  print(head(df_log2tpm_meta))
   print(sig_event)
 
   df <- df_log2tpm_meta %>%
@@ -161,10 +157,7 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
     t() %>%
     as.data.frame()
 
-  print(df)
   df_ <- df # copy df
-  print(head(df_))
-
   colnames(df_) <- c( "exp", paste0(LM_type), "data_source") #add column names from first row
 
   df_ <- df_[-1,] %>% # drop first row 
@@ -172,8 +165,6 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
           dplyr::filter(get(LM_type) != "") #drop samaples with out the cell type label
 
   df_$exp <- as.numeric(as.character(df_$exp))
-
-  print(head(df_))
 
   p <- ggplot( df_, aes(x = get(LM_type), y = exp, color=data_source)) +
       # geom_violin() +
@@ -198,7 +189,6 @@ import_deseq2 <- function(filename, topN, plot_out_dir, deseq2_dir, meta_col, co
 
   # Filename to string
   LM22_type <- stringr::str_trim(substr(filename, 1, nchar(filename)-4))
-  print(LM22_type)
 
   # Make output directories
   if (!dir.exists(paste0(plot_out_dir,LM22_type))){
@@ -274,6 +264,86 @@ import_deseq2 <- function(filename, topN, plot_out_dir, deseq2_dir, meta_col, co
   return(df_top_sig_neg_and_pos)
 }
 
+import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_col){
+  #' Import results from MESA compare_sample_sets runs within a broader cell type
+  #' (e.g. within T-cells). Find the top signficant events, make event level
+  #' plots, make heatmaps of the events. This function calls import_deseq2(),
+  #' unpack_import_css_res(), and make_pheatmap()
+  #'
+  #' @param ls_cell_types - list of LM22 cell-types that were compared in
+  #' compareWithinType.R script
+  #' @param topN - integer; how many of the top splicing events to use
+  #' @param label - string to use to represent cell type in output files
+  #' @return ls_top_events - list containing 3 list - top positive events, top
+  #' negative events, and top negative and positive
+
+
+  # Get output files from compareWithinType script
+  ls_css_file_names <- list.files(deseq2_dir,pattern = ".csv")
+  print(ls_css_file_names)
+
+  # For input cell type list , convert to filename
+  ls_cell_types_file <- c()
+  for (val in ls_cell_types){
+    new_val <- paste0(gsub(" ","_", val), ".csv")
+    ls_cell_types_file <- append(ls_cell_types_file, new_val)
+  }
+
+  print(ls_cell_types_file)
+
+  # Intersect with the files that exist (Not all will have a mesa css output )
+  ls_css_file_names_cell_type  <- intersect(ls_css_file_names, ls_cell_types_file)
+  print(ls_css_file_names_cell_type)
+
+  #Import files, find top signficant events, plot each event
+  ls_res <- lapply(
+                    ls_css_file_names_cell_type,
+                    topN=topN,
+                    import_deseq2,
+                    meta_col =meta_col,
+                    plot_out_dir =  paste0(opt$out_dir,"/ref_matrix/within_type/"),
+                    deseq2_dir =  deseq2_dir,
+                    comparison_label = "withinType")
+
+  # If only 2 CSS files, they should have identical resuls
+  # (comparing A vs B then B) , so only return the results of one
+  if (length(ls_css_file_names_cell_type) <= 2) {
+      #only keep first result
+      df_res <- ls_res[[1]]
+  } else {
+      df_res <- dplyr::bind_rows(ls_res)
+  }
+
+  ls_top_events <- df_res$X
+
+  # Filter metadata
+  df_metadata_subset <- df_metadata %>%
+    dplyr::filter(LM22 %in% ls_cell_types) %>%
+    droplevels(.) %>%
+    dplyr::arrange(Run)
+
+  # Filter all PS
+  df_log2tpm_batch_corrrected_subset <- df_log2tpm_batch_corrrected %>%
+    dplyr::select(as.vector(unlist(df_metadata_subset$Run)))
+
+  print(head(df_log2tpm_batch_corrrected))
+  print(head(df_metadata))
+  print(head(df_log2tpm_batch_corrrected_subset))
+  print(head(df_metadata_subset))
+  print(dim(df_log2tpm_batch_corrrected))
+  print(dim(df_metadata))
+  print(dim(df_log2tpm_batch_corrrected_subset))
+  print(dim(df_metadata_subset))
+  # Make heatmap with this cell types events only within this cell types samples
+  make_pheatmap(ls_top_events, paste0(label, "_gene_heatmap"),
+          df_metadata_subset, df_log2tpm_batch_corrrected_subset )
+
+  # Make heatmap with this cell types events and ALL samples
+  make_pheatmap(ls_top_events, paste0(label,"_gene_heatmap_all_samples"),
+          df_metadata, df_log2tpm_batch_corrrected )
+
+  return(df_res)
+}
 ###################
 # MAIN
 ###################
@@ -328,14 +398,24 @@ df_log2tpm_meta <- rbind(df_log2tpm_batch_corrrected, df_sample_annotations)
 #######################################
 
 # Get all outputs from compare sample sets 1 vs all comparisons
-ls_lm22_css_file_names <- list.files(
+ls_lm22_de_file_names <- list.files(
                                   paste0(opt$out_dir,"/compare_LM22/deseq2_outputs/"),
-                                  pattern = " .csv")[1] #keep space to avoid import of sample tables
+                                  pattern = ".csv")
 
-print(ls_lm22_css_file_names)
+print(ls_lm22_de_file_names)
+ls_cell_types_file <- list()
+for (val in unique(list(df_metadata$LM22))){
+    new_val <- paste0(gsub(" ","_", val), ".csv")
+    ls_cell_types_file <- append(ls_cell_types_file, new_val)
+  }
+
+print(ls_cell_types_file)
+
+ls_de_file_names_cell_type  <- unlist(intersect(ls_lm22_de_file_names, ls_cell_types_file))
+print(ls_de_file_names_cell_type)
 
 # Import, find signficant events and plot each one
-ls_lm22_res <- foreach(i=ls_lm22_css_file_names,
+ls_lm22_res <- foreach(i=ls_de_file_names_cell_type,
                       .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
     import_deseq2(
       filename = i,
@@ -347,31 +427,128 @@ ls_lm22_res <- foreach(i=ls_lm22_css_file_names,
       )
   }
 
-# df_lm22_res <- dplyr::bind_rows(ls_lm22_res)
-# print(head(df_lm22_res))
-# print(dim(df_lm22_res))
+df_lm22_res <- dplyr::bind_rows(ls_lm22_res)
+print(head(df_lm22_res))
+print(dim(df_lm22_res))
+
+# Make heatmap using top events
+make_pheatmap(df_lm22_res$X, "LM22_diff_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected )
+
+
+########################################
+# Import LM6 1 vs all comparisons
+#######################################
+
+# Get all outputs from compare sample sets 1 vs all comparisons
+ls_lm6_de_file_names <- list.files(
+                                  paste0(opt$out_dir,"/compare_LM6/deseq2_outputs/"),
+                                  pattern = ".csv")
+
+ls_cell_types_file <- list()
+for (val in unique(list(df_metadata$LM6))){
+    new_val <- paste0(gsub(" ","_", val), ".csv")
+    ls_cell_types_file <- append(ls_cell_types_file, new_val)
+  }
+
+print(ls_cell_types_file)
+
+ls_de_file_names_cell_type_lm6  <- unlist(intersect(ls_lm6_de_file_names, ls_cell_types_file))
+print(ls_de_file_names_cell_type_lm6)
+
+
+# Import, find signficant events and plot each one
+ls_lm6_res <- foreach(i=ls_de_file_names_cell_type_lm6,
+                      .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
+    import_deseq2(
+      filename = i,
+      topN = 20,
+      meta_col="LM6",
+      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM6/"),
+      deseq2_dir=paste0(opt$out_dir,"/compare_LM6/deseq2_outputs/"),
+      comparison_label = "LM6"
+      )
+  }
+
+df_lm6_res <- dplyr::bind_rows(ls_lm6_res)
+print(head(df_lm6_res))
+print(dim(df_lm6_res))
+
+# Make heatmap using top events
+make_pheatmap(df_lm6_res$X, "LM6_diff_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected )
+
+
+
+########################################
+# Import within type comparisons
+# #######################################
+# mast_cell_types <- list(
+#   "Mast cells resting",
+#   "Mast cells activated")
+
+# NK_cell_types <- list(
+#   "NK cells resting",
+#   "NK cells activated")
+
+ls_within_cell_types <- list(
+  "Tcell" = list(
+    "T cells CD8",
+    "T cells CD4 naive",
+    #   "T cells CD4 memory resting",
+    #   "T cells CD4 memory  activated",
+    "T cells follicular helper",
+    "T cells regulatory (Tregs)",
+    "T cells gamma delta"),
+  "Mon_Mac" = list(
+      "Monocytes",
+      "Macrophages M0",
+      "Macrophages M1"
+      # "Macrophages M2"
+      ),
+  "Bcell" = list(
+    "B cells naive",
+    "B cells memory"),
+  "Dendritic" = list(
+    "Dendritic cells resting",
+    "Dendritic cells activated"))
+
+ls_within_res <- foreach(i=names(ls_within_cell_types),
+                        .packages=c('magrittr','dplyr','ggplot2','pheatmap')) %dopar% {
+
+      import_deseq2_within(
+        ls_cell_types = ls_within_cell_types[[i]],
+        topN = 20,
+        label = i,
+        deseq2_dir = paste0(opt$out_dir, "/compare_within_type/deseq2_outputs/"),
+        meta_col = "LM22")
+
+      }
+
+print(ls_within_res)
+
+df_within_res <- dplyr::bind_rows(ls_within_res, .id = "column_label")
+print(head(df_within_res))
+print(dim(df_within_res))
 
 # # Make heatmap using top events
-# make_pheatmap(df_lm22_res$event, "LM22_diff_splicing_heatmap", metadata, all_PS )
-
-# # Locate the deseq2 outputs
-# ls_deseq_paths = list.files(
-#   path = paste0(opt$in_dir,"/deseq2_outputs"),
-#   pattern = "*" , full.names = TRUE)
-# stopifnot(length(unique(df_metadata$LM22))==length(ls_deseq_paths))
-
-# # Import deseq2 outputs, make volcano, and get list of top up DEG
-# ls_topN_results <-lapply(ls_deseq_paths, read_in_deseq2, topN=20)
-
-# # Split DEG lists from read_in_deseq2 into different lists
-# ls_res_topN_DEG_by_pval <- unlist(lapply(c(1:length(ls_topN_results)),
-#     function(x) ls_topN_results[[x]]$ls_topN_DEG_by_pval))
-# ls_res_topN_upDEG <- unlist(lapply(c(1:length(ls_topN_results)),
-#     function(x) ls_topN_results[[x]]$ls_topN_DEG_up_reg))
-# ls_res_topN_downDEG <- unlist(lapply(c(1:length(ls_topN_results)),
-#     function(x) ls_topN_results[[x]]$ls_topN_DEG_down_reg))
+make_pheatmap(df_within_res$X, "withinType_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected)
 
 
+
+########################################
+# Combined reference matrix
+######################################
+df_combined_res <- dplyr::bind_rows(list("lm6"  = df_lm6_res,
+                                        "lm22"= df_lm22_res,
+                                        "within" = df_within_res),
+                                        .id = "column_label2")
+print(df_combined_res)
+
+write.table(df_combined_res,
+            file=paste0(opt$out_dir,"/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
+            sep = "\t",row.names = FALSE, quote=F)
+
+# Make heatmap using top events
+make_pheatmap(df_combined_res$X, "LM6_LM22_withinType_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected)
 
 
 # ##################################
