@@ -311,7 +311,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
       }
 }
 
-import_mesa_css_within<- function(ls_cell_types, top_n,  label, css_dir, meta_col){
+import_mesa_css_within<- function(ls_cell_types, topN,  label, css_dir, meta_col){
   #' Import results from MESA compare_sample_sets runs within a broader cell type
   #' (e.g. within T-cells). Find the top signficant events, make event level
   #' plots, make heatmaps of the events. This function calls import_mesa_css(),
@@ -319,7 +319,7 @@ import_mesa_css_within<- function(ls_cell_types, top_n,  label, css_dir, meta_co
   #'
   #' @param ls_cell_types - list of LM22 cell-types that were compared in
   #' compareWithinType.R script
-  #' @param top_n - integer; how many of the top splicing events to use
+  #' @param topN - integer; how many of the top splicing events to use
   #' @param label - string to use to represent cell type in output files
   #' @return ls_top_events - list containing 3 list - top positive events, top
   #' negative events, and top negative and positive
@@ -341,7 +341,7 @@ import_mesa_css_within<- function(ls_cell_types, top_n,  label, css_dir, meta_co
   #Import files, find top signficant events, plot each event
   ls_res <- lapply(
                     ls_css_file_names_cell_type,
-                    topN=top_n,
+                    topN=topN,
                     import_mesa_css,
                     meta_col =meta_col,
                     plot_out_dir =  paste0(opt$out_dir,"/ref_matrix/within_type/"),
@@ -479,7 +479,7 @@ ls_lm22_res <- foreach(i=ls_lm22_css_file_names,
                       .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
     import_mesa_css(
       filename = i,
-      topN = 10,
+      topN = 20,
       meta_col="LM22",
       plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/"),
       css_dir=paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/"),
@@ -510,11 +510,11 @@ ls_lm6_res <- foreach(i=ls_lm6_css_file_names,
                       .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
     import_mesa_css(
       filename = i,
-      topN = 10,
+      topN = 20,
       meta_col="LM6",
       plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM6/"),
       css_dir=paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/"),
-      comparison_label = "LM22"
+      comparison_label = "LM6"
       )
   }
 
@@ -564,7 +564,7 @@ ls_within_res <- foreach(i=names(ls_within_cell_types),
 
       import_mesa_css_within(
         ls_cell_types = ls_within_cell_types[[i]],
-        top_n = 10,
+        topN = 20,
         label = i,
         css_dir = paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"),
         meta_col = "LM22")

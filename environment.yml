@@ -36,3 +36,4 @@ dependencies:
   - r-tidyverse
   - r-doParallel
   - r-foreach
+  - r-UpSetR
