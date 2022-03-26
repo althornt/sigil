@@ -195,10 +195,9 @@ print(dim(df_lm6_gene_z))
 
 # # Scatterplots 
 df_lm6_merged_z_long <- format_merge(df_lm6_gene_z,df_lm6_splice_z )
-print(head(df_lm6_merged_z_long))
-scatter_all(df_lm6_merged_z_long, paste0(opt$out_dir, "/lm6_scatter_all.png"))
-scatter_per_gene(df_lm6_merged_z_long, paste0(opt$out_dir, "/LM6_scatterplots/"))
-
+# print(head(df_lm6_merged_z_long))
+# scatter_all(df_lm6_merged_z_long, paste0(opt$out_dir, "/lm6_scatter_all.png"))
+# scatter_per_gene(df_lm6_merged_z_long, paste0(opt$out_dir, "/LM6_scatterplots/"))
 
 #######################
 # LM22
@@ -229,11 +228,35 @@ print(dim(df_lm22_gene_z))
 
 # # Scatterplots 
 df_lm22_merged_z_long <- format_merge(df_lm22_gene_z,df_lm22_splice_z )
-scatter_all(df_lm22_merged_z_long, paste0(opt$out_dir, "/lm22_scatter_all.png"))
-scatter_per_gene(df_lm22_merged_z_long, paste0(opt$out_dir, "/LM22_scatterplots/"))
-
-
+# scatter_all(df_lm22_merged_z_long, paste0(opt$out_dir, "/lm22_scatter_all.png"))
+# scatter_per_gene(df_lm22_merged_z_long, paste0(opt$out_dir, "/LM22_scatterplots/"))
 
 #######################
 # Count splicing types 
 ########################
+	# - event - NA - no matched gene
+	# - event - matched gene not in gene ref matrix
+	# - event - matched gene in ref matrix same cell 
+	# - event - matched gene in ref matrix different cell 
+print("Total number of events:")
+print(nrow(df_splice_ref))
+
+print("Total number of unique events:")
+print(length(unique(df_splice_ref$event)))
+
+print("Number of events with no gene:")
+print( nrow(df_splice_ref %>% 
+  filter(overlapping == "")))
+
+
+df_merged_z <- df_lm22_splice_z  %>%
+        inner_join(df_lm22_gene_z, by = c("gene"), suffix=c("_splice","_gene")) %>%
+        select(event, gene, cell_types_splice, gene,cell_types_gene ) %>%
+        arrange(gene)
+        
+print("Number of events with matched gene in gene reference matrix:")
+print(nrow(df_merged_z))
+
+print("Number of spliced genes with matched gene in gene reference matrix:")
+print(length(unique(df_merged_z$gene)))
+
