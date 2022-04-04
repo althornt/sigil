@@ -173,12 +173,12 @@ print(opt$spliceDir)
 print(opt$geneDir)
 
 # Make output directories
-if (!dir.exists(file.path(opt$out_dir,"/LM6_scatterplots/"))){
-  dir.create(file.path(opt$out_dir,"/LM6_scatterplots/"),
-              recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/LM22_scatterplots/"))){
-  dir.create(file.path(opt$out_dir,"/LM22_scatterplots/"),
-              recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(file.path(opt$out_dir,"/LM6_scatterplots/"))){
+#   dir.create(file.path(opt$out_dir,"/LM6_scatterplots/"),
+#               recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(file.path(opt$out_dir,"/LM22_scatterplots/"))){
+#   dir.create(file.path(opt$out_dir,"/LM22_scatterplots/"),
+#               recursive = TRUE, showWarnings = TRUE)}
 
 # Read in files 
 
@@ -373,34 +373,77 @@ for (this_event in df_splice_ref$event){
 
 print(head(df_splice_ref))
 
-# for (label_type in c(cell_type, overlapping, ))
+########################################
+# Scatter plot all
+#######################################
 
-p <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
-  geom_point(size=.5) +
-  labs(title= "") + 
-  geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
-  geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
-  geom_text(
-            label= df_splice_ref$overlapping,
-            nudge_x = 0.05, nudge_y = 0.05,
-            check_overlap =F, col = "black", size = 1
-          ) +
-  theme_minimal() +
-  theme(legend.position="bottom", 
-        legend.title = element_text(size = 5), 
-        legend.text = element_text(size = 5)) 
-        # +
-  # guides(color = guide_legend(nrow = 3))
+for (label_type in c("cell_type", "event", "overlapping", "group")){
 
-ggsave(plot = p, filename = paste0(opt$out_dir, "/splice_ref_vs_gene.png"))
+  p <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
+    geom_point(size=.5) +
+    labs(title= "") + 
+    geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
+    geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
+    geom_text(
+              label= df_splice_ref[[label_type]],
+              nudge_x = 0.05, nudge_y = 0.05,
+              check_overlap =F, col = "black", size = 1
+            ) +
+    theme_minimal() +
+    theme(legend.position="bottom", 
+          legend.title = element_text(size = 5), 
+          legend.text = element_text(size = 5),
+          axis.title.x=element_text(size=7),
+          axis.title.y=element_text(size=7))  +
+    guides(color = guide_legend(nrow = 2))
 
-	# - for each reference matrix splice junction
-	# 	- for that cell type pull the gene expression from the big table
-	# 	- z-score all
-	# 	- scatter plot one labeling gene
-	# 	- another labeling event
-	# 	- another labeling cell-type sig
-	# 	- only plot the z-score for the cell_type specific one 
+  ggsave(plot = p, width = 12, height = 7, dpi = 300,
+        filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, ".png"))
+}
+
+
+########################################
+# Scatter for each cell type and group
+#######################################
+if (!dir.exists(file.path(opt$out_dir,"/splice_ref_vs_gene_by_cell/"))){
+  dir.create(file.path(opt$out_dir,"/splice_ref_vs_gene_by_cell/"),
+              recursive = TRUE, showWarnings = TRUE)}
+
+for (cell in unique(df_splice_ref$cell_type_group)){
+
+  df_splice_ref_subset <- df_splice_ref %>% 
+                          filter(cell_type_group == cell)
+
+  for (label_type in c( "event", "overlapping", "group")){
+
+    p <- ggplot(aes(x=splice_z, y=gene_z), data=df_splice_ref_subset)+ 
+      geom_point(size=2) +
+      labs(title= cell) + 
+      geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "black") +  
+      geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "black") +
+      geom_text(
+                label= df_splice_ref_subset[[label_type]],
+                nudge_x = 0.05, nudge_y = 0.05,
+                check_overlap =F, col = "black", size = 2
+              ) +
+      theme_minimal() +
+      theme(legend.position="bottom", 
+            legend.title = element_text(size = 5), 
+            legend.text = element_text(size = 5),
+            axis.title.x = element_text(size=7),
+            axis.title.y = element_text(size=7))  +
+      guides(color = guide_legend(nrow = 2))
+
+    ggsave(plot = p, width = 12, height = 7, dpi = 300,
+          filename = paste0(opt$out_dir, "splice_ref_vs_gene_by_cell/splice_ref_vs_gene",cell,"_",label_type, ".png"))
+  }
+
+
+}
+
+
+
+
 
 
 
