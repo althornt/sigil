@@ -35,13 +35,16 @@ importMetaMESA <- function(row){
   res_inc_count_path <- file.path(row[2], "mesa_out", "mesa_inclusionCounts.tsv")
   res_allPS_path <- file.path(row[2], "mesa_out", "mesa_allPS.tsv")
   res_cluster_path <- file.path(row[2], "mesa_out", "mesa_allClusters.tsv")
-  res_IR_path <- file.path(row[2], "mesa_out", "mesa_ir_table_intron_retention.tsv")
+  res_IR_table_path <- file.path(row[2], "mesa_out", "mesa_ir_table_intron_retention.tsv")
+  res_IR_cov_dir_path <- file.path(row[2], "mesa_out", "mesa_intron_coverage")
+
 
   return(list(
       "ls_mesa_inc_count_files"=res_inc_count_path,
       "ls_mesa_allPS_files"=res_allPS_path,
       "ls_mesa_cluster_files"=res_cluster_path,
-      "ls_mesa_IR_files" = res_IR_path,
+      "ls_mesa_IR_table_files" = res_IR_table_path,
+      "ls_mesa_IR_cov_dir" = res_IR_cov_dir_path,
       "metadata"=df_metadata,
       "ls_samples_run"=df_metadata$Run))
 }
@@ -176,14 +179,15 @@ ls_mesa_meta = apply(df_manifest, 1, importMetaMESA)
 
 # Split into ls of mesa and metadata files for each data set
 ls_mesa_inc_count_files <- ls_mesa_allPS_files <- ls_mesa_cluster_files <- c()
-ls_mesa_IR_files <- ls_meta <- ls_sample_names <- c()
+ls_mesa_IR_table_files <- ls_mesa_IR_cov_dir <- ls_meta <- ls_sample_names <- c()
 for (item in ls_mesa_meta) {
      ls_mesa_inc_count_files <- append(ls_mesa_inc_count_files, item[1])
      ls_mesa_allPS_files <- append(ls_mesa_allPS_files, item[2])
      ls_mesa_cluster_files <- append(ls_mesa_cluster_files, item[3])
-     ls_mesa_IR_files <- append(ls_mesa_IR_files, item[4])
-     ls_meta <- append(ls_meta, item[5])
-     ls_sample_names <- append(ls_sample_names, item[6])
+     ls_mesa_IR_table_files <- append(ls_mesa_IR_table_files, item[4])
+     ls_mesa_IR_cov_dir <- append(ls_mesa_IR_cov_dir, item[5])
+     ls_meta <- append(ls_meta, item[6])
+     ls_sample_names <- append(ls_sample_names, item[7])
    }
 
 # Combine metadata from each data source by rows
@@ -200,153 +204,240 @@ write.csv(df_merged_metadata_lm22,
 # List of samples with LM22 label
 ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
 
-#########################################
-# Merge mesa files
-#########################################
-# Note: Do not merge PS files, PS needs to be recalculated
-mesa_file_names <- list(
-              list(ls_mesa_inc_count_files,
-                  "manifest_mesa_inclusionCounts_files.tsv","merged_mesa_inclusionCounts.tsv" ),
-              list(ls_mesa_IR_files,
-                 "manifest_mesa_IR_files.tsv","merged_mesa_ir_table_intron_retention.tsv" ))
+####################################################
+# Read in all individual mesa IR files and merge
+####################################################
+# Get list of all _intron_coverage.txt files from all batches
+ls_mesa_IR_cov_files <- ls_mesa_IR_cov_file_names <- list()
+for (dir in ls_mesa_IR_cov_dir){
+  files <- file.path(dir, list.files(dir))
+  names <- unlist(strsplit(as.character(strsplit(list.files(dir),split= "/")),
+                 split = "_intron_coverage.txt"))
 
-merge <- foreach(i=mesa_file_names ) %dopar% {
+  ls_mesa_IR_cov_files <- append(ls_mesa_IR_cov_files,files )
+  ls_mesa_IR_cov_file_names <- append(ls_mesa_IR_cov_file_names,names )
+}
 
-        # Write manifest needed for mesa select
-        write.table(as.data.frame(unlist(i[1])),
-          file=paste0(opt$out_dir,"/",i[2]),
-          col.names = FALSE,
-          row.names = FALSE,
-          quote = FALSE)
+names(ls_mesa_IR_cov_files) <- ls_mesa_IR_cov_file_names
 
-        # Run mesa select to merge the mesa file
-        cmd <- paste0(
-          "mesa select -m ",
-                  opt$out_dir,"/",i[2], " -o ",
-                  opt$out_dir,"/",i[3], "  --join intersection 2>&1"
-                )
+# Files to dfs
+ls_mesa_IR_cov_dfs <- foreach(i=ls_mesa_IR_cov_files,
+                            n = names(ls_mesa_IR_cov_files), .packages=  'magrittr' ) %dopar% {
+    df <- readr::read_delim(i, delim = "\t",   col_names = FALSE) %>%
+        dplyr::mutate(X1  = as.character(X1),
+                      X2  = as.character(X2),
+                      X3  = as.character(X3),
+                      X4  = as.character(X4)  ) %>%
+        dplyr::select( "X1", "X2","X3","X4", "X5", "X6") %>%
+        dplyr::select(-X5,X5) # Move data col to last col
 
-        print(cmd)
-        system(cmd)
+    names(df)[6] <- n # Rename col to sample name
+    df
     }
 
-# Import each merged MESA file and check they have same number of samples
-df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_inclusionCounts.tsv"),
-                                    row.names = 1, header=T)
-df_merged_IR <- read.table(paste0(opt$out_dir,"/merged_mesa_ir_table_intron_retention.tsv"),
-                                    row.names = 1, header=T)
-if(all.equal(ncol(df_merged_inc_counts),
-            ncol(df_merged_IR)) != TRUE)
-  stop("Error: Number of columns in merged inclusion counts and merged intron retention counts are not equal")
-######################################
-# Convert Merged count file to PS
-######################################
-# 2>&1 sends standard error standard output
-PS_cmd <- paste0(
-    "mesa counts_to_ps -i ",
-    opt$out_dir,"/merged_mesa_inclusionCounts.tsv -o ",
-    opt$out_dir,"/merged_mesa  --recluster 2>&1"
-    )
-print(PS_cmd)
-system(PS_cmd)
+print("df inputs to merge ")
+print(head(ls_mesa_IR_cov_dfs))
+print(tail(ls_mesa_IR_cov_dfs))
+print(length(ls_mesa_IR_cov_dfs))
 
-# Read in new PS file calculated from merged inclusion counts
-df_merged_allPS <- read.table(paste0(opt$out_dir,"/merged_mesa_allPS.tsv"),
-                              row.names = 1, header=T)
+# Combine all files by columns 
+df_merged_IR <- ls_mesa_IR_cov_dfs %>% 
+      purrr::reduce(dplyr::inner_join,
+                    by = c("X1","X2","X3","X4","X6"),
+                    na_matches = "never")  
 
-if(all.equal(ncol(df_merged_allPS),
-            ncol(df_merged_inc_counts),
-            ncol(df_merged_IR)) != TRUE)
-            stop("Error: Number of columns in merged inclusion counts, PS, and intron retention are not equal")
+print("Combined.......")
+print(head(df_merged_IR, n = 10))
+print(tail(df_merged_IR, n = 10))
+print(dim(df_merged_IR))
 
-######################################
-# UMAPs before batch correction
-######################################
-df_to_UMAP(df_merged_inc_counts, "UMAPs_pre_batch_correction/inclusionCounts_PCA_UMAP")
-df_to_UMAP(df_merged_allPS, "UMAPs_pre_batch_correction/allPS_PCA_UMAP")
-df_to_UMAP(df_merged_IR, "UMAPs_pre_batch_correction/IR_PCA_UMAP")
+# print(colSums(is.na(df_merged_IR)))
 
-########################################################
-# Batch correction of inclusion counts
-#########################################################
-# Log2 + 1 transform counts
-df_log2trans_inc_counts <- as.data.frame(log2(df_merged_inc_counts +1))
-
-# Limma remove batch effect
-df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
-                                  df_log2trans_inc_counts,
-                                  batch = df_merged_metadata$data_source,
-                                  batch2 = df_merged_metadata$type
-                                  )
-
-# Undo log2(x+1) with 2^x - 1
-df_merged_inc_counts_batch_corr = 2^df_mesa_inc_count_merge_log2_batch_corr -1
-rownames(df_merged_inc_counts_batch_corr) <- rownames(df_merged_inc_counts)
-
-# Round all counts below 1 to 0
-df_merged_inc_counts_batch_corr[df_merged_inc_counts_batch_corr < 1 ] <- 0
-
+# [1] 124896    202
+# Write merged table file 
 write.table(
-  df_merged_inc_counts_batch_corr,
-  file.path(opt$out_dir,"batch_corr_mesa_inclusionCounts.tsv"),
-  sep="\t",quote=F, col.names = NA)
-
-########################################################
-# Convert batch corrected counts to PS
-#########################################################
-# Merge all PS files with MESA select_samples command
-# 2>&1 sends standard error standard output
-PS_cmd <- paste0(
-    "mesa counts_to_ps -i ",
-    opt$out_dir,"/batch_corr_mesa_inclusionCounts.tsv -o ",
-    opt$out_dir,"/batch_corr_mesa  --recluster 2>&1"
-    )
-print(PS_cmd)
-system(PS_cmd)
-
-########################################################
-# UMAPs of PS after batch correction
-#########################################################
-df_merged_allPS_batch_corr <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_allPS.tsv"),
-                              row.names = 1, header=T)
-
-# Drop non LM22 samples from mesa PS
-df_merged_allPS_batch_corr_lm22 <- df_merged_allPS_batch_corr %>%
-  dplyr::select(ls_smpls_lm22)
-rownames(df_merged_allPS_batch_corr_lm22) <- rownames(df_merged_allPS_batch_corr)
-
-write.table(
-  df_merged_allPS_batch_corr_lm22,
-  file.path(opt$out_dir,"batch_corr_mesa_allPS_LM22.tsv"), quote=F,sep="\t", na="nan",
+  df_merged_IR,
+  file.path(opt$out_dir,"merged_mesa_intron_coverage.tsv"), quote=F,sep="\t", na="nan",
   col.names = NA, row.names= TRUE)
 
-######################################
-# Intron Retention batch correction
-######################################
-# Log2 + 1 transform IR
-df_merged_IR_log2 <- as.data.frame(log2(df_merged_IR +1))
 
-# Limma remove batch effect
-df_merged_IR_log2_batch_corr <- limma::removeBatchEffect(
-                                  df_merged_IR_log2,
-                                  batch = df_merged_metadata$data_source,
-                                  batch2 = df_merged_metadata$type
-                                  )
+df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_intron_coverage.tsv"),
+                                    row.names = 1, header=T)
 
-# Undo log2(x+1) with 2^x - 1
-df_merged_IR_batch_corr = 2^df_merged_IR_log2_batch_corr -1
-rownames(df_merged_IR_batch_corr) <- rownames(df_merged_IR)
+print(head(df_merged_inc_counts))
+print(tail(df_merged_inc_counts))
+print(dim(df_merged_inc_counts))
 
-######################################
-# UMAPs after batch correction
-######################################
-df_to_UMAP(df_merged_inc_counts_batch_corr, "UMAPs_post_batch_correction/inclusionCounts_PCA_UMAP")
-df_to_UMAP(df_merged_allPS_batch_corr, "UMAPs_post_batch_correction/allPS_PCA_UMAP")
-df_to_UMAP(df_merged_IR_batch_corr, "UMAPs_post_batch_correction/IR_PCA_UMAP")
+# # Log2 + 1 transform counts
+# df_log2trans_IR_cov <- as.data.frame(log2(df_merged_inc_counts +1))
 
-#################################################
-# Compare distributions before and after BC
-#################################################
-plot_before_after(df_merged_inc_counts, as.data.frame(df_merged_inc_counts_batch_corr), "hist_inclusionCounts_before_after_bc.png", "Inclusion count")
-plot_before_after(df_merged_allPS, as.data.frame(df_merged_allPS_batch_corr), "hist_PS_before_after_bc.png","PS")
-plot_before_after(df_merged_IR, as.data.frame(df_merged_IR_batch_corr), "hist_IR_before_after_bc.png","Intron coverage")
+# # Limma remove batch effect
+# df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
+#                                   df_log2trans_inc_counts,
+#                                   batch = df_merged_metadata$data_source,
+#                                   batch2 = df_merged_metadata$type
+#                                   )
+
+# # Undo log2(x+1) with 2^x - 1
+# df_merged_inc_counts_batch_corr = 2^df_mesa_inc_count_merge_log2_batch_corr -1
+# rownames(df_merged_inc_counts_batch_corr) <- rownames(df_merged_inc_counts)
+
+# # Round all counts below 1 to 0
+# df_merged_inc_counts_batch_corr[df_merged_inc_counts_batch_corr < 1 ] <- 0
+
+# write.table(
+#   df_merged_inc_counts_batch_corr,
+#   file.path(opt$out_dir,"batch_corr_mesa_intron_coverage.tsv"),
+#   sep="\t",quote=F, col.names = NA)
+
+
+# #########################################
+# # Merge mesa files
+# #########################################
+# # Note: Do not merge PS files, PS needs to be recalculated
+# mesa_file_names <- list(
+#               list(ls_mesa_inc_count_files,
+#                   "manifest_mesa_inclusionCounts_files.tsv","merged_mesa_inclusionCounts.tsv" ),
+#               list(ls_mesa_IR_table_files,
+#                  "manifest_mesa_IR_files.tsv","merged_mesa_ir_table_intron_retention.tsv" ))
+
+# merge <- foreach(i=mesa_file_names ) %dopar% {
+
+#         # Write manifest needed for mesa select
+#         write.table(as.data.frame(unlist(i[1])),
+#           file=paste0(opt$out_dir,"/",i[2]),
+#           col.names = FALSE,
+#           row.names = FALSE,
+#           quote = FALSE)
+
+#         # Run mesa select to merge the mesa file
+#         cmd <- paste0(
+#           "mesa select -m ",
+#                   opt$out_dir,"/",i[2], " -o ",
+#                   opt$out_dir,"/",i[3], "  --join intersection 2>&1"
+#                 )
+
+#         print(cmd)
+#         system(cmd)
+#     }
+
+# # Import each merged MESA file and check they have same number of samples
+# df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_inclusionCounts.tsv"),
+#                                     row.names = 1, header=T)
+# df_merged_IR <- read.table(paste0(opt$out_dir,"/merged_mesa_ir_table_intron_retention.tsv"),
+#                                     row.names = 1, header=T)
+# if(all.equal(ncol(df_merged_inc_counts),
+#             ncol(df_merged_IR)) != TRUE)
+#   stop("Error: Number of columns in merged inclusion counts and merged intron retention counts are not equal")
+# ######################################
+# # Convert Merged count file to PS
+# ######################################
+# # 2>&1 sends standard error standard output
+# PS_cmd <- paste0(
+#     "mesa counts_to_ps -i ",
+#     opt$out_dir,"/merged_mesa_inclusionCounts.tsv -o ",
+#     opt$out_dir,"/merged_mesa  --recluster 2>&1"
+#     )
+# print(PS_cmd)
+# system(PS_cmd)
+
+# # Read in new PS file calculated from merged inclusion counts
+# df_merged_allPS <- read.table(paste0(opt$out_dir,"/merged_mesa_allPS.tsv"),
+#                               row.names = 1, header=T)
+
+# if(all.equal(ncol(df_merged_allPS),
+#             ncol(df_merged_inc_counts),
+#             ncol(df_merged_IR)) != TRUE)
+#             stop("Error: Number of columns in merged inclusion counts, PS, and intron retention are not equal")
+
+# ######################################
+# # UMAPs before batch correction
+# ######################################
+# df_to_UMAP(df_merged_inc_counts, "UMAPs_pre_batch_correction/inclusionCounts_PCA_UMAP")
+# df_to_UMAP(df_merged_allPS, "UMAPs_pre_batch_correction/allPS_PCA_UMAP")
+# df_to_UMAP(df_merged_IR, "UMAPs_pre_batch_correction/IR_PCA_UMAP")
+
+# ########################################################
+# # Batch correction of inclusion counts
+# #########################################################
+# # Log2 + 1 transform counts
+# df_log2trans_inc_counts <- as.data.frame(log2(df_merged_inc_counts +1))
+
+# # Limma remove batch effect
+# df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
+#                                   df_log2trans_inc_counts,
+#                                   batch = df_merged_metadata$data_source,
+#                                   batch2 = df_merged_metadata$type
+#                                   )
+
+# # Undo log2(x+1) with 2^x - 1
+# df_merged_inc_counts_batch_corr = 2^df_mesa_inc_count_merge_log2_batch_corr -1
+# rownames(df_merged_inc_counts_batch_corr) <- rownames(df_merged_inc_counts)
+
+# # Round all counts below 1 to 0
+# df_merged_inc_counts_batch_corr[df_merged_inc_counts_batch_corr < 1 ] <- 0
+
+# write.table(
+#   df_merged_inc_counts_batch_corr,
+#   file.path(opt$out_dir,"batch_corr_mesa_inclusionCounts.tsv"),
+#   sep="\t",quote=F, col.names = NA)
+
+# ########################################################
+# # Convert batch corrected counts to PS
+# #########################################################
+# # Merge all PS files with MESA select_samples command
+# # 2>&1 sends standard error standard output
+# PS_cmd <- paste0(
+#     "mesa counts_to_ps -i ",
+#     opt$out_dir,"/batch_corr_mesa_inclusionCounts.tsv -o ",
+#     opt$out_dir,"/batch_corr_mesa  --recluster 2>&1"
+#     )
+# print(PS_cmd)
+# system(PS_cmd)
+
+# ########################################################
+# # UMAPs of PS after batch correction
+# #########################################################
+# df_merged_allPS_batch_corr <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_allPS.tsv"),
+#                               row.names = 1, header=T)
+
+# # Drop non LM22 samples from mesa PS
+# df_merged_allPS_batch_corr_lm22 <- df_merged_allPS_batch_corr %>%
+#   dplyr::select(ls_smpls_lm22)
+# rownames(df_merged_allPS_batch_corr_lm22) <- rownames(df_merged_allPS_batch_corr)
+
+# write.table(
+#   df_merged_allPS_batch_corr_lm22,
+#   file.path(opt$out_dir,"batch_corr_mesa_allPS_LM22.tsv"), quote=F,sep="\t", na="nan",
+#   col.names = NA, row.names= TRUE)
+
+# ######################################
+# # Intron Retention batch correction
+# ######################################
+# # Log2 + 1 transform IR
+# df_merged_IR_log2 <- as.data.frame(log2(df_merged_IR +1))
+
+# # Limma remove batch effect
+# df_merged_IR_log2_batch_corr <- limma::removeBatchEffect(
+#                                   df_merged_IR_log2,
+#                                   batch = df_merged_metadata$data_source,
+#                                   batch2 = df_merged_metadata$type
+#                                   )
+
+# # Undo log2(x+1) with 2^x - 1
+# df_merged_IR_batch_corr = 2^df_merged_IR_log2_batch_corr -1
+# rownames(df_merged_IR_batch_corr) <- rownames(df_merged_IR)
+
+# ######################################
+# # UMAPs after batch correction
+# ######################################
+# df_to_UMAP(df_merged_inc_counts_batch_corr, "UMAPs_post_batch_correction/inclusionCounts_PCA_UMAP")
+# df_to_UMAP(df_merged_allPS_batch_corr, "UMAPs_post_batch_correction/allPS_PCA_UMAP")
+# df_to_UMAP(df_merged_IR_batch_corr, "UMAPs_post_batch_correction/IR_PCA_UMAP")
+
+# #################################################
+# # Compare distributions before and after BC
+# #################################################
+# plot_before_after(df_merged_inc_counts, as.data.frame(df_merged_inc_counts_batch_corr), "hist_inclusionCounts_before_after_bc.png", "Inclusion count")
+# plot_before_after(df_merged_allPS, as.data.frame(df_merged_allPS_batch_corr), "hist_PS_before_after_bc.png","PS")
+# plot_before_after(df_merged_IR, as.data.frame(df_merged_IR_batch_corr), "hist_IR_before_after_bc.png","Intron coverage")
