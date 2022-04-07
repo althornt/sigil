@@ -194,6 +194,11 @@ df_splice_ref <- read.csv(file= paste0(
                                 opt$spliceDir,
                                 "/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
                           sep = "\t",header=TRUE) 
+# Merge cols to add LM tag (within type uses LM22 groups )
+df_splice_ref <- df_splice_ref %>%
+  mutate(cell_type_group = ifelse(group=="LM6",
+                                paste(cell_type, "LM6", sep = "_"),
+                                paste(cell_type, "LM22", sep = "_")))
 print("splice ref mat")
 print(head(df_splice_ref))
 print(dim(df_splice_ref))
@@ -205,8 +210,15 @@ df_gene_ref <- read.csv(file= paste0(
                               "/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
                          sep = "\t",header=TRUE) %>%
               rename(gene = X)
+
+# Merge cols to add LM tag (within type uses LM22 groups )
+df_gene_ref <- df_gene_ref %>%
+  mutate(cell_type_group = ifelse(group=="LM6",
+                                paste(cell_type, "LM6", sep = "_"),
+                                paste(cell_type, "LM22", sep = "_")))
 print("gene ref mat")
 print(head(df_gene_ref))
+print(unique(df_gene_ref$group))
 
 #############
 # MAIN PLOT: 
@@ -214,13 +226,6 @@ print(head(df_gene_ref))
 # LM22 splice ref vs all matched genes
 ##############################
 # Adding Z-scores into the splice ref df 
-
-# Merge cols to add LM tag (within type uses LM22 groups )
-df_splice_ref <- df_splice_ref %>%
-  mutate(cell_type_group = ifelse(group=="LM6",
-                                paste(cell_type, "LM6", sep = "_"),
-                                paste(cell_type, "LM22", sep = "_")))
-print(head(df_splice_ref))
 
 ##################################
 # Formating Gene Exp Z-score df
@@ -287,7 +292,6 @@ colnames(df_lm6_splice_z) <- paste(colnames(df_lm6_splice_z),"LM6",sep=" ")
 
 print(head(df_lm6_splice_z))
 print(head(df_lm22_splice_z))
-
 
 # Merge by row.names (cant cbind due to different number of events likely due to NANs)
 df_splice_LM6_LM22_med_z <- merge(df_lm6_splice_z,df_lm22_splice_z,by=0) %>%
@@ -479,51 +483,30 @@ print(head(df_splice_ref))
 #         filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, "_zoomed.png"))
 # }
 
-##########################################
-# UpSet plots - event vs cell type group
-##########################################
-# Build matrix
-#     cell1 cell2  cell3
-#event1 0      0     1
-#event2  1     1     0
-# print(head(df_splice_ref))
+################################################################################
+# Quantify number of splice change with little gene change
+###############################################################################
+# Find ratio of abs gene Z to abs splice gene 
+# Splice / gene 
+# 
 
-# # Matrix filled of 0s
-# df_upset_event2cell <- data.frame(matrix(0,
-#                             ncol = length(unique(df_splice_ref$cell_type_group)),
-#                             nrow = length(unique(df_splice_ref$event))))
-# colnames(df_upset_event2cell) <- unique(df_splice_ref$cell_type_group)
-# rownames(df_upset_event2cell) <- unique(df_splice_ref$event)
+# New col for ratio
+# df_splice_ref <- df_splice_ref %>%
+    # mutate
 
-# print(head(df_upset_event2cell))
+# Sort by ratio 
 
 
-# # Loop through ref matrix rows and populate matrix
-# for (row in 1:nrow(df_splice_ref)) {
-#   cell <- as.character(df_splice_ref[row, "cell_type_group"])
-#   event <- as.character(df_splice_ref[row, "event"])
-#   df_upset_event2cell[event, cell] <- 1
-# }
 
-# print(tail(df_upset_event2cell))
+# df_splice_ref
+
+# If abs splice z > 1
 
 
-# plotObject <- UpSetR::upset(df_upset_event2cell, 
-#                             order.by = "freq",
-#                             keep.order = F, 
-#                             nintersects = 15, 
-#                             nsets= ncol(df_upset_event2cell), 
-#                             empty.intersections = "off")
-
-# pdf(file= paste0(opt$out_dir, "/upset_event2cell.pdf")) # or other device
-# plotObject
-# dev.off()
 
 
-# print(dim(df_upset_event2cell))
 
 
-# print(colSums(df_upset_event2cell))
 
 
 
@@ -533,6 +516,8 @@ upset_plot <- function(df_ref, val, output_name){
   #event1 0      0     1
   #event2  1     1     0
 
+  print("Start")  
+  # print(is.data.frame(df_ref))
   df_ref <- as.data.frame(df_ref)
   print(head(df_ref))
   print(val)
@@ -544,21 +529,26 @@ upset_plot <- function(df_ref, val, output_name){
                               ))
   colnames(df_upset) <- unique(df_ref$cell_type_group)
   rownames(df_upset) <- unique(unique(df_ref[,paste0(val)]))
-  # print("---------------")
+  print("---------------")
   print(head(df_upset))
+  print(dim(df_upset))
+
+  # print(is.data.frame(df_ref))
 
   # Loop through ref matrix rows and populate matrix
   for (row in 1:nrow(df_ref)) {
-    cell <- as.character(df_splice_ref[row, "cell_type_group"])
-    event <- as.character(df_splice_ref[row, paste0(val)])
+    cell <- as.character(df_ref[row, "cell_type_group"])
+    # print(cell)
+    event <- as.character(df_ref[row, paste0(val)])
     df_upset[event, cell] <- 1
   }
 
+  # nintersects 15 and nsets ncol(df_upset) takes 5 hrs to run 
   plotObject <- UpSetR::upset(df_upset, 
                             order.by = "freq",
                             keep.order = F, 
-                            nintersects = 12, 
-                            nsets= 10, 
+                            nintersects = 5, 
+                            # nsets= 5, 
                             nsets= ncol(df_upset), 
                             empty.intersections = "off")
   pdf(file= paste0(output_name))
@@ -571,12 +561,11 @@ upset_plot <- function(df_ref, val, output_name){
 # UpSet Plots
 ################
 ls_upsets <- list(
-  list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plot_event2cell.pdf")),
-  list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plot_eventgene2cell.pdf"))
-  #list(df_gene_ref, gene, paste0(opt$out_dir, "/upset_DEG2cell.pdf"))
+  # list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plot_event2cell.pdf"))
+  # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plot_eventgene2cell.pdf"))
+  list(df_gene_ref, "gene", paste0(opt$out_dir, "upset_plot_DEG2cell.pdf"))
 )
 
-# Making each upset plot may be slow 
 foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
   upset_plot(
       df_ref = i[1],
@@ -584,54 +573,6 @@ foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
       output_name = i[3] 
       )
   }
-
-
-
-
-
-#########################################################
-# UpSet plots - Splice event's gene vs cell type group
-# #########################################################
-
-# # Matrix filled of 0s
-# df_upset_gene2cell <- data.frame(matrix(0,
-#                             ncol = length(unique(df_splice_ref$cell_type_group)),
-#                             nrow = length(unique(df_splice_ref$overlapping))))
-# colnames(df_upset_gene2cell) <- unique(df_splice_ref$cell_type_group)
-# rownames(df_upset_gene2cell) <- unique(df_splice_ref$overlapping)
-
-# print(head(df_upset_gene2cell))
-
-
-# # Loop through ref matrix rows and populate matrix
-# for (row in 1:nrow(df_splice_ref)) {
-#   cell <- as.character(df_splice_ref[row, "cell_type_group"])
-#   gene <- as.character(df_splice_ref[row, "overlapping"])
-#   df_upset_gene2cell[gene, cell] <- 1
-# }
-
-# print(tail(df_upset_gene2cell))
-
-
-# plotObject <- UpSetR::upset(df_upset_gene2cell, 
-#                             order.by = "degree",
-#                             keep.order = F, 
-#                             nintersects = 15, 
-#                             nsets= 17, 
-#                             empty.intersections = "off")
-
-# pdf(file= paste0(opt$out_dir, "/upset_gene2cell.pdf")) # or other device
-# plotObject
-# dev.off()
-
-###########################################################
-# UpSet plots - DEG vs cell type group
-##########################################################
-
-
-
-
-
 
 
 # # Map events to their signifcant cell type
