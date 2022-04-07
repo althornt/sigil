@@ -385,101 +385,250 @@ for (this_event in df_splice_ref$event){
 
 print(head(df_splice_ref))
 
-########################################
-# Scatter plot all
-#######################################
+# ########################################
+# # Scatter plot all
+# #######################################
 
-for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref")){
+# for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref")){
 
-  p <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
-    geom_point(size=.5) +
-    labs(title= "") + 
-    geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
-    geom_text(
-              label= df_splice_ref[[label_type]],
-              nudge_x = 0.05, nudge_y = 0.05,
-              check_overlap =F, col = "black", size = 1
-            ) +
-    theme_minimal() +
-    theme(legend.position="bottom", 
-          legend.title = element_text(size = 5), 
-          legend.text = element_text(size = 5),
-          axis.title.x=element_text(size=7),
-          axis.title.y=element_text(size=7))  +
-    guides(color = guide_legend(nrow = 2))
+#   p <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
+#     geom_point(size=.5) +
+#     labs(title= "") + 
+#     geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
+#     geom_text(
+#               label= df_splice_ref[[label_type]],
+#               nudge_x = 0.05, nudge_y = 0.05,
+#               check_overlap =F, col = "black", size = 1
+#             ) +
+#     theme_minimal() +
+#     theme(legend.position="bottom", 
+#           legend.title = element_text(size = 5), 
+#           legend.text = element_text(size = 5),
+#           axis.title.x=element_text(size=7),
+#           axis.title.y=element_text(size=7))  +
+#     guides(color = guide_legend(nrow = 2))
 
-  ggsave(plot = p, width = 12, height = 7, dpi = 300,
-        filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, ".png"))
-}
+#   ggsave(plot = p, width = 12, height = 7, dpi = 400,
+#         filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, ".png"))
+# }
 
 
-########################################
-# Scatter for each cell type and group
-#######################################
-if (!dir.exists(file.path(opt$out_dir,"/splice_ref_vs_gene_by_cell/"))){
-  dir.create(file.path(opt$out_dir,"/splice_ref_vs_gene_by_cell/"),
-              recursive = TRUE, showWarnings = TRUE)}
+# ########################################
+# # Scatter for each cell type and group
+# #######################################
+# if (!dir.exists(file.path(opt$out_dir,"/splice_ref_vs_gene_by_cell/"))){
+#   dir.create(file.path(opt$out_dir,"/splice_ref_vs_gene_by_cell/"),
+#               recursive = TRUE, showWarnings = TRUE)}
 
-for (cell in unique(df_splice_ref$cell_type_group)){
+# for (cell in unique(df_splice_ref$cell_type_group)){
 
-  df_splice_ref_subset <- df_splice_ref %>% 
-                          filter(cell_type_group == cell)
+#   df_splice_ref_subset <- df_splice_ref %>% 
+#                           filter(cell_type_group == cell)
 
-  for (label_type in c( "event", "overlapping", "group", "in_gene_ref")){
+#   for (label_type in c( "event", "overlapping", "group", "in_gene_ref")){
 
-    p <- ggplot(aes(x=splice_z, y=gene_z), data=df_splice_ref_subset)+ 
-      geom_point(size=2) +
-      labs(title= cell) + 
-      geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "black") +  
-      geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "black") +
-      geom_text(
-                label= df_splice_ref_subset[[label_type]],
-                nudge_x = 0.05, nudge_y = 0.05,
-                check_overlap =F, col = "black", size = 2
-              ) +
-      theme_minimal() +
-      theme(legend.position="bottom", 
-            legend.title = element_text(size = 5), 
-            legend.text = element_text(size = 5),
-            axis.title.x = element_text(size=7),
-            axis.title.y = element_text(size=7))  +
-      guides(color = guide_legend(nrow = 2))
+#     p <- ggplot(aes(x=splice_z, y=gene_z), data=df_splice_ref_subset)+ 
+#       geom_point(size=2) +
+#       labs(title= cell) + 
+#       geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "black") +  
+#       geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "black") +
+#       geom_text(
+#                 label= df_splice_ref_subset[[label_type]],
+#                 nudge_x = 0.05, nudge_y = 0.05,
+#                 check_overlap =F, col = "black", size = 2
+#               ) +
+#       theme_minimal() +
+#       theme(legend.position="bottom", 
+#             legend.title = element_text(size = 5), 
+#             legend.text = element_text(size = 5),
+#             axis.title.x = element_text(size=7),
+#             axis.title.y = element_text(size=7))  +
+#       guides(color = guide_legend(nrow = 2))
 
-    ggsave(plot = p, width = 12, height = 7, dpi = 300,
-          filename = paste0(opt$out_dir, "splice_ref_vs_gene_by_cell/splice_ref_vs_gene",cell,"_",label_type, ".png"))
+#     ggsave(plot = p, width = 12, height = 7, dpi = 400,
+#           filename = paste0(opt$out_dir, "splice_ref_vs_gene_by_cell/splice_ref_vs_gene",cell,"_",label_type, ".png"))
+#   }
+# }
+
+# ########################################
+# # Zoom in on scatterplot of all
+# #######################################
+# for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref")){
+
+#   p <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
+#     geom_point(size=2) +
+#     labs(title= "") + 
+#     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     geom_text(
+#               label= df_splice_ref[[label_type]],
+#               nudge_x = 0.01, nudge_y = 0.01,
+#               check_overlap =F, col = "black", size = 3
+#             ) +
+#     theme_minimal() +
+#     theme(legend.position="bottom", 
+#           legend.title = element_text(size = 5), 
+#           legend.text = element_text(size = 5),
+#           axis.title.x=element_text(size=7),
+#           axis.title.y=element_text(size=7))  +
+#     guides(color = guide_legend(nrow = 2)) +
+#     ylim(-.5, .5) 
+
+#   ggsave(plot = p, width = 12, height = 7, dpi = 400,
+#         filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, "_zoomed.png"))
+# }
+
+##########################################
+# UpSet plots - event vs cell type group
+##########################################
+# Build matrix
+#     cell1 cell2  cell3
+#event1 0      0     1
+#event2  1     1     0
+# print(head(df_splice_ref))
+
+# # Matrix filled of 0s
+# df_upset_event2cell <- data.frame(matrix(0,
+#                             ncol = length(unique(df_splice_ref$cell_type_group)),
+#                             nrow = length(unique(df_splice_ref$event))))
+# colnames(df_upset_event2cell) <- unique(df_splice_ref$cell_type_group)
+# rownames(df_upset_event2cell) <- unique(df_splice_ref$event)
+
+# print(head(df_upset_event2cell))
+
+
+# # Loop through ref matrix rows and populate matrix
+# for (row in 1:nrow(df_splice_ref)) {
+#   cell <- as.character(df_splice_ref[row, "cell_type_group"])
+#   event <- as.character(df_splice_ref[row, "event"])
+#   df_upset_event2cell[event, cell] <- 1
+# }
+
+# print(tail(df_upset_event2cell))
+
+
+# plotObject <- UpSetR::upset(df_upset_event2cell, 
+#                             order.by = "freq",
+#                             keep.order = F, 
+#                             nintersects = 15, 
+#                             nsets= ncol(df_upset_event2cell), 
+#                             empty.intersections = "off")
+
+# pdf(file= paste0(opt$out_dir, "/upset_event2cell.pdf")) # or other device
+# plotObject
+# dev.off()
+
+
+# print(dim(df_upset_event2cell))
+
+
+# print(colSums(df_upset_event2cell))
+
+
+
+upset_plot <- function(df_ref, val, output_name){
+  # Build matrix
+  #     cell1 cell2  cell3
+  #event1 0      0     1
+  #event2  1     1     0
+
+  df_ref <- as.data.frame(df_ref)
+  print(head(df_ref))
+  print(val)
+
+  # Matrix filled of 0s
+  df_upset<- data.frame(matrix(0,
+                              ncol = length(unique(df_ref$cell_type_group)),
+                              nrow = length(unique(df_ref[,paste0(val)]))
+                              ))
+  colnames(df_upset) <- unique(df_ref$cell_type_group)
+  rownames(df_upset) <- unique(unique(df_ref[,paste0(val)]))
+  # print("---------------")
+  print(head(df_upset))
+
+  # Loop through ref matrix rows and populate matrix
+  for (row in 1:nrow(df_ref)) {
+    cell <- as.character(df_splice_ref[row, "cell_type_group"])
+    event <- as.character(df_splice_ref[row, paste0(val)])
+    df_upset[event, cell] <- 1
+  }
+
+  plotObject <- UpSetR::upset(df_upset, 
+                            order.by = "freq",
+                            keep.order = F, 
+                            nintersects = 12, 
+                            nsets= 10, 
+                            nsets= ncol(df_upset), 
+                            empty.intersections = "off")
+  pdf(file= paste0(output_name))
+  print(plotObject)
+  dev.off()
   }
 
 
-}
+#################
+# UpSet Plots
+################
+ls_upsets <- list(
+  list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plot_event2cell.pdf")),
+  list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plot_eventgene2cell.pdf"))
+  #list(df_gene_ref, gene, paste0(opt$out_dir, "/upset_DEG2cell.pdf"))
+)
 
-########################################
-# Zoom in on scatterplot of all
-#######################################
-for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref")){
+# Making each upset plot may be slow 
+foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
+  upset_plot(
+      df_ref = i[1],
+      val= i[2],
+      output_name = i[3] 
+      )
+  }
 
-  p <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
-    geom_point(size=2) +
-    labs(title= "") + 
-    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    geom_text(
-              label= df_splice_ref[[label_type]],
-              nudge_x = 0.01, nudge_y = 0.01,
-              check_overlap =F, col = "black", size = 3
-            ) +
-    theme_minimal() +
-    theme(legend.position="bottom", 
-          legend.title = element_text(size = 5), 
-          legend.text = element_text(size = 5),
-          axis.title.x=element_text(size=7),
-          axis.title.y=element_text(size=7))  +
-    guides(color = guide_legend(nrow = 2)) +
-    ylim(-.5, .5) 
 
-  ggsave(plot = p, width = 12, height = 7, dpi = 300,
-        filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, "_zoomed.png"))
-}
+
+
+
+#########################################################
+# UpSet plots - Splice event's gene vs cell type group
+# #########################################################
+
+# # Matrix filled of 0s
+# df_upset_gene2cell <- data.frame(matrix(0,
+#                             ncol = length(unique(df_splice_ref$cell_type_group)),
+#                             nrow = length(unique(df_splice_ref$overlapping))))
+# colnames(df_upset_gene2cell) <- unique(df_splice_ref$cell_type_group)
+# rownames(df_upset_gene2cell) <- unique(df_splice_ref$overlapping)
+
+# print(head(df_upset_gene2cell))
+
+
+# # Loop through ref matrix rows and populate matrix
+# for (row in 1:nrow(df_splice_ref)) {
+#   cell <- as.character(df_splice_ref[row, "cell_type_group"])
+#   gene <- as.character(df_splice_ref[row, "overlapping"])
+#   df_upset_gene2cell[gene, cell] <- 1
+# }
+
+# print(tail(df_upset_gene2cell))
+
+
+# plotObject <- UpSetR::upset(df_upset_gene2cell, 
+#                             order.by = "degree",
+#                             keep.order = F, 
+#                             nintersects = 15, 
+#                             nsets= 17, 
+#                             empty.intersections = "off")
+
+# pdf(file= paste0(opt$out_dir, "/upset_gene2cell.pdf")) # or other device
+# plotObject
+# dev.off()
+
+###########################################################
+# UpSet plots - DEG vs cell type group
+##########################################################
+
+
 
 
 
