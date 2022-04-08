@@ -212,133 +212,80 @@ ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
 # Read in all individual mesa IR files and merge
 ####################################################
 # Get list of all _intron_coverage.txt files from all batches
-# ls_mesa_IR_cov_files <- ls_mesa_IR_cov_file_names <- list()
-# for (dir in ls_mesa_IR_cov_dir){
-#   files <- file.path(dir, list.files(dir))
-#   names <- unlist(strsplit(as.character(strsplit(list.files(dir),split= "/")),
-#                  split = "_intron_coverage.txt"))
+ls_mesa_IR_cov_files <- ls_mesa_IR_cov_file_names <- list()
+for (dir in ls_mesa_IR_cov_dir){
+  files <- file.path(dir, list.files(dir))
+  names <- unlist(strsplit(as.character(strsplit(list.files(dir),split= "/")),
+                 split = "_intron_coverage.txt"))
 
-#   ls_mesa_IR_cov_files <- append(ls_mesa_IR_cov_files,files )
-#   ls_mesa_IR_cov_file_names <- append(ls_mesa_IR_cov_file_names,names )
-# }
-
-# names(ls_mesa_IR_cov_files) <- ls_mesa_IR_cov_file_names
-
-# # Files to dfs
-# ls_mesa_IR_cov_dfs <- foreach(i=ls_mesa_IR_cov_files,
-#                             n = names(ls_mesa_IR_cov_files), .packages=  'magrittr' ) %dopar% {
-#     df <- readr::read_delim(i, delim = "\t",   col_names = FALSE) %>%
-#         dplyr::mutate(X1  = as.character(X1),
-#                       X2  = as.character(X2),
-#                       X3  = as.character(X3),
-#                       X4  = as.character(X4)  ) %>%
-#         dplyr::select( "X1", "X2","X3","X4", "X5", "X6") %>%
-#         dplyr::select(-X5,X5) # Move data col to last col
-
-#     names(df)[6] <- n # Rename col to sample name
-#     df
-#     }
-
-# print("df inputs to merge ")
-# print(head(ls_mesa_IR_cov_dfs))
-# print(tail(ls_mesa_IR_cov_dfs))
-# print(length(ls_mesa_IR_cov_dfs))
-
-# # Combine all files by columns 
-# df_merged_IR <- ls_mesa_IR_cov_dfs %>% 
-#       purrr::reduce(dplyr::inner_join,
-#                     by = c("X1","X2","X3","X4","X6"),
-#                     na_matches = "never")  
-
-# print("Combined.......")
-# print(head(df_merged_IR, n = 10))
-# print(tail(df_merged_IR, n = 10))
-# print(dim(df_merged_IR))
-
-# # print(colSums(is.na(df_merged_IR)))
-
-# # [1] 124896    202
-# # Write merged table file 
-# write.table(
-#   df_merged_IR,
-#   file.path(opt$out_dir,"merged_mesa_intron_coverage.tsv"), quote=F,sep="\t", na="nan",
-#   col.names = NA, row.names= TRUE)
-
-# # [1] 124896    202
-df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_intron_coverage.tsv"),
-                                    row.names = 1, header=T)
-
-vals_merged_inc_counts <- df_merged_inc_counts[,-c(1:5)]
-
-# Log2 + 1 transform counts
-df_log2trans_IR_cov <- as.data.frame(log2(vals_merged_inc_counts +1))
-
-# Limma remove batch effect
-df_mesa_IR_cov_merge_log2_batch_corr <- limma::removeBatchEffect(
-                                  df_log2trans_IR_cov,
-                                  batch = df_merged_metadata$data_source,
-                                  batch2 = df_merged_metadata$type
-                                  )
-
-# Undo log2(x+1) with 2^x - 1
-df_mesa_IR_cov_merge_log2_batch_corr = 2^df_mesa_IR_cov_merge_log2_batch_corr -1
-
-# Round all counts below 1 to 0
-df_mesa_IR_cov_merge_log2_batch_corr[df_mesa_IR_cov_merge_log2_batch_corr < 1 ] <- 0
-
-# Write Full table 
-write.table(
-  df_mesa_IR_cov_merge_log2_batch_corr,
-  file.path(opt$out_dir,"batch_corr_mesa_intron_coverage.tsv"),
-  sep="\t",quote=F, col.names = NA, row.names = TRUE)
-
-# Write back into individual files ; each data col to a different file 
-df_bed_cols <- df_merged_inc_counts[, c(1:5)]
-
-# Loop over IR cov columns
-for(i in 6:ncol(df_mesa_IR_cov_merge_log2_batch_corr)) {      
-  str_sample_id <- colnames(df_mesa_IR_cov_merge_log2_batch_corr)[i]
-
-  # Bind bed columns (same for all) to this col from loop 
-  df_IR <- cbind(df_bed_cols, df_mesa_IR_cov_merge_log2_batch_corr[,i]) %>%
-    dplyr::select(-X6,X6) # Move strand col to last col
-
-  # Add empty rows that maybe expected but arent needed
-  df_IR$X7 <- df_IR$X8 <- NA 
-
-  # Write to file
-  write.table(
-    x = df_IR,
-    file = paste0(opt$out_dir,"/mesa_intron_coverage_bc/",
-      str_sample_id,"_intron_coverage.txt"),
-    sep="\t",quote=F, col.names = FALSE, row.names = FALSE)
+  ls_mesa_IR_cov_files <- append(ls_mesa_IR_cov_files,files )
+  ls_mesa_IR_cov_file_names <- append(ls_mesa_IR_cov_file_names,names )
 }
 
+names(ls_mesa_IR_cov_files) <- ls_mesa_IR_cov_file_names
 
+# Files to dfs
+ls_mesa_IR_cov_dfs <- foreach(i=ls_mesa_IR_cov_files,
+                            n = names(ls_mesa_IR_cov_files), .packages=  'magrittr' ) %dopar% {
+    df <- readr::read_delim(i, delim = "\t",   col_names = FALSE) %>%
+        dplyr::mutate(X1  = as.character(X1),
+                      X2  = as.character(X2),
+                      X3  = as.character(X3),
+                      X4  = as.character(X4)  ) %>%
+        dplyr::select( "X1", "X2","X3","X4", "X5", "X6") %>%
+        dplyr::select(-X5,X5) # Move data col to last col
 
-# Run IR table to convert from coverage to ???
-# Run mesa IR table to merge from counts to IR 
-# cmd <- paste0(
-#   "mesa select -m ",
-#           opt$out_dir,"/",i[2], " -o ",
-#           opt$out_dir,"/",i[3], "  --join intersection 2>&1"
-#         )
+    names(df)[6] <- n # Rename col to sample name
+    df
+    }
 
-  #  "mesa ir_table -i ", mesa_inclusionCounts.tsv " -c mesa_allClusters.tsv \
-  #       -d ${params.outdir}/mesa_out/mesa_intron_coverage -o mesa_ir_table -r
+# Combine all files by columns 
+df_merged_IR_cov <- ls_mesa_IR_cov_dfs %>% 
+      purrr::reduce(dplyr::inner_join,
+                    by = c("X1","X2","X3","X4","X6"),
+                    na_matches = "never")  
 
-# print(cmd)
-# system(cmd)
+# [1] 124896    202
+# Write merged table file 
+write.table(
+  df_merged_IR_cov,
+  file.path(opt$out_dir,"merged_mesa_intron_coverage.tsv"), quote=F,sep="\t",
+     na="nan", col.names = NA, row.names= TRUE)
+
+# Write back into individual files ; each data col to a different file 
+df_bed_cols <- df_merged_IR_cov[, c(1:5)]
+ls_cols <- 6:ncol(df_merged_IR_cov)
+
+# foreach(i=ls_cols ) %dopar% {
+#   str_sample_id <- colnames(df_merged_IR_cov)[i]
+
+#   # Bind bed columns (same for all) to this col from loop 
+#   df_IR <- cbind(df_bed_cols, df_merged_IR_cov[,i]) %>%
+#     dplyr::select(-X6,X6) # Move strand col to last col
+
+#   # Add empty cols that may be expected but arent needed when not using mesa table -r
+#   df_IR$X7 <- df_IR$X8 <- paste0("0,0,0,0,0")
+
+#   # Write to file
+#   write.table(
+#     x = df_IR,
+#     file = paste0(opt$out_dir,"/mesa_intron_coverage/",
+#       str_sample_id,"_intron_coverage.txt"),
+#     sep="\t",quote=F, col.names = FALSE, row.names = FALSE)
+
+#  }
+
 
 # #########################################
-# # Merge mesa files
+# # Merge mesa inclusion count files
 # #########################################
-# # Note: Do not merge PS files, PS needs to be recalculated
+# # Note: Do not merge PS files or IR table files because
+# # they need to be recalculated from merged counts/coverage
 # mesa_file_names <- list(
 #               list(ls_mesa_inc_count_files,
-#                   "manifest_mesa_inclusionCounts_files.tsv","merged_mesa_inclusionCounts.tsv" ),
-#               list(ls_mesa_IR_table_files,
-#                  "manifest_mesa_IR_files.tsv","merged_mesa_ir_table_intron_retention.tsv" ))
+#                   "manifest_mesa_inclusionCounts_files.tsv","merged_mesa_inclusionCounts.tsv" ))
+#               # list(ls_mesa_IR_table_files,
+#               #    "manifest_mesa_IR_files.tsv","merged_mesa_ir_table_intron_retention.tsv" ))
 
 # merge <- foreach(i=mesa_file_names ) %dopar% {
 
@@ -363,11 +310,34 @@ for(i in 6:ncol(df_mesa_IR_cov_merge_log2_batch_corr)) {
 # # Import each merged MESA file and check they have same number of samples
 # df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_inclusionCounts.tsv"),
 #                                     row.names = 1, header=T)
-# df_merged_IR <- read.table(paste0(opt$out_dir,"/merged_mesa_ir_table_intron_retention.tsv"),
-#                                     row.names = 1, header=T)
-# if(all.equal(ncol(df_merged_inc_counts),
-#             ncol(df_merged_IR)) != TRUE)
-#   stop("Error: Number of columns in merged inclusion counts and merged intron retention counts are not equal")
+# # df_merged_IR_PS <- read.table(paste0(opt$out_dir,"/????????.tsv"),
+# #                                     row.names = 1, header=T)
+# # if(all.equal(ncol(df_merged_inc_counts),
+# #             ncol(df_merged_IR)) != TRUE)
+# #   stop("Error: Number of columns in merged inclusion counts and merged intron retention counts are not equal")
+
+#####################################################
+#  Merged non corrected IR cov file to IR PS
+#####################################################
+#  Move all orginal IR coverage files into one new df
+# dir.create(paste0(opt$out_dir,"/mesa_intron_coverage/"))
+# file.copy(from =unlist(ls_mesa_IR_cov_files) ,
+#           to = paste0(opt$out_dir,"/mesa_intron_coverage/"),
+#            recursive = TRUE, overwrite = TRUE)
+
+# Run IR table 
+# cmd <- paste0("mesa ir_table -i ", opt$out_dir, 
+#         "/merged_mesa_inclusionCounts.tsv -c ",
+#         opt$out_dir,"/merged_mesa_allClusters.tsv -d ",
+#         opt$out_dir, "/mesa_intron_coverage -o ",
+#         opt$out_dir,"/merged_mesa_ir_table")
+
+# print(cmd)
+# system(cmd)
+
+df_merged_IR_PS <- read.table(paste0(opt$out_dir,"/merged_mesa_ir_table_intron_retention.tsv"),
+                              row.names = 1, header=T) 
+
 # ######################################
 # # Convert Merged count file to PS
 # ######################################
@@ -386,7 +356,7 @@ for(i in 6:ncol(df_mesa_IR_cov_merge_log2_batch_corr)) {
 
 # if(all.equal(ncol(df_merged_allPS),
 #             ncol(df_merged_inc_counts),
-#             ncol(df_merged_IR)) != TRUE)
+#             ncol(df_merged_IR_PS)) != TRUE)
 #             stop("Error: Number of columns in merged inclusion counts, PS, and intron retention are not equal")
 
 # ######################################
@@ -394,7 +364,76 @@ for(i in 6:ncol(df_mesa_IR_cov_merge_log2_batch_corr)) {
 # ######################################
 # df_to_UMAP(df_merged_inc_counts, "UMAPs_pre_batch_correction/inclusionCounts_PCA_UMAP")
 # df_to_UMAP(df_merged_allPS, "UMAPs_pre_batch_correction/allPS_PCA_UMAP")
-# df_to_UMAP(df_merged_IR, "UMAPs_pre_batch_correction/IR_PCA_UMAP")
+# df_to_UMAP(df_merged_IR_PS, "UMAPs_pre_batch_correction/IR_PCA_UMAP")
+
+# ########################################################
+# # Batch correction of IR coverage 
+# #########################################################
+# df_merged_inc_counts <- read.table(paste0(opt$out_dir,
+#                                   "/merged_mesa_intron_coverage.tsv"),
+#                                   row.names = 1, header=T)
+# vals_merged_inc_counts <- df_merged_inc_counts[,-c(1:5)]
+# # Log2 + 1 transform counts
+# df_log2trans_IR_cov <- as.data.frame(log2(vals_merged_inc_counts +1))
+
+# # Limma remove batch effect
+# df_mesa_IR_cov_merge_log2_batch_corr <- limma::removeBatchEffect(
+#                                   df_log2trans_IR_cov,
+#                                   batch = df_merged_metadata$data_source,
+#                                   batch2 = df_merged_metadata$type
+#                                   )
+
+# # Undo log2(x+1) with 2^x - 1
+# df_mesa_IR_cov_merge_log2_batch_corr = 2^df_mesa_IR_cov_merge_log2_batch_corr -1
+
+# # Round all counts below 1 to 0
+# df_mesa_IR_cov_merge_log2_batch_corr[df_mesa_IR_cov_merge_log2_batch_corr < 1 ] <- 0
+
+# # Write Full table 
+# write.table(
+#   df_mesa_IR_cov_merge_log2_batch_corr,
+#   file.path(opt$out_dir,"batch_corr_mesa_intron_coverage.tsv"),
+#   sep="\t",quote=F, col.names = NA, row.names = TRUE)
+
+# # Write back into individual files ; each data col to a different file 
+# df_bed_cols <- df_merged_inc_counts[, c(1:5)]
+
+# # Loop over IR cov columns
+# for(i in 6:ncol(df_mesa_IR_cov_merge_log2_batch_corr)) {      
+#   str_sample_id <- colnames(df_mesa_IR_cov_merge_log2_batch_corr)[i]
+
+#   # Bind bed columns (same for all) to this col from loop 
+#   df_IR <- cbind(df_bed_cols, df_mesa_IR_cov_merge_log2_batch_corr[,i]) %>%
+#     dplyr::select(-X6,X6) # Move strand col to last col
+
+#   # Add empty rows that maybe expected but arent needed
+#   df_IR$X7 <- df_IR$X8 <- NA 
+
+#   # Write to file
+#   write.table(
+#     x = df_IR,
+#     file = paste0(opt$out_dir,"/mesa_intron_coverage_bc/",
+#       str_sample_id,"_intron_coverage.txt"),
+#     sep="\t",quote=F, col.names = FALSE, row.names = FALSE)
+# }
+
+# ########################################################
+# # Convert batch corrected IR counts to IR PS
+# #########################################################
+
+# # Run IR table to convert from coverage to ???
+# # Run mesa IR table to merge from counts to IR 
+# # cmd <- paste0(
+# #   "mesa select -m ",
+# #           opt$out_dir,"/",i[2], " -o ",
+# #           opt$out_dir,"/",i[3], "  --join intersection 2>&1"
+# #         )
+
+#   #  "mesa ir_table -i ", mesa_inclusionCounts.tsv " -c mesa_allClusters.tsv \
+#   #       -d ${params.outdir}/mesa_out/mesa_intron_coverage -o mesa_ir_table -r
+
+# # print(cmd)
+# # system(cmd)
 
 # ########################################################
 # # Batch correction of inclusion counts
@@ -435,7 +474,7 @@ for(i in 6:ncol(df_mesa_IR_cov_merge_log2_batch_corr)) {
 # system(PS_cmd)
 
 # ########################################################
-# # UMAPs of PS after batch correction
+# # Open PS after batch correction / write LM22 subset 
 # #########################################################
 # df_merged_allPS_batch_corr <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_allPS.tsv"),
 #                               row.names = 1, header=T)
@@ -449,23 +488,6 @@ for(i in 6:ncol(df_mesa_IR_cov_merge_log2_batch_corr)) {
 #   df_merged_allPS_batch_corr_lm22,
 #   file.path(opt$out_dir,"batch_corr_mesa_allPS_LM22.tsv"), quote=F,sep="\t", na="nan",
 #   col.names = NA, row.names= TRUE)
-
-# ######################################
-# # Intron Retention batch correction
-# ######################################
-# # Log2 + 1 transform IR
-# df_merged_IR_log2 <- as.data.frame(log2(df_merged_IR +1))
-
-# # Limma remove batch effect
-# df_merged_IR_log2_batch_corr <- limma::removeBatchEffect(
-#                                   df_merged_IR_log2,
-#                                   batch = df_merged_metadata$data_source,
-#                                   batch2 = df_merged_metadata$type
-#                                   )
-
-# # Undo log2(x+1) with 2^x - 1
-# df_merged_IR_batch_corr = 2^df_merged_IR_log2_batch_corr -1
-# rownames(df_merged_IR_batch_corr) <- rownames(df_merged_IR)
 
 # ######################################
 # # UMAPs after batch correction
