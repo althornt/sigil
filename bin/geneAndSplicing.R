@@ -388,12 +388,44 @@ for (this_event in df_splice_ref$event){
 
 
 print(head(df_splice_ref))
+################################################################################
+# Quantify number of splice change with little gene change
+###############################################################################
+df_splice_ref$high_ratio <- NA
+df_splice_ref <- df_splice_ref %>%
+    mutate(ratio = abs(splice_z/gene_z)) %>%
+    mutate(high_ratio = ifelse(ratio > 5,
+                                paste(overlapping),
+                                high_ratio)) %>%
+    arrange(desc(ratio))
 
-# ########################################
-# # Scatter plot all
-# #######################################
+print("splice ref mat")
+print(head(df_splice_ref, n = 50))
+# print(tail(df_splice_ref, n = 50))
 
-# for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref")){
+print("---------------")
+df_splice_ref %>%
+  drop_na(ratio) %>%
+  filter(ratio < 5) %>%
+  arrange(ratio) %>%
+  head(n = 10)
+
+# df_splice_ref %>%
+#   filter(overlapping == "CSF2RA")
+
+perc_event_high_ratio <- sum(!is.na(df_splice_ref$high_ratio))/nrow(df_splice_ref)
+print(perc_event_high_ratio)
+
+# for (i in unique(df_splice_ref$high_ratio)){
+#   cat(i)
+#   cat("\n")
+# }
+
+# # ########################################
+# # # Scatter plot all
+# # #######################################
+
+# for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref", "high_ratio")){
 
 #   p <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
 #     geom_point(size=.5) +
@@ -430,7 +462,7 @@ print(head(df_splice_ref))
 #   df_splice_ref_subset <- df_splice_ref %>% 
 #                           filter(cell_type_group == cell)
 
-#   for (label_type in c( "event", "overlapping", "group", "in_gene_ref")){
+#   for (label_type in c( "event", "overlapping", "group", "in_gene_ref", "high_ratio")){
 
 #     p <- ggplot(aes(x=splice_z, y=gene_z), data=df_splice_ref_subset)+ 
 #       geom_point(size=2) +
@@ -458,7 +490,7 @@ print(head(df_splice_ref))
 # ########################################
 # # Zoom in on scatterplot of all
 # #######################################
-# for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref")){
+# for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref", "high_ratio")){
 
 #   p <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
 #     geom_point(size=2) +
@@ -477,33 +509,11 @@ print(head(df_splice_ref))
 #           axis.title.x=element_text(size=7),
 #           axis.title.y=element_text(size=7))  +
 #     guides(color = guide_legend(nrow = 2)) +
-#     ylim(-.5, .5) 
+#     ylim(-1, 1) 
 
 #   ggsave(plot = p, width = 12, height = 7, dpi = 400,
 #         filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, "_zoomed.png"))
 # }
-
-################################################################################
-# Quantify number of splice change with little gene change
-###############################################################################
-# Find ratio of abs gene Z to abs splice gene 
-# Splice / gene 
-# 
-
-# New col for ratio
-# df_splice_ref <- df_splice_ref %>%
-    # mutate
-
-# Sort by ratio 
-
-
-
-# df_splice_ref
-
-# If abs splice z > 1
-
-
-
 
 
 
@@ -515,30 +525,19 @@ upset_plot <- function(df_ref, val, output_name){
   #     cell1 cell2  cell3
   #event1 0      0     1
   #event2  1     1     0
-
-  print("Start")  
-  # print(is.data.frame(df_ref))
   df_ref <- as.data.frame(df_ref)
-  print(head(df_ref))
-  print(val)
 
   # Matrix filled of 0s
   df_upset<- data.frame(matrix(0,
-                              ncol = length(unique(df_ref$cell_type_group)),
+                              ncol = length(unique(df_ref$cell_type)),
                               nrow = length(unique(df_ref[,paste0(val)]))
                               ))
-  colnames(df_upset) <- unique(df_ref$cell_type_group)
+  colnames(df_upset) <- unique(df_ref$cell_type)
   rownames(df_upset) <- unique(unique(df_ref[,paste0(val)]))
-  print("---------------")
-  print(head(df_upset))
-  print(dim(df_upset))
-
-  # print(is.data.frame(df_ref))
 
   # Loop through ref matrix rows and populate matrix
   for (row in 1:nrow(df_ref)) {
-    cell <- as.character(df_ref[row, "cell_type_group"])
-    # print(cell)
+    cell <- as.character(df_ref[row, "cell_type"])
     event <- as.character(df_ref[row, paste0(val)])
     df_upset[event, cell] <- 1
   }
@@ -547,8 +546,9 @@ upset_plot <- function(df_ref, val, output_name){
   plotObject <- UpSetR::upset(df_upset, 
                             order.by = "freq",
                             keep.order = F, 
-                            nintersects = 5, 
-                            # nsets= 5, 
+                            # nintersects = 5, 
+                            nintersects = nrow(df_upset), 
+                            # nsets= 2, 
                             nsets= ncol(df_upset), 
                             empty.intersections = "off")
   pdf(file= paste0(output_name))
@@ -561,8 +561,8 @@ upset_plot <- function(df_ref, val, output_name){
 # UpSet Plots
 ################
 ls_upsets <- list(
-  # list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plot_event2cell.pdf"))
-  # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plot_eventgene2cell.pdf"))
+  list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plot_event2cell.pdf")),
+  list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plot_eventgene2cell.pdf")),
   list(df_gene_ref, "gene", paste0(opt$out_dir, "upset_plot_DEG2cell.pdf"))
 )
 
