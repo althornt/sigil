@@ -147,7 +147,7 @@ format_merge <- function(df_gene,  df_splice){
 # }
 
 
-upset_plot <- function(df_ref, val, output_name){
+upset_plot <- function(df_ref, val, output_name, ls_sets){
   # Build matrix
   #     cell1 cell2  cell3
   #event1 0      0     1
@@ -169,18 +169,38 @@ upset_plot <- function(df_ref, val, output_name){
     df_upset[event, cell] <- 1
   }
 
-  # nintersects 15 and nsets ncol(df_upset) takes 5 hrs to run 
-  plotObject <- UpSetR::upset(df_upset, 
-                            order.by = "freq",
-                            keep.order = F, 
-                            nintersects = 25, 
-                            # nintersects = nrow(df_upset), 
-                            # nsets= 2, 
-                            nsets= ncol(df_upset), 
-                            empty.intersections = "off")
+  print(colnames(df_upset))
+  print("--")
+  print(as.vector(unlist(ls_sets)))
+  print("----------------------")
+
+  if (ls_sets == "NA"){
+    # nintersects 15 and nsets ncol(df_upset) takes 5 hrs to run 
+      plotObject <- UpSetR::upset(df_upset, 
+                              order.by = "freq",
+                              keep.order = F, 
+                              nintersects = 35, 
+                              # nintersects = nrow(df_upset), 
+                              # nsets= 2, 
+                              nsets= ncol(df_upset), 
+                              empty.intersections = "off")
+    } else {
+      plotObject <- UpSetR::upset(df_upset, 
+                                order.by = "freq",
+                                keep.order = F, 
+                                nintersects = 15, 
+                                sets = as.vector(unlist(ls_sets)), 
+                                empty.intersections = "off")
+
+    }
+  
+  
+  
   pdf(file= paste0(output_name))
   print(plotObject)
   dev.off()
+
+
   }
 
 
@@ -661,19 +681,40 @@ df_to_UMAP(df_gene_ref_PS_ref, "UMAPs/gene_and_splice_ref_PCA_UMAP" )
 # #################
 # # UpSet Plots
 # ################
-# ls_upsets <- list(
-#   list(df_splice_ref, "event", paste0(opt$out_dir, "upsetplot_event2cell.pdf")),
-#   list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upsetplot_eventgene2cell.pdf")),
-#   list(df_gene_ref, "gene", paste0(opt$out_dir, "upsetplot_DEG2cell.pdf"))
-# )
+# T_cell_within_cell_types <-  c(
+#     "T_cells_CD8",
+#     "T_cells_CD4_naive",
+#     #   "T cells CD4 memory resting",
+#     #   "T cells CD4 memory  activated",
+#     "T_cells_follicular_helper",
+#     "T_cells_regulatory_(Tregs)",
+#     "T_cells_gamma_delta")
 
-# foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
-#   upset_plot(
-#       df_ref = i[1],
-#       val= i[2],
-#       output_name = i[3] 
-#       )
-#   }
+T_cell_within_cell_types <- c("T_cells_CD4_naive","T_cells_CD8", 
+    "T_cells_follicular_helper", "T_cells_gamma_delta"  )
+     
+
+ls_upsets <- list(
+  # list(df_splice_ref, "event", paste0(opt$out_dir, "upsetplot_event2cell.pdf"), "NA"),
+  # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upsetplot_eventgene2cell.pdf"), "NA"),
+  # list(df_gene_ref, "gene", paste0(opt$out_dir, "upsetplot_DEG2cell.pdf", "NA")),
+
+  list(df_splice_ref, "event", paste0(opt$out_dir, "upsetplot_event2cell_Tcell.pdf"), T_cell_within_cell_types),
+  list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upsetplot_eventgene2cell_Tcell.pdf"), T_cell_within_cell_types),
+  list(df_gene_ref, "gene", paste0(opt$out_dir, "upsetplot_DEG2cell_Tcell.pdf"), T_cell_within_cell_types)
+)
+
+foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
+  upset_plot(
+      df_ref = i[1],
+      val= i[2],
+      output_name = i[3], 
+      ls_sets = i[4]
+      )
+  }
+
+
+
 
 
 
