@@ -19,6 +19,69 @@ registerDoParallel(cl)
 ########################
 # Functions
 #########################
+
+make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
+
+  set.seed(123)
+
+  # Make color palette
+  n <- length(unique(df_metadata[[meta_col]]))
+  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+  # Run UMAP
+  umap.out <- umap(df_PCA, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
+  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
+  umap.out$Run <- rownames(df_PCA)
+
+  # Merge UMAP results with metadata
+  umap.out.merge = merge(umap.out, df_metadata)
+
+  # Plot UMAP
+  plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="bottom",legend.title = element_blank()) +
+    scale_color_manual(values=pal) +
+    labs(title= paste("Cell types, n_neighbors =",num_neighbor, sep = ' '))
+
+  # Save UMAP plot
+  ggsave(file.path(opt$out_dir,
+                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
+         device = "png",
+         width = 12,
+         dpi = 300)
+}
+df_to_UMAP <- function(input_df, output_path){
+
+  var <- apply(input_df[, -1], 1, var)
+  param <- quantile(var, c(.1), na.rm=T)
+  input_df_filt <- input_df[var > param & !is.na(var), ]
+
+  # Transpose and format
+  input_df_filt_t <- as.data.frame(t(input_df_filt))
+  rownames(input_df_filt_t) <- colnames(input_df)
+
+  print("----------------------------")
+  print(dim(input_df))
+  print(dim(input_df_filt))
+  print(dim(input_df_filt_t))
+  # PCA
+  prcomp.out = as.data.frame(prcomp(na.omit(input_df_filt_t), center=T,  scale = T)$x)
+  print(dim(prcomp.out))
+
+  # Making variations of UMAPs with different numbers of neighbors
+  lapply(c(20), make_umap, meta_col="data_source",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+  lapply(c(20), make_umap, meta_col="LM22",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+  lapply(c(20), make_umap, meta_col="sigil_general",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+  lapply(c(20), make_umap, meta_col="LM6",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+
+}
+
 format_merge <- function(df_gene,  df_splice){
   # Making long dfs
   df_gene_z_long <- df_gene %>%
@@ -40,27 +103,27 @@ format_merge <- function(df_gene,  df_splice){
   return(df_merged_z_long)
 
 }
-scatter_per_gene <- function(df_long, ouput_prefix){
+# scatter_per_gene <- function(df_long, ouput_prefix){
 
-  # Make scatter plot for each matching gene
-  ls_genes <- unique(df_long$gene)
-  for (g in ls_genes){
-    df_g <- df_long %>%
-      filter(gene == g)
-    p <- ggplot(aes(x=gene_z, y=splice_z, color = cell_ID, shape = event), data=df_g)+ 
-      geom_point() +
-      labs(title= g) + geom_hline(yintercept = 0) +  geom_vline(xintercept = 0) +
-      geom_text(
-                label= df_g$cell_types_splice,
-                nudge_x = 0.05, nudge_y = 0.05,
-                check_overlap =F, col = "black", size = 1
-              ) +
-      theme_minimal()
+#   # Make scatter plot for each matching gene
+#   ls_genes <- unique(df_long$gene)
+#   for (g in ls_genes){
+#     df_g <- df_long %>%
+#       filter(gene == g)
+#     p <- ggplot(aes(x=gene_z, y=splice_z, color = cell_ID, shape = event), data=df_g)+ 
+#       geom_point() +
+#       labs(title= g) + geom_hline(yintercept = 0) +  geom_vline(xintercept = 0) +
+#       geom_text(
+#                 label= df_g$cell_types_splice,
+#                 nudge_x = 0.05, nudge_y = 0.05,
+#                 check_overlap =F, col = "black", size = 1
+#               ) +
+#       theme_minimal()
 
-    ggsave(plot = p, filename = paste0(ouput_prefix, g, ".png"))
-  }
+#     ggsave(plot = p, filename = paste0(ouput_prefix, g, ".png"))
+#   }
 
-}
+# }
 # save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
 #   #' Function to save pheatmaps to a pdf file
 #   stopifnot(!missing(x))
@@ -71,17 +134,55 @@ scatter_per_gene <- function(df_long, ouput_prefix){
 #   dev.off()
 # }
 
-scatter_all <- function(df_long, output_path){
-  # Scatter plot with all matching events/genes
-  p <- ggplot(aes(x=gene_z, y=splice_z, color = gene), data=df_long)+ 
-    geom_point() +
-    geom_text(
-              label= df_long$gene,
-              nudge_x = 0.05, nudge_y = 0.05,
-              check_overlap =F, col = "black", size = 1.5
-            )
-  ggsave(plot = p, filename = output_path)
-}
+# scatter_all <- function(df_long, output_path){
+#   # Scatter plot with all matching events/genes
+#   p <- ggplot(aes(x=gene_z, y=splice_z, color = gene), data=df_long)+ 
+#     geom_point() +
+#     geom_text(
+#               label= df_long$gene,
+#               nudge_x = 0.05, nudge_y = 0.05,
+#               check_overlap =F, col = "black", size = 1.5
+#             )
+#   ggsave(plot = p, filename = output_path)
+# }
+
+
+upset_plot <- function(df_ref, val, output_name){
+  # Build matrix
+  #     cell1 cell2  cell3
+  #event1 0      0     1
+  #event2  1     1     0
+  df_ref <- as.data.frame(df_ref)
+
+  # Matrix filled of 0s
+  df_upset<- data.frame(matrix(0,
+                              ncol = length(unique(df_ref$cell_type)),
+                              nrow = length(unique(df_ref[,paste0(val)]))
+                              ))
+  colnames(df_upset) <- unique(df_ref$cell_type)
+  rownames(df_upset) <- unique(unique(df_ref[,paste0(val)]))
+
+  # Loop through ref matrix rows and populate matrix
+  for (row in 1:nrow(df_ref)) {
+    cell <- as.character(df_ref[row, "cell_type"])
+    event <- as.character(df_ref[row, paste0(val)])
+    df_upset[event, cell] <- 1
+  }
+
+  # nintersects 15 and nsets ncol(df_upset) takes 5 hrs to run 
+  plotObject <- UpSetR::upset(df_upset, 
+                            order.by = "freq",
+                            keep.order = F, 
+                            nintersects = 25, 
+                            # nintersects = nrow(df_upset), 
+                            # nsets= 2, 
+                            nsets= ncol(df_upset), 
+                            empty.intersections = "off")
+  pdf(file= paste0(output_name))
+  print(plotObject)
+  dev.off()
+  }
+
 
 calcGroupMed <- function(df_exp, ls_gene, LM_type){
   str_LM <- as.character(LM_type)
@@ -176,15 +277,15 @@ print(opt$geneDir)
 # if (!dir.exists(file.path(opt$out_dir,"/LM6_scatterplots/"))){
 #   dir.create(file.path(opt$out_dir,"/LM6_scatterplots/"),
 #               recursive = TRUE, showWarnings = TRUE)}
-# if (!dir.exists(file.path(opt$out_dir,"/LM22_scatterplots/"))){
-#   dir.create(file.path(opt$out_dir,"/LM22_scatterplots/"),
-#               recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(file.path(opt$out_dir,"/UMAPs/"))){
+  dir.create(file.path(opt$out_dir,"/UMAPs/"),
+              recursive = TRUE, showWarnings = TRUE)}
 
 # Read in files 
 
 # Metadata
-metadata <- read.csv(file = opt$metadata)
-df_sample_annotations <- metadata %>%
+df_metadata <- read.csv(file = opt$metadata)
+df_sample_annotations <- df_metadata %>%
   dplyr::select(Run,LM22,LM6, sigil_general, data_source) %>%
   tibble::column_to_rownames("Run") %>%
   t()
@@ -220,17 +321,6 @@ print("gene ref mat")
 print(head(df_gene_ref))
 print(unique(df_gene_ref$group))
 
-#############
-# MAIN PLOT: 
-##############################
-# LM22 splice ref vs all matched genes
-##############################
-# Adding Z-scores into the splice ref df 
-
-##################################
-# Formating Gene Exp Z-score df
-#################################
-
 # Read in all gene exp 
 df_exp <- read.table(file= paste0(
                               opt$geneDir,
@@ -240,186 +330,238 @@ df_exp <- df_exp %>% mutate_if(is.character,as.numeric)
 print(head(df_exp))
 print(dim(df_exp))
 
-# Gene exp : get medians and z-score across group
-df_exp_LM22_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "LM22")
-df_exp_LM22_med_z <- t(scale(t(df_exp_LM22_med)))
-df_exp_LM6_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "LM6")
-df_exp_LM6_med_z <- t(scale(t(df_exp_LM6_med)))
+# Read in all MESA PS 
+df_all_PS <- read.table(file = paste0(
+                          opt$spliceDir,
+                          "/batch_corr_mesa_allPS_LM22.tsv"),
+                          sep="\t", header = TRUE, row.names=1) 
+df_all_PS <- df_all_PS %>% mutate_if(is.character,as.numeric)
 
-# Add LM6 / LM22 tags to column names because same cell name can be in both
-colnames(df_exp_LM22_med_z) <- paste(colnames(df_exp_LM22_med_z),"LM22",sep=" ")
-colnames(df_exp_LM6_med_z) <- paste(colnames(df_exp_LM6_med_z),"LM6",sep=" ")
+print(head(df_all_PS))
+print(dim(df_all_PS))
+######################
+# UMAPS
+#######################
 
-# Gene exp: Combine LM6 and LM22 dfs
-df_exp_LM6_LM22_med_z <- cbind(df_exp_LM6_med_z, df_exp_LM22_med_z)
-print("Combined......")
-print(head(df_exp_LM6_LM22_med_z))
-print(dim(df_exp_LM6_LM22_med_z))
+# Gene UMAP
+df_exp_ref <- df_exp %>%
+  tibble::rownames_to_column('gene') %>%  
+  filter(gene %in% df_gene_ref$gene) %>%
+  tibble::column_to_rownames('gene')
+# print(head(df_exp_ref))
+print(dim(df_exp_ref))
+df_to_UMAP(df_exp_ref, "UMAPs/gene_ref_PCA_UMAP" )
 
-# Replace spaces in names with _ to match other df
-str_conv_space <- function(in_str){
-  paste(unlist(strsplit(as.character(in_str), split=" ")),
-                                    collapse="_")
-}
+# Splice UMAP
+df_PS_ref <- df_all_PS %>%
+  rownames_to_column("event") %>%
+  filter(event %in% df_splice_ref$event) %>%
+  column_to_rownames("event")
+# print(head(df_PS_ref))
+print(dim(df_PS_ref))
+df_PS_ref_log <- as.data.frame(log2(df_PS_ref +1))
+df_to_UMAP(df_PS_ref_log, "UMAPs/splice_ref_PCA_UMAP" )
 
-# Replace spaces with _ to match other df
-new_exp_names <- unlist(lapply(colnames(df_exp_LM6_LM22_med_z),FUN= str_conv_space))
-colnames(df_exp_LM6_LM22_med_z) <- new_exp_names
-print(head(df_exp_LM6_LM22_med_z))
+# Gene and splice UMAP
+df_gene_ref_PS_ref <- rbind(df_exp_ref,df_PS_ref_log )
+print(dim(df_PS_ref))
+df_to_UMAP(df_gene_ref_PS_ref, "UMAPs/gene_and_splice_ref_PCA_UMAP" )
 
-# Confirm new columns str format matches ref mat rows
-# Add stop if not equal 
-print(dim(df_splice_ref))
-print(dim(df_splice_ref %>% filter(cell_type_group %in% colnames(df_exp_LM6_LM22_med_z))))
-print("############################")
-##################################
-# Formating Splice Z-score df
-#################################
-df_lm22_splice_z <- read.csv(file= paste0(opt$spliceDir,
-                                      "explore_ref_matrix/LM22_med_zscore.csv"),
-                            header=TRUE, check.names=FALSE, row.names = 1)
+#############
+# MAIN PLOT: 
+##############################
+# LM22 splice ref vs all matched genes
+##############################
+# Adding Z-scores into the splice ref df 
+
+# ##################################
+# # Formating Gene Exp Z-score df
+# #################################
+# # Gene exp : get medians and z-score across group
+# df_exp_LM22_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "LM22")
+# df_exp_LM22_med_z <- t(scale(t(df_exp_LM22_med)))
+# df_exp_LM6_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "LM6")
+# df_exp_LM6_med_z <- t(scale(t(df_exp_LM6_med)))
+
+# # Add LM6 / LM22 tags to column names because same cell name can be in both
+# colnames(df_exp_LM22_med_z) <- paste(colnames(df_exp_LM22_med_z),"LM22",sep=" ")
+# colnames(df_exp_LM6_med_z) <- paste(colnames(df_exp_LM6_med_z),"LM6",sep=" ")
+
+# # Gene exp: Combine LM6 and LM22 dfs
+# df_exp_LM6_LM22_med_z <- cbind(df_exp_LM6_med_z, df_exp_LM22_med_z)
+# print("Combined......")
+# print(head(df_exp_LM6_LM22_med_z))
+# print(dim(df_exp_LM6_LM22_med_z))
+
+# # Replace spaces in names with _ to match other df
+# str_conv_space <- function(in_str){
+#   paste(unlist(strsplit(as.character(in_str), split=" ")),
+#                                     collapse="_")
+# }
+
+# # Replace spaces with _ to match other df
+# new_exp_names <- unlist(lapply(colnames(df_exp_LM6_LM22_med_z),FUN= str_conv_space))
+# colnames(df_exp_LM6_LM22_med_z) <- new_exp_names
+# print(head(df_exp_LM6_LM22_med_z))
+
+# # Confirm new columns str format matches ref mat rows
+# # Add stop if not equal 
+# print(dim(df_splice_ref))
+# print(dim(df_splice_ref %>% filter(cell_type_group %in% colnames(df_exp_LM6_LM22_med_z))))
+# print("############################")
+# ##################################
+# # Formating Splice Z-score df
+# #################################
+# df_lm22_splice_z <- read.csv(file= paste0(opt$spliceDir,
+#                                       "explore_ref_matrix/LM22_med_zscore.csv"),
+#                             header=TRUE, check.names=FALSE, row.names = 1)
 
 
-print(head(df_lm22_splice_z))
-df_lm6_splice_z <- read.csv(file= paste0(opt$spliceDir,
-                                      "explore_ref_matrix/LM6_med_zscore.csv"),
-                            header=TRUE, check.names=FALSE, row.names = 1) 
-print(head(df_lm6_splice_z))
+# print(head(df_lm22_splice_z))
+# df_lm6_splice_z <- read.csv(file= paste0(opt$spliceDir,
+#                                       "explore_ref_matrix/LM6_med_zscore.csv"),
+#                             header=TRUE, check.names=FALSE, row.names = 1) 
+# print(head(df_lm6_splice_z))
 
-# Add LM6 / LM22 tags to column names because same cell name can be in both
-colnames(df_lm22_splice_z) <- paste(colnames(df_lm22_splice_z),"LM22",sep=" ")
-colnames(df_lm6_splice_z) <- paste(colnames(df_lm6_splice_z),"LM6",sep=" ")
+# # Add LM6 / LM22 tags to column names because same cell name can be in both
+# colnames(df_lm22_splice_z) <- paste(colnames(df_lm22_splice_z),"LM22",sep=" ")
+# colnames(df_lm6_splice_z) <- paste(colnames(df_lm6_splice_z),"LM6",sep=" ")
 
-print(head(df_lm6_splice_z))
-print(head(df_lm22_splice_z))
+# print(head(df_lm6_splice_z))
+# print(head(df_lm22_splice_z))
 
-# Merge by row.names (cant cbind due to different number of events likely due to NANs)
-df_splice_LM6_LM22_med_z <- merge(df_lm6_splice_z,df_lm22_splice_z,by=0) %>%
-  column_to_rownames("Row.names")
+# # Merge by row.names (cant cbind due to different number of events likely due to NANs)
+# df_splice_LM6_LM22_med_z <- merge(df_lm6_splice_z,df_lm22_splice_z,by=0) %>%
+#   column_to_rownames("Row.names")
 
-# Splice: Combine LM6 and LM22
-# df_splice_LM6_LM22_med_z <- cbind(df_lm6_splice_z, df_lm22_splice_z)
-print(dim(df_lm6_splice_z))
-print(dim(df_lm22_splice_z))
-print(dim(df_splice_LM6_LM22_med_z))
-print(head(df_splice_LM6_LM22_med_z))
+# # Splice: Combine LM6 and LM22
+# # df_splice_LM6_LM22_med_z <- cbind(df_lm6_splice_z, df_lm22_splice_z)
+# print(dim(df_lm6_splice_z))
+# print(dim(df_lm22_splice_z))
+# print(dim(df_splice_LM6_LM22_med_z))
+# print(head(df_splice_LM6_LM22_med_z))
 
-# Replace spaces with _ to match other df
-new_splice_names <- unlist(lapply(colnames(df_splice_LM6_LM22_med_z),FUN= str_conv_space))
-colnames(df_splice_LM6_LM22_med_z) <- new_splice_names
-print(head(df_splice_LM6_LM22_med_z))
+# # Replace spaces with _ to match other df
+# new_splice_names <- unlist(lapply(colnames(df_splice_LM6_LM22_med_z),FUN= str_conv_space))
+# colnames(df_splice_LM6_LM22_med_z) <- new_splice_names
+# print(head(df_splice_LM6_LM22_med_z))
 
-# Check new columns str format matches ref mat rows
-# Add stop if not equal 
-print(dim(df_splice_ref))
-print(dim(df_splice_ref %>% filter(cell_type_group %in% colnames(df_splice_LM6_LM22_med_z))))
+# # Check new columns str format matches ref mat rows
+# # Add stop if not equal 
+# print(dim(df_splice_ref))
+# print(dim(df_splice_ref %>% filter(cell_type_group %in% colnames(df_splice_LM6_LM22_med_z))))
 
-#################################################
-# Adding z-scores into df of splice ref events 
-#################################################
-print("###############################################################")
-# All genes that were in splice ref matrix
-df_splice_ref_genes <- unique(df_splice_ref$overlapping)
-print(length(df_splice_ref_genes))
+# #################################################
+# # Adding z-scores into df of splice ref events 
+# #################################################
+# print("###############################################################")
+# # All genes that were in splice ref matrix
+# df_splice_ref_genes <- unique(df_splice_ref$overlapping)
+# print(length(df_splice_ref_genes))
 
-# Add col to show if that gene was also in gene ref 
-df_splice_ref <- df_splice_ref %>% 
-  mutate(in_gene_ref = ifelse(overlapping %in% df_gene_ref$gene, paste(overlapping), ""))
+# # Add col to show if that gene was also in gene ref 
+# df_splice_ref <- df_splice_ref %>% 
+#   mutate(in_gene_ref = ifelse(overlapping %in% df_gene_ref$gene, paste(overlapping), ""))
 
-df_splice_ref['gene_z'] <- NA
-df_splice_ref['splice_z'] <- NA
-print(head(df_splice_ref))
+# df_splice_ref['gene_z'] <- NA
+# df_splice_ref['splice_z'] <- NA
+# print(head(df_splice_ref))
 
-print(head(df_exp_LM6_LM22_med_z))
+# print(head(df_exp_LM6_LM22_med_z))
 
-# Adding gene z_scores to splice ref df
-for (gene in df_splice_ref_genes){
-  # print("start.............")
-  # print(gene)
-  #  For each gene get the cell_types the splice event was signifcant in
-  df_  <- df_splice_ref %>% filter(overlapping == gene)
-  # print(as.vector(unlist(unique(df_$cell_type))))
-  # print(df_)
+# # Adding gene z_scores to splice ref df
+# for (gene in df_splice_ref_genes){
+#   # print("start.............")
+#   # print(gene)
+#   #  For each gene get the cell_types the splice event was signifcant in
+#   df_  <- df_splice_ref %>% filter(overlapping == gene)
+#   # print(as.vector(unlist(unique(df_$cell_type))))
+#   # print(df_)
 
-  # Check if gene in gene exp data (splicing can have lists for overlaps "AC129492.1,AC129492.4")
-  if (gene %in% rownames(df_exp_LM6_LM22_med_z)){
+#   # Check if gene in gene exp data (splicing can have lists for overlaps "AC129492.1,AC129492.4")
+#   if (gene %in% rownames(df_exp_LM6_LM22_med_z)){
     
-    # Iterate over cell types
-    for (gene_cell in as.vector(unlist(unique(df_$cell_type_group)))){
-      # print(gene_cell)
+#     # Iterate over cell types
+#     for (gene_cell in as.vector(unlist(unique(df_$cell_type_group)))){
+#       # print(gene_cell)
 
-      # Look up the gene exp val for gene and cell type
-      z <- df_exp_LM6_LM22_med_z[gene, gene_cell] 
-      # print(z)
+#       # Look up the gene exp val for gene and cell type
+#       z <- df_exp_LM6_LM22_med_z[gene, gene_cell] 
+#       # print(z)
 
-      # Add gene z to each corresponding splice ref rows
-      df_splice_ref <- df_splice_ref %>%
-        mutate(gene_z = ifelse(((overlapping==gene) & (cell_type_group==gene_cell)), z, gene_z))
-    }
-  } else
-  {print("no gene match")}
-}
-
-
-print(head(df_splice_ref))
-# print(df_splice_ref)
-
-# Adding splice z_scores to splice ref df
-for (this_event in df_splice_ref$event){
-  print("start.................")
-  print(this_event)
-  df_  <- df_splice_ref %>% filter(event == this_event)
-  print(df_)
-
-  # Iterate over cell types
-  for (splice_cell in as.vector(unlist(unique(df_$cell_type_group)))){
-    print(splice_cell)
-    print(df_ %>% filter(cell_type_group ==splice_cell ))
-
-    z <- df_splice_LM6_LM22_med_z[this_event, splice_cell] 
-    print(z)
-
-    print(df_splice_LM6_LM22_med_z %>% select(splice_cell) %>% filter(row.names(.)==this_event))
-
-    df_splice_ref <- df_splice_ref %>%
-       mutate(splice_z = ifelse(((event==this_event) & (cell_type_group==splice_cell)), z, splice_z))
-}
-}
+#       # Add gene z to each corresponding splice ref rows
+#       df_splice_ref <- df_splice_ref %>%
+#         mutate(gene_z = ifelse(((overlapping==gene) & (cell_type_group==gene_cell)), z, gene_z))
+#     }
+#   } else
+#   {print("no gene match")}
+# }
 
 
-print(head(df_splice_ref))
-################################################################################
-# Quantify number of splice change with little gene change
-###############################################################################
-df_splice_ref$high_ratio <- NA
-df_splice_ref <- df_splice_ref %>%
-    mutate(ratio = abs(splice_z/gene_z)) %>%
-    mutate(high_ratio = ifelse(ratio > 5,
-                                paste(overlapping),
-                                high_ratio)) %>%
-    arrange(desc(ratio))
+# print(head(df_splice_ref))
+# # print(df_splice_ref)
 
-print("splice ref mat")
-print(head(df_splice_ref, n = 50))
-# print(tail(df_splice_ref, n = 50))
+# # Adding splice z_scores to splice ref df
+# for (this_event in df_splice_ref$event){
+#   print("start.................")
+#   print(this_event)
+#   df_  <- df_splice_ref %>% filter(event == this_event)
+#   print(df_)
 
-print("---------------")
-df_splice_ref %>%
-  drop_na(ratio) %>%
-  filter(ratio < 5) %>%
-  arrange(ratio) %>%
-  head(n = 10)
+#   # Iterate over cell types
+#   for (splice_cell in as.vector(unlist(unique(df_$cell_type_group)))){
+#     print(splice_cell)
+#     print(df_ %>% filter(cell_type_group ==splice_cell ))
 
-# df_splice_ref %>%
-#   filter(overlapping == "CSF2RA")
+#     z <- df_splice_LM6_LM22_med_z[this_event, splice_cell] 
+#     print(z)
 
-perc_event_high_ratio <- sum(!is.na(df_splice_ref$high_ratio))/nrow(df_splice_ref)
-print(perc_event_high_ratio)
+#     print(df_splice_LM6_LM22_med_z %>% select(splice_cell) %>% filter(row.names(.)==this_event))
 
+#     df_splice_ref <- df_splice_ref %>%
+#        mutate(splice_z = ifelse(((event==this_event) & (cell_type_group==splice_cell)), z, splice_z))
+# }
+# }
+
+
+# print(head(df_splice_ref))
+# ################################################################################
+# # Quantify number of splice change with little gene change
+# ###############################################################################
+# df_splice_ref$high_ratio <- NA
+# df_splice_ref <- df_splice_ref %>%
+#     mutate(ratio = abs(splice_z/gene_z)) %>%
+#     mutate(high_ratio = ifelse(ratio > 5,
+#                                 paste(overlapping),
+#                                 high_ratio)) %>%
+#     arrange(desc(ratio))
+
+# print("splice ref mat")
+# print(head(df_splice_ref, n = 50))
+# # print(tail(df_splice_ref, n = 50))
+
+# lowratio <- df_splice_ref %>%
+#   drop_na(ratio) %>%
+#   filter(ratio < 5) %>%
+#   arrange(ratio) %>%
+#   head(n = 100) 
+
+# # df_splice_ref %>%
+# #   filter(overlapping == "CSF2RA")
+
+# perc_event_high_ratio <- sum(!is.na(df_splice_ref$high_ratio))/nrow(df_splice_ref)
+# print("Percent of splice ref events with a splice z score to gene score ratio over 5")
+# print(perc_event_high_ratio)
 # for (i in unique(df_splice_ref$high_ratio)){
 #   cat(i)
 #   cat("\n")
 # }
+
+# for (i in unique(lowratio$overlapping)){
+#   cat(i)
+#   cat("\n")
+# }
+
 
 # # ########################################
 # # # Scatter plot all
@@ -516,65 +658,31 @@ print(perc_event_high_ratio)
 # }
 
 
+# #################
+# # UpSet Plots
+# ################
+# ls_upsets <- list(
+#   list(df_splice_ref, "event", paste0(opt$out_dir, "upsetplot_event2cell.pdf")),
+#   list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upsetplot_eventgene2cell.pdf")),
+#   list(df_gene_ref, "gene", paste0(opt$out_dir, "upsetplot_DEG2cell.pdf"))
+# )
+
+# foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
+#   upset_plot(
+#       df_ref = i[1],
+#       val= i[2],
+#       output_name = i[3] 
+#       )
+#   }
 
 
 
 
-upset_plot <- function(df_ref, val, output_name){
-  # Build matrix
-  #     cell1 cell2  cell3
-  #event1 0      0     1
-  #event2  1     1     0
-  df_ref <- as.data.frame(df_ref)
-
-  # Matrix filled of 0s
-  df_upset<- data.frame(matrix(0,
-                              ncol = length(unique(df_ref$cell_type)),
-                              nrow = length(unique(df_ref[,paste0(val)]))
-                              ))
-  colnames(df_upset) <- unique(df_ref$cell_type)
-  rownames(df_upset) <- unique(unique(df_ref[,paste0(val)]))
-
-  # Loop through ref matrix rows and populate matrix
-  for (row in 1:nrow(df_ref)) {
-    cell <- as.character(df_ref[row, "cell_type"])
-    event <- as.character(df_ref[row, paste0(val)])
-    df_upset[event, cell] <- 1
-  }
-
-  # nintersects 15 and nsets ncol(df_upset) takes 5 hrs to run 
-  plotObject <- UpSetR::upset(df_upset, 
-                            order.by = "freq",
-                            keep.order = F, 
-                            # nintersects = 5, 
-                            nintersects = nrow(df_upset), 
-                            # nsets= 2, 
-                            nsets= ncol(df_upset), 
-                            empty.intersections = "off")
-  pdf(file= paste0(output_name))
-  print(plotObject)
-  dev.off()
-  }
 
 
-#################
-# UpSet Plots
-################
-ls_upsets <- list(
-  list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plot_event2cell.pdf")),
-  list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plot_eventgene2cell.pdf")),
-  list(df_gene_ref, "gene", paste0(opt$out_dir, "upset_plot_DEG2cell.pdf"))
-)
-
-foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
-  upset_plot(
-      df_ref = i[1],
-      val= i[2],
-      output_name = i[3] 
-      )
-  }
-
-
+##########################################
+# OLD
+##########################################
 # # Map events to their signifcant cell type
 # df_event2cell <- df_splice_ref %>%
 #     group_by(event) %>%
