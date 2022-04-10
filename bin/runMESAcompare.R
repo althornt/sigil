@@ -2,7 +2,6 @@
 library(optparse)
 library(magrittr)
 library(dplyr)
-# library(pheatmap)
 library(foreach)
 library(doParallel)
 cl <- makeCluster(detectCores() - 1)
@@ -193,17 +192,6 @@ write.table(x = data.frame("cluster"=rownames(all_PS_nan_filt),all_PS_nan_filt),
 print("Number of junctions removed for having over 75% samples with Nans:")
 print(nrow(all_PS)- nrow(all_PS_nan_filt))
 
-# read_in_all_PS_nan_filt = read.table(file = paste0(
-#       opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"),
-#        sep="\t", row.names = 1, header = TRUE)
-#
-#
-# print("read_in_all_PS_nan_filt after read in ")
-# print(head(read_in_all_PS_nan_filt))
-# print(dim(read_in_all_PS_nan_filt))
-
-print(cl)
-
 ###################
 # LM22
 ###################
@@ -214,17 +202,16 @@ if("LM22" %in% colnames(metadata)){
     runCompareSampleSets_1_vs_all(
         cell_type_val = i,
         meta_col_to_use="LM22")}
-
 }
-
 
 ##################
 # LM6
 ##################
 if("LM6" %in% colnames(metadata)){
   ls_lm6_cell_types <- unique(metadata[["LM6"]])
-  ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
+  ls_lm6_cell_types <- drop_levels(ls_lm6_cell_types[ls_lm6_cell_types != ""])
 
+  # Run MESA compare_sample_sets for each general subtype and make heatmap
   foreach(i=ls_lm6_cell_types, .packages='magrittr') %dopar% {
     runCompareSampleSets_1_vs_all(
         cell_type_val = i,
@@ -232,37 +219,3 @@ if("LM6" %in% colnames(metadata)){
 }
 
 
-###################
-# LM22
-###################
-# if("LM22" %in% colnames(metadata)){
-#   ls_lm22_cell_types <- unique(metadata[["LM22"]])
-#
-#   # Run MESA compare_sample_sets for each general subtype and make heatmap
-#   sigil_lm22_mesa_comp_res <- sapply(
-#     ls_lm22_cell_types,
-#     runCompareSampleSets_1_vs_all,
-#     meta_col_to_use="LM22",
-#     USE.NAMES = TRUE)
-#
-#   ls_combined_diff_splice_events <- unlist(sigil_lm22_mesa_comp_res)
-#   print(length(ls_combined_diff_splice_events))
-#
-# }
-
-##################
-# LM6
-##################
-# if("LM6" %in% colnames(metadata)){
-#   ls_lm6_cell_types <- unique(metadata[["LM6"]])
-#   ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
-#
-#   # Run MESA compare_sample_sets for each general subtype and make heatmap
-#   sigil_lm6_mesa_comp_res <- sapply(
-#     ls_lm6_cell_types,
-#     runCompareSampleSets_1_vs_all,
-#     meta_col_to_use="LM6",
-#     USE.NAMES = TRUE)
-#
-#
-# }

@@ -44,10 +44,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   df_all_PS_sig_events_mat <- as.data.frame(lapply(df_all_PS_sig_events,
                                           function(x) as.numeric(as.character(x)))) 
                                           
-
   rownames(df_all_PS_sig_events_mat) <- rownames(df_all_PS_sig_events)
-
-  print(head(df_all_PS_sig_events))
 
   for (val in list("LM22", "LM6")){
       if (nrow(df_all_PS_sig_events) < 50){
@@ -61,19 +58,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
         dplyr::arrange(Run) %>%
         tibble::column_to_rownames("Run")
 
-      # print(head(df_sample_annotations))
-      # print(head(df_all_PS_sig_events))
-      # print(dim(df_sample_annotations))
-      # print(dim(df_all_PS_sig_events))
-      # print(rownames(df_sample_annotations))
-      # print(colnames(df_all_PS_sig_events))
-      # print(class(rownames(df_sample_annotations)))
-      # print(class(colnames(df_all_PS_sig_events)))
-
-      print(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
-
       # stopifnot(rownames(df_sample_annotations) == colnames(df_all_PS_sig_events))
-      print(rownames(df_all_PS_sig_events))
 
       heatmap_res <- pheatmap(
         main = paste0(" "),
@@ -148,8 +133,6 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
   #' @param cell_type - string of the cell type the event was significant in
   #' @param out_dir - path to output directory
   #' @return NA
-
-  print(sig_event)
 
   df <- df_log2tpm_meta %>%
     tibble::rownames_to_column("gene") %>%
@@ -280,7 +263,6 @@ import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_co
 
   # Get output files from compareWithinType script
   ls_css_file_names <- list.files(deseq2_dir,pattern = ".csv")
-  print(ls_css_file_names)
 
   # For input cell type list , convert to filename
   ls_cell_types_file <- c()
@@ -289,11 +271,8 @@ import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_co
     ls_cell_types_file <- append(ls_cell_types_file, new_val)
   }
 
-  print(ls_cell_types_file)
-
   # Intersect with the files that exist (Not all will have a mesa css output )
   ls_css_file_names_cell_type  <- intersect(ls_css_file_names, ls_cell_types_file)
-  print(ls_css_file_names_cell_type)
 
   #Import files, find top signficant events, plot each event
   ls_res <- lapply(
@@ -326,14 +305,6 @@ import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_co
   df_log2tpm_batch_corrrected_subset <- df_log2tpm_batch_corrrected %>%
     dplyr::select(as.vector(unlist(df_metadata_subset$Run)))
 
-  print(head(df_log2tpm_batch_corrrected))
-  print(head(df_metadata))
-  print(head(df_log2tpm_batch_corrrected_subset))
-  print(head(df_metadata_subset))
-  print(dim(df_log2tpm_batch_corrrected))
-  print(dim(df_metadata))
-  print(dim(df_log2tpm_batch_corrrected_subset))
-  print(dim(df_metadata_subset))
   # Make heatmap with this cell types events only within this cell types samples
   make_pheatmap(ls_top_events, paste0(label, "_gene_heatmap"),
           df_metadata_subset, df_log2tpm_batch_corrrected_subset )
@@ -402,17 +373,13 @@ ls_lm22_de_file_names <- list.files(
                                   paste0(opt$out_dir,"/compare_LM22/deseq2_outputs/"),
                                   pattern = ".csv")
 
-print(ls_lm22_de_file_names)
 ls_cell_types_file <- list()
 for (val in unique(list(df_metadata$LM22))){
     new_val <- paste0(gsub(" ","_", val), ".csv")
     ls_cell_types_file <- append(ls_cell_types_file, new_val)
   }
 
-print(ls_cell_types_file)
-
 ls_de_file_names_cell_type  <- unlist(intersect(ls_lm22_de_file_names, ls_cell_types_file))
-print(ls_de_file_names_cell_type)
 
 # Import, find signficant events and plot each one
 ls_lm22_res <- foreach(i=ls_de_file_names_cell_type,
@@ -428,6 +395,7 @@ ls_lm22_res <- foreach(i=ls_de_file_names_cell_type,
   }
 
 df_lm22_res <- dplyr::bind_rows(ls_lm22_res)
+print("LM22")
 print(head(df_lm22_res))
 print(dim(df_lm22_res))
 
@@ -444,17 +412,13 @@ ls_lm6_de_file_names <- list.files(
                                   paste0(opt$out_dir,"/compare_LM6/deseq2_outputs/"),
                                   pattern = ".csv")
 
-ls_cell_types_file <- list()
+ls_lm6_cell_types_file <- list()
 for (val in unique(list(df_metadata$LM6))){
     new_val <- paste0(gsub(" ","_", val), ".csv")
-    ls_cell_types_file <- append(ls_cell_types_file, new_val)
+    ls_lm6_cell_types_file <- append(ls_lm6_cell_types_file, new_val)
   }
 
-print(ls_cell_types_file)
-
-ls_de_file_names_cell_type_lm6  <- unlist(intersect(ls_lm6_de_file_names, ls_cell_types_file))
-print(ls_de_file_names_cell_type_lm6)
-
+ls_de_file_names_cell_type_lm6  <- unlist(intersect(ls_lm6_de_file_names, ls_lm6_cell_types_file))
 
 # Import, find signficant events and plot each one
 ls_lm6_res <- foreach(i=ls_de_file_names_cell_type_lm6,
@@ -470,13 +434,12 @@ ls_lm6_res <- foreach(i=ls_de_file_names_cell_type_lm6,
   }
 
 df_lm6_res <- dplyr::bind_rows(ls_lm6_res)
+print("LM6")
 print(head(df_lm6_res))
 print(dim(df_lm6_res))
 
 # Make heatmap using top events
 make_pheatmap(df_lm6_res$X, "LM6_diff_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected )
-
-
 
 ########################################
 # Import within type comparisons
@@ -523,16 +486,13 @@ ls_within_res <- foreach(i=names(ls_within_cell_types),
 
       }
 
-print(ls_within_res)
-
 df_within_res <- dplyr::bind_rows(ls_within_res, .id = "column_label")
+print("df_within_res")
 print(head(df_within_res))
 print(dim(df_within_res))
 
 # # Make heatmap using top events
 make_pheatmap(df_within_res$X, "withinType_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected)
-
-
 
 ########################################
 # Combined reference matrix
@@ -541,7 +501,9 @@ df_combined_res <- dplyr::bind_rows(list("lm6"  = df_lm6_res,
                                         "lm22"= df_lm22_res,
                                         "within" = df_within_res),
                                         .id = "column_label2")
-print(df_combined_res)
+print("df_combined_res")
+print(head(df_combined_res))
+print(dim(df_combined_res))
 
 write.table(df_combined_res,
             file=paste0(opt$out_dir,"/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),

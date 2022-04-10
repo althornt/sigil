@@ -218,6 +218,11 @@ print(dim(df_LM6_med_z))
 print(dim(df_LM22_med))
 print(dim(df_LM22_med_z))
 
+write.csv(df_LM6_med, paste0(opt$out_dir,"/LM6_med.csv") )
+write.csv(df_LM6_med_z, paste0(opt$out_dir,"/LM6_med_zscore.csv") )
+write.csv(df_LM22_med, paste0(opt$out_dir,"/LM22_med.csv") )
+write.csv(df_LM22_med_z, paste0(opt$out_dir,"/LM22_med_zscore.csv") )
+
 # ########################################################
 # # Make subsets from gene lists
 # ########################################################
@@ -228,38 +233,37 @@ print(dim(df_LM22_med_z))
 # ls_IL_junctions <- df_spliceRefMatrix$overlapping[grep("IL", df_spliceRefMatrix$overlapping)]
 # print(ls_IL_junctions)
 
-# # print("List of genes:")
-# # print(sort(unique(df_spliceRefMatrix$overlapping)))
-
-# df_spliceRefMatrix %>%
-#   filter(overlapping == "DICER1") %>%
-#   select(event)
+print("List of genes:")
+print(sort(unique(df_spliceRefMatrix$overlapping)))
+df_spliceRefMatrix %>%
+  filter(overlapping == "DICER1") %>%
+  select(event)
   
-# ls_immune_genes <- c("CD83","CD300A","CD44","IL32","IL7R")
-# ls_immune_junctions <- df_spliceRefMatrix$event[df_spliceRefMatrix$overlapping %in% ls_immune_genes]
+ls_immune_genes <- c("CD83","CD300A","CD44","IL32","IL7R")
+ls_immune_junctions <- df_spliceRefMatrix$event[df_spliceRefMatrix$overlapping %in% ls_immune_genes]
 
-# print(ls_immune_junctions)
+print(ls_immune_junctions)
 
-# df_LM22_med_immune_junctions <- df_LM22_med %>%
-#   rownames_to_column("col") %>%
-#   filter(col %in% ls_immune_junctions) %>%
-#   column_to_rownames("col")
+df_LM22_med_immune_junctions <- df_LM22_med %>%
+  rownames_to_column("col") %>%
+  filter(col %in% ls_immune_junctions) %>%
+  column_to_rownames("col")
 
-# print(df_LM22_med_immune_junctions)
+print(df_LM22_med_immune_junctions)
 
-# heatmap_res <- pheatmap(
-#         main = paste0(" "),
-#         df_LM22_med_immune_junctions,
-#         scale = "row",
-#         show_rownames=T,
-#         show_colnames=T,
-#         na_col = "grey"
-#         )
+heatmap_res <- pheatmap(
+        main = paste0(" "),
+        df_LM22_med_immune_junctions,
+        scale = "row",
+        show_rownames=T,
+        show_colnames=T,
+        na_col = "grey"
+        )
 
-# save_pheatmap_pdf(
-#         heatmap_res,
-#         paste0(opt$out_dir,"/CD_IL_genes_heatmap_med.pdf")
-#         )
+save_pheatmap_pdf(
+        heatmap_res,
+        paste0(opt$out_dir,"/CD_IL_genes_heatmap_med.pdf")
+        )
 
 # print(df_spliceRefMatrix[df_spliceRefMatrix$overlapping %in% ls_immune_genes,])
 
@@ -273,63 +277,64 @@ print(dim(df_LM22_med_z))
 # Count distribution of junctions for each gene
 ########################################################
 
-# print("Most common genes in the reference matrix:")
+print("Most common genes in the reference matrix:")
 
-# # Map each gene to cell types the event is present in 
-# gene_2_celltypes <- df_spliceRefMatrix %>% 
-#   group_by(overlapping) %>% 
-#   summarize(context = list(cell_type)) %>%
-#   mutate(cell_types = map_chr(context, toString)) %>%
-#   select(overlapping,cell_types) 
+# Map each gene to cell types the event is present in 
+gene_2_celltypes <- df_spliceRefMatrix %>% 
+  group_by(overlapping) %>% 
+  summarize(context = list(cell_type)) %>%
+  mutate(cell_types = map_chr(context, toString)) %>%
+  select(overlapping,cell_types) 
 
-# print(gene_2_celltypes)
+print(gene_2_celltypes)
 
-# # count genes in matrix
-# df_countbygene <- df_spliceRefMatrix %>% 
-#   count(overlapping, sort = TRUE) %>%
-#   inner_join(gene_2_celltypes, by="overlapping")
-# write.csv(df_countbygene, paste0(opt$out_dir,"/countbygene.csv"))
-# print(df_countbygene)
+# count genes in matrix
+df_countbygene <- df_spliceRefMatrix %>% 
+  count(overlapping, sort = TRUE) %>%
+  inner_join(gene_2_celltypes, by="overlapping")
+write.csv(df_countbygene, paste0(opt$out_dir,"/countbygene.csv"))
+print(df_countbygene)
 
-# # Plot distribution of counts per gene 
-# df_hist <- df_spliceRefMatrix %>% 
-#   count(overlapping, sort = TRUE) 
-# ggplot(df_hist, aes(x=n)) + 
-#   geom_histogram() + 
-#   scale_x_continuous(breaks = round(seq(min(df_hist$n), max(df_hist$n), by = 1),1)) +
-#   ggtitle("Counts per gene in the splicing reference matrix") 
-# ggsave( paste0(opt$out_dir,"/hist_count_per_gene.png"))
-
-# # print("---------------------------------------------------------------------------------")
-
-
-# # Map each gene to cell types the event is present in 
-# event_2_celltypes <- df_spliceRefMatrix %>% 
-#   group_by(event) %>% 
-#   summarize(context = list(cell_type)) %>%
-#   mutate(cell_types = map_chr(context, toString)) %>%
-#   select(event,cell_types) 
-
-# print(event_2_celltypes)
-
-# # count genes in matrix
-# df_countbyevent <- df_spliceRefMatrix %>% 
-#   count(event, sort = TRUE) %>%
-#   inner_join(event_2_celltypes, by="event")
-# # write.csv(df_countbygene, paste0(opt$out_dir,"/countbygene.csv"))
-
-# print(df_countbyevent)
-
-# # Plot distribution of counts per gene 
-# df_hist_event <- df_spliceRefMatrix %>% 
-#   count(event, sort = TRUE) 
-# ggplot(df_hist_event, aes(x=n)) + 
-#   geom_histogram() + 
-#   scale_x_continuous(breaks = round(seq(min(df_hist$n), max(df_hist$n), by = 1),1)) +
-#   ggtitle("Counts per event in the splicing reference matrix") 
-# ggsave( paste0(opt$out_dir,"/hist_count_per_event.png"))
+# Plot distribution of counts per gene 
+df_hist <- df_spliceRefMatrix %>% 
+  count(overlapping, sort = TRUE) 
+ggplot(df_hist, aes(x=n)) + 
+  geom_histogram() + 
+  scale_x_continuous(breaks = round(seq(min(df_hist$n), max(df_hist$n), by = 1),1)) +
+  ggtitle("Counts per gene in the splicing reference matrix") 
+ggsave( paste0(opt$out_dir,"/hist_count_per_gene.png"))
 
 # print("---------------------------------------------------------------------------------")
+
+
+# Map each gene to cell types the event is present in 
+event_2_celltypes <- df_spliceRefMatrix %>% 
+  group_by(event) %>% 
+  summarize(context = list(cell_type)) %>%
+  mutate(cell_types = map_chr(context, toString)) %>%
+  select(event,cell_types) 
+
+print(event_2_celltypes)
+
+# count genes in matrix
+df_countbyevent <- df_spliceRefMatrix %>% 
+  count(event, sort = TRUE) %>%
+  inner_join(event_2_celltypes, by="event") %>%
+  select(event, n)
+# write.csv(df_countbygene, paste0(opt$out_dir,"/countbygene.csv"))
+
+print(df_countbyevent)
+
+# Plot distribution of counts per gene 
+df_hist_event <- df_spliceRefMatrix %>% 
+  count(event, sort = TRUE) 
+ggplot(df_hist_event, aes(x=n)) + 
+  geom_histogram() + 
+  scale_x_continuous(breaks = round(seq(min(df_hist_event$n), max(df_hist_event$n), by = 1),1)) +
+  ggtitle("Counts per event in the splicing reference matrix") 
+ggsave( paste0(opt$out_dir,"/hist_count_per_event.png"))
+
+print("---------------------------------------------------------------------------------")
 
 
 

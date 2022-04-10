@@ -169,11 +169,6 @@ upset_plot <- function(df_ref, val, output_name, ls_sets){
     df_upset[event, cell] <- 1
   }
 
-  print(colnames(df_upset))
-  print("--")
-  print(as.vector(unlist(ls_sets)))
-  print("----------------------")
-
   if (ls_sets == "NA"){
     # nintersects 15 and nsets ncol(df_upset) takes 5 hrs to run 
       plotObject <- UpSetR::upset(df_upset, 
@@ -193,8 +188,6 @@ upset_plot <- function(df_ref, val, output_name, ls_sets){
                                 empty.intersections = "off")
 
     }
-  
-  
   
   pdf(file= paste0(output_name))
   print(plotObject)

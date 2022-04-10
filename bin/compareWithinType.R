@@ -79,9 +79,8 @@ call_run_css_cell_type <- function(ls_cell_types, label){
   #' @params ls_cell_types - list of cell type names within category
   #' @params label - string to use iin naming outputs
 
-  print("____Call Func")
   print(label)
-  
+
   ls_cell_types <- unlist(ls_cell_types)
   print(ls_cell_types )
 

@@ -65,7 +65,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
 
   # Save UMAP plot
   ggsave(file.path(opt$out_dir,
-                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
+                   paste0(out_path,meta_col,num_neighbor,"png", sep = '.')),
          device = "png",
          width = 12,
          dpi = 300)
@@ -91,9 +91,12 @@ runDEseq2 <- function(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_
   if (!dir.exists(file.path(path_to_deseq2_folder))){
     dir.create(file.path(path_to_deseq2_folder),recursive = TRUE, showWarnings = TRUE)
     }
-
+  str_cell_type_val <- paste(unlist(strsplit(
+                                    as.character(cell_type_val), split=" ")),
+                                    collapse="_")
+  print(str_cell_type_val)
   #Write output to file for checking (not read by script)
-  write.csv(sampleTable,file.path(paste(path_to_deseq2_folder,cell_type_val,"sampletable.csv")))
+  write.csv(sampleTable,file.path(paste0(path_to_deseq2_folder,str_cell_type_val,"_sampletable.csv")))
   print(sampleTable)
 
   ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22[rownames(sampleTable)]
@@ -165,7 +168,7 @@ runDEseq2 <- function(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_
   res<-res[order(res$padj),]
 
   #Write output to file
-  write.csv(as.data.frame(res),file.path(paste(path_to_deseq2_folder,cell_type_val,".csv")))
+  write.csv(as.data.frame(res),file.path(paste0(path_to_deseq2_folder,str_cell_type_val,".csv")))
 }
 
 runDE_1_vs_all_within_type <- function(ls_cell_types, label) {
@@ -286,27 +289,12 @@ write.csv(metadata_summary,
            row.names = FALSE)
 
 ##################
-# DESEQ2 LM22
-# ##################
-# # Run deseq2 on each LM22 cell type vs all others
-# if("LM22" %in% colnames(df_merged_metadata_lm22)){
-#   ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])
-#   print(ls_lm22_cell_types)
-#   foreach(i=ls_lm22_cell_types, .packages=  c('magrittr', 'DESeq2', 'tximport')) %dopar% {
-#     runDE_1_vs_all(
-#         cell_type_val = i,
-#         meta_col_to_use="LM22"
-#         )
-#       }
-# }
-
-##################
 # DESEQ2 LM6
 ##################
 # Run deseq2 on each LM6 cell type vs all others
 if("LM6" %in% colnames(df_merged_metadata_lm22)){
   ls_lm6_cell_types <-  unique(df_merged_metadata_lm22[["LM6"]])
-  ls_lm6_cell_types <- droplevels(ls_lm6_cell_types[ls_lm6_cell_types != ""])
+  ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
 
   print(ls_lm6_cell_types)
   print("-----")
@@ -316,6 +304,21 @@ if("LM6" %in% colnames(df_merged_metadata_lm22)){
         meta_col_to_use="LM6"
         )
     }
+}
+
+##################
+# DESEQ2 LM22
+# ##################
+# Run deseq2 on each LM22 cell type vs all others
+if("LM22" %in% colnames(df_merged_metadata_lm22)){
+  ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])
+  print(ls_lm22_cell_types)
+  foreach(i=ls_lm22_cell_types, .packages=  c('magrittr', 'DESeq2', 'tximport')) %dopar% {
+    runDE_1_vs_all(
+        cell_type_val = i,
+        meta_col_to_use="LM22"
+        )
+      }
 }
 
 ##################
@@ -380,76 +383,10 @@ ls_within_cell_types <- list(
 )
 
 # Run Deseq2 for one cell type vs all other samples
-
-# foreach(i=ls_within_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
-#   print("foreach")
-#   runDE_1_vs_all_within_type(
-#       ls_cell_types = i[2], 
-#       label= i[1]
-#       )
-#   }
-
-####################################
-# UMAPs before batch correction
-####################################
-
-# # Drop genes with low variance.
-# getVar <- apply(log2trans_dat[, -1], 1, var)
-# param <- median(getVar)
-# log2trans_dat_filt <- log2trans_dat[getVar > param & !is.na(getVar), ]
-
-# # Transpose and format
-# log2trans_dat_filt_t <- as.data.frame(t(log2trans_dat_filt)) %>%
-#   dplyr::filter(!row.names(.) %in% c("gene"))
-# rownames(log2trans_dat_filt_t) <- colnames(log2trans_dat_filt)
-
-# # PCA.
-# prcomp.out = as.data.frame(prcomp(log2trans_dat_filt_t, scale = F)$x)
-# prcomp.out$Run = rownames(log2trans_dat_filt_t)
-# prcomp.out.merge = merge(prcomp.out, y = log2trans_dat)
-
-# # Making variations of UMAPs with different numbers of neighbors
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
-#   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
-
-# ####################################
-# # UMAPs after batch correction
-# ####################################
-
-# # Batch correction
-# log2trans_dat_batch_corr <- limma::removeBatchEffect(
-#                                   log2trans_dat,
-#                                   batch = df_merged_metadata_lm22$data_source,
-#                                   batch2 = df_merged_metadata_lm22$type
-#                                   )
-
-#   write.csv(log2trans_dat_batch_corr,
-#            file.path(file.path(opt$out_dir,"combined_kallisto_log2tpm_batch_corrected.csv")),
-#            row.names = TRUE)
-
-# # Drop genes with low variance.
-# getVar_batch_corr <- apply(log2trans_dat_batch_corr[, -1], 1, var)
-# param <- median(getVar_batch_corr)
-# log2trans_dat_batch_corr_filt <- log2trans_dat_batch_corr[getVar_batch_corr > param & !is.na(getVar_batch_corr), ]
-
-# # Transpose and format
-# log2trans_dat_batch_corr_filt_t <- as.data.frame(t(log2trans_dat_batch_corr_filt)) %>%
-#   dplyr::filter(!row.names(.) %in% c("gene"))
-# rownames(log2trans_dat_batch_corr_filt_t) <- colnames(log2trans_dat_batch_corr_filt)
-
-# # PCA.
-# prcomp.out.batch.corr = as.data.frame(prcomp(log2trans_dat_batch_corr_filt_t, scale = F)$x)
-# prcomp.out.batch.corr$Run = rownames(log2trans_dat_batch_corr_filt_t)
-# # prcomp.out.merge = merge(prcomp.out, y = log2trans_dat)
-
-# # Making variations of UMAPs with different numbers of neighbors
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
-#   df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
-#   df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
-#   df_PCA = prcomp.out.batch.corr, out_path = "UMAPs_post_batch_correction/kallisto_PCA_UMAP")
+foreach(i=ls_within_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
+  print("foreach")
+  runDE_1_vs_all_within_type(
+      ls_cell_types = i[2], 
+      label= i[1]
+      )
+  }
