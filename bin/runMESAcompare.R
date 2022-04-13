@@ -4,7 +4,7 @@ library(magrittr)
 library(dplyr)
 library(foreach)
 library(doParallel)
-cl <- makeCluster(detectCores() - 1)
+cl <- makeCluster(detectCores() - 1, outfile = "")
 registerDoParallel(cl)
 
 runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
@@ -83,7 +83,6 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
   #############################################################################
   # If enough samples, compare groups
   if ((nrow(df_m1_main_cell_type)>2) & (nrow(df_m2_others)>2)){
-
     print("running MESA compare...")
 
     # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
@@ -98,17 +97,6 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
     system(cmd)
     # print(cmd)
   }
-
-}
-
-save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
-  #' Function to save pheatmaps to a pdf file
-  stopifnot(!missing(x))
-  stopifnot(!missing(filename))
-  pdf(filename, width=width, height=height)
-  grid::grid.newpage()
-  grid::grid.draw(x$gtable)
-  dev.off()
 }
 
 # Arguments
@@ -170,27 +158,35 @@ if (!dir.exists(paste0(opt$out_dir,"/compare_LM6/celltype_subset_dfs/"))){
   dir.create(paste0(opt$out_dir,"/compare_LM6/celltype_subset_dfs/"),
    recursive = TRUE, showWarnings = TRUE)
 }
+
 # Open files
 metadata = read.csv(file = opt$metadata)
-all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
-
-print("all_PS")
-# print(head(all_PS))
-print(dim(all_PS))
+df_all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
+print("df_all_PS")
+print(dim(df_all_PS))
 
 # Remove rows with more than 25% NA
-all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.75), ]
-
+all_PS_nan_filt <- df_all_PS[which(rowMeans(!is.na(df_all_PS)) > 0.75), ]
 print("all_PS_nan_filt")
 print(dim(all_PS_nan_filt))
 
-# Write table and add name rownames "cluster"
+# Check PS and filtered PS dfs have expected number of samples
+if(all.equal(length(metadata$Run),
+            ncol(df_all_PS),
+            ncol(all_PS_nan_filt)) != TRUE)
+            stop("Error: Number of columns(samples) is not consistent")
+
+# Write filtered PS df and add name rownames "cluster" to keep expected mesa format
+str_PS_basename <- basename(opt$mesa_PS)
+str_PS_basename<- substr(str_PS_basename,1,nchar(str_PS_basename)-4)
+
 write.table(x = data.frame("cluster"=rownames(all_PS_nan_filt),all_PS_nan_filt),
           na="nan", row.names = FALSE, quote=FALSE,
            sep = "\t",
-          file = paste0(opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"))
+          file = paste0(opt$out_dir,"/", str_PS_basename,"_nan_filt.tsv"))
+
 print("Number of junctions removed for having over 75% samples with Nans:")
-print(nrow(all_PS)- nrow(all_PS_nan_filt))
+print(nrow(df_all_PS)- nrow(all_PS_nan_filt))
 
 ###################
 # LM22
@@ -198,6 +194,7 @@ print(nrow(all_PS)- nrow(all_PS_nan_filt))
 if("LM22" %in% colnames(metadata)){
   ls_lm22_cell_types <- unique(metadata[["LM22"]])
 
+  # Run MESA compare_sample_sets for each LM22 subtype 
   foreach(i=ls_lm22_cell_types, .packages='magrittr') %dopar% {
     runCompareSampleSets_1_vs_all(
         cell_type_val = i,
@@ -209,9 +206,9 @@ if("LM22" %in% colnames(metadata)){
 ##################
 if("LM6" %in% colnames(metadata)){
   ls_lm6_cell_types <- unique(metadata[["LM6"]])
-  ls_lm6_cell_types <- drop_levels(ls_lm6_cell_types[ls_lm6_cell_types != ""])
+  ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
 
-  # Run MESA compare_sample_sets for each general subtype and make heatmap
+  # Run MESA compare_sample_sets for each LM6 subtype 
   foreach(i=ls_lm6_cell_types, .packages='magrittr') %dopar% {
     runCompareSampleSets_1_vs_all(
         cell_type_val = i,
