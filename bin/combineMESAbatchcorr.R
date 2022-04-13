@@ -506,6 +506,20 @@ df_merged_IR_batch_corr <- read.table(paste0(opt$out_dir,
 
 print(head(df_merged_IR_batch_corr))
 print(dim(df_merged_IR_batch_corr))
+
+# Drop non LM22 samples from mesa PS
+df_merged_IR_batch_corr_lm22 <- df_merged_IR_batch_corr %>%
+  dplyr::select(ls_smpls_lm22)
+rownames(df_merged_IR_batch_corr_lm22) <- rownames(df_merged_IR_batch_corr)
+
+print(head(df_merged_IR_batch_corr_lm22))
+print(dim(df_merged_IR_batch_corr_lm22))
+
+write.table(
+  df_merged_IR_batch_corr_lm22,
+  file.path(opt$out_dir,"batch_corr_mesa_ir_table_intron_retention_LM22.tsv"), quote=F,sep="\t", na="nan",
+  col.names = NA, row.names= TRUE)
+
 ########################################################
 # Open PS after batch correction / write LM22 subset 
 #########################################################
