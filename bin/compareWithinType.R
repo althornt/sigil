@@ -55,8 +55,6 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, ls_gen_cell_types,
   # If enough samples, compare groups
   if ((nrow(df_m1_main_cell_type)>2) & (nrow(df_m2_others)>2)){
 
-    print("running MESA compare_sample_sets...")
-
     # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
     cmd <- paste0(
       "mesa compare_sample_sets --psiMESA ",PS_path,
@@ -66,7 +64,7 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, ls_gen_cell_types,
       opt$gtf, " 2>&1")
 
     system(cmd)
-    print(cmd)
+    # print(cmd)
 
   } else {
     print("Not running MESA compare_sample_sets because not at least 3 samples in each group...")
@@ -188,16 +186,27 @@ if (!dir.exists(paste0(opt$out_dir,"/celltype_subset_dfs/"))){
 
 # Open files
 metadata = read.csv(file = opt$metadata)
-all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
+df_all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
+print(dim(df_all_PS))
+
+# Write filtered PS df and add name rownames "cluster" to keep expected mesa format
+str_PS_basename <- basename(opt$mesa_PS)
+str_PS_basename<- substr(str_PS_basename,1,nchar(str_PS_basename)-4)
 
 # Remove rows with more than 50% NA
-all_PS_nan_filt <- all_PS[which(rowMeans(!is.na(all_PS)) > 0.5), ]
+all_PS_nan_filt <- df_all_PS[which(rowMeans(!is.na(df_all_PS)) > 0.5), ]
+
+# Check PS and filtered PS dfs have expected number of samples
+if(all.equal(length(metadata$Run),
+            ncol(df_all_PS),
+            ncol(all_PS_nan_filt)) != TRUE)
+            stop("Error: Number of columns(samples) is not consistent")
+
 write.table(x = all_PS_nan_filt, na="nan", row.names = TRUE, quote=FALSE,
           col.names=NA, sep = "\t",
-          file = paste0(opt$out_dir, "/batch_corr_mesa_allPS_LM22_nan_filt.tsv"))
+          file = paste0(opt$out_dir,"/", str_PS_basename,"_nan_filt.tsv"))
 print("Number of junctions removed for having over 50% samples with Nans:")
-print(nrow(all_PS)- nrow(all_PS_nan_filt))
-
+print(nrow(df_all_PS)- nrow(all_PS_nan_filt))
 
 ######################
 # Cell type lists
