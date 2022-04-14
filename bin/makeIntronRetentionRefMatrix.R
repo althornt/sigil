@@ -247,6 +247,77 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
   return(df_top_sig_neg_and_pos)
 }
 
+import_mesa_css_within<- function(ls_cell_types, topN,  label, css_dir, meta_col){
+  #' Import results from MESA compare_sample_sets runs within a broader cell type
+  #' (e.g. within T-cells). Find the top signficant events, make event level
+  #' plots, make heatmaps of the events. This function calls import_mesa_css(),
+  #' unpack_import_css_res(), and make_pheatmap()
+  #'
+  #' @param ls_cell_types - list of LM22 cell-types that were compared in
+  #' compareWithinType.R script
+  #' @param topN - integer; how many of the top splicing events to use
+  #' @param label - string to use to represent cell type in output files
+  #' @return ls_top_events - list containing 3 list - top positive events, top
+  #' negative events, and top negative and positive
+
+
+  # Get output files from compareWithinType script
+  ls_css_file_names <- list.files(css_dir,pattern = ".tsv")
+
+  print(ls_css_file_names)
+
+  # For input cell type list , convert to filename
+  ls_cell_types_file <- c()
+  for (val in ls_cell_types){
+    new_val <- paste0(gsub(" ","_", val), ".tsv")
+    ls_cell_types_file <- append(ls_cell_types_file, new_val)
+  }
+
+  # Intersect with the files that exist (Not all will have a mesa css output )
+  ls_css_file_names_cell_type  <- intersect(ls_css_file_names, ls_cell_types_file)
+
+  #Import files, find top signficant events, plot each event
+  ls_res <- lapply(
+                    ls_css_file_names_cell_type,
+                    topN=topN,
+                    import_mesa_css,
+                    meta_col =meta_col,
+                    plot_out_dir =  paste0(opt$out_dir,"/within_type/"),
+                    css_dir =  css_dir,
+                    comparison_label = "withinType")
+
+  # If only 2 CSS files, they should have identical resuls
+  # (comparing A vs B then B) , so only return the results of one
+  if (length(ls_css_file_names_cell_type) <= 2) {
+      #only keep first result
+      df_res <- ls_res[[1]]
+  } else {
+      df_res <- dplyr::bind_rows(ls_res)
+  }
+
+  ls_top_events <- df_res$event
+
+  # Filter metadata
+  df_metadata_subset <- metadata %>%
+    dplyr::filter(LM22 %in% ls_cell_types) %>%
+    droplevels(.) %>%
+    dplyr::arrange(Run)
+
+  # Filter all PS
+  df_all_PS <- all_PS %>%
+    dplyr::select(as.vector(unlist(df_metadata_subset$Run)))
+
+  # Make heatmap with this cell types events only within this cell types samples
+  make_pheatmap(ls_top_events, paste0(label, "_diff_IR_heatmap"),
+          df_metadata_subset, df_all_PS )
+
+  # Make heatmap with this cell types events and ALL samples
+  make_pheatmap(ls_top_events, paste0(label,"_diff_IR_heatmap_all_samples"),
+          metadata, all_PS )
+
+  return(df_res)
+}
+
 # Arguments
 option_list <- list(
   optparse::make_option(
@@ -362,3 +433,104 @@ print(dim(df_lm22_res))
 
 # Make heatmap using top events
 make_pheatmap(df_lm22_res$event, "LM22_diff_IR_heatmap", metadata, all_PS )
+
+
+########################################
+# Import LM6 1 vs all comparisons
+#######################################
+
+# Get all outputs from compare sample sets 1 vs all comparisons
+ls_lm6_css_file_names <- list.files(
+                                  paste0(opt$dir_group_comp,
+                                  "/compare_LM6/mesa_css_outputs/"),
+                                  pattern = ".tsv")
+# ls_lm6_css_file_names <- ls_lm6_css_file_names[!ls_lm6_css_file_names %in% c("heatmaps")]
+
+# Import, find signficant events and plot each one
+ls_lm6_res <- foreach(i=ls_lm6_css_file_names,
+                      .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
+    import_mesa_css(
+      filename = i,
+      topN = 20,
+      meta_col="LM6",
+      plot_out_dir = paste0(opt$out_dir,"/LM6/"),
+      css_dir=paste0(opt$dir_group_comp,"/compare_LM6/mesa_css_outputs/"),
+      comparison_label = "LM6"
+      )
+  }
+
+df_lm6_res <- dplyr::bind_rows(ls_lm6_res)
+print(head(df_lm6_res))
+print(dim(df_lm6_res))
+
+# Make heatmap using top events
+make_pheatmap(df_lm6_res$event, "LM6_diff_IR_heatmap", metadata, all_PS)
+
+########################################
+# Import within comparisons
+#######################################
+# mast_cell_types <- list(
+#   "Mast cells resting",
+#   "Mast cells activated")
+
+# NK_cell_types <- list(
+#   "NK cells resting",
+#   "NK cells activated")
+
+ls_within_cell_types <- list(
+  "Tcell" = list(
+    "T cells CD8",
+    "T cells CD4 naive",
+    #   "T cells CD4 memory resting",
+    #   "T cells CD4 memory  activated",
+    "T cells follicular helper",
+    "T cells regulatory (Tregs)",
+    "T cells gamma delta"),
+  "Mon_Mac" = list(
+      "Monocytes",
+      "Macrophages M0",
+      "Macrophages M1"
+      # "Macrophages M2"
+      ),
+  "Bcell" = list(
+    "B cells naive",
+    "B cells memory"),
+  "Dendritic" = list(
+    "Dendritic cells resting",
+    "Dendritic cells activated"))
+
+
+ls_within_res <- foreach(i=names(ls_within_cell_types),
+                        .packages=c('magrittr','dplyr','ggplot2','pheatmap')) %dopar% {
+
+      import_mesa_css_within(
+        ls_cell_types = ls_within_cell_types[[i]],
+        topN = 20,
+        label = i,
+        css_dir = paste0(opt$dir_within_comp, "/mesa_css_outputs/"),
+        meta_col = "LM22")
+
+      }
+
+df_within_res <- dplyr::bind_rows(ls_within_res, .id = "column_label")
+print(df_within_res)
+
+# Make heatmap using top events
+make_pheatmap(df_within_res$event, "withinType_IR_heatmap", metadata, all_PS)
+
+########################################
+# Combined reference matrix
+######################################
+df_combined_res <- dplyr::bind_rows(list("lm6"  = df_lm6_res,
+                                        "lm22"= df_lm22_res,
+                                        "within" = df_within_res),
+                                        .id = "column_label2")
+print(df_combined_res)
+
+write.table(df_combined_res,
+            file=paste0(opt$out_dir,"/lm22_lm6_withinType_combinedRefMat.tsv"),
+            sep = "\t",row.names = FALSE, quote=F)
+
+# Make heatmap using top events
+make_pheatmap(df_combined_res$event, "LM6_LM22_withinType_IR_heatmap", metadata, all_PS)
+

@@ -307,7 +307,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
 
       save_pheatmap_pdf(
         heatmap_res,
-        paste0(opt$out_dir,"/ref_matrix/",label,"_",val,"_rowname",rowname_on_off,".pdf"))
+        paste0(opt$out_dir,"/",label,"_",val,"_rowname",rowname_on_off,".pdf"))
       }
 }
 
@@ -344,7 +344,7 @@ import_mesa_css_within<- function(ls_cell_types, topN,  label, css_dir, meta_col
                     topN=topN,
                     import_mesa_css,
                     meta_col =meta_col,
-                    plot_out_dir =  paste0(opt$out_dir,"/ref_matrix/within_type/"),
+                    plot_out_dir =  paste0(opt$out_dir,"/within_type/"),
                     css_dir =  css_dir,
                     comparison_label = "withinType")
 
@@ -395,6 +395,18 @@ option_list <- list(
     help = "full path to mesa cluster file"),
 
   optparse::make_option(
+    c("-g", "--dir_group_comp"),
+    type = "character",
+    default = NULL,
+    help = "path to css outptus from runMESAcompare"),
+
+   optparse::make_option(
+    c("-w", "--dir_within_comp"),
+    type = "character",
+    default = NULL,
+    help = "path to css outputs from compare within type"),
+
+  optparse::make_option(
     c("-o", "--out_dir"),
     type = "character",
     default = NULL,
@@ -442,26 +454,14 @@ print(length(ls_clusters))
 print(tail(ls_clusters))
 
 # Make output directories
-if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM22/volcanos"))){
-  dir.create(paste0(opt$out_dir,"/ref_matrix/LM22/volcanos"),
-   recursive = TRUE, showWarnings = TRUE)
-}
+ls_out_paths <- list("/LM22/volcanos","/LM6/volcanos","/within_type/volcanos","/UMAPs" )
+for (path in ls_out_paths){
 
-if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/LM6/volcanos"))){
-  dir.create(paste0(opt$out_dir,"/ref_matrix/LM6/volcanos"),
-   recursive = TRUE, showWarnings = TRUE)
+  if (!dir.exists(paste0(opt$out_dir,path))){
+    dir.create(paste0(opt$out_dir,path),
+    recursive = TRUE, showWarnings = TRUE)
 }
-
-if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/within_type/volcanos"))){
-  dir.create(paste0(opt$out_dir,"/ref_matrix/within_type/volcanos"),
-   recursive = TRUE, showWarnings = TRUE)
 }
-
-if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/UMAPs"))){
-  dir.create(paste0(opt$out_dir,"/ref_matrix/UMAPs"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-
 
 ########################################
 # Import LM22 1 vs all comparisons
@@ -469,7 +469,7 @@ if (!dir.exists(paste0(opt$out_dir,"/ref_matrix/UMAPs"))){
 
 # Get all outputs from compare sample sets 1 vs all comparisons
 ls_lm22_css_file_names <- list.files(
-                                  paste0(opt$out_dir,
+                                  paste0(opt$dir_group_comp,
                                   "/compare_LM22/mesa_css_outputs/"),
                                   pattern = ".tsv")
 ls_lm22_css_file_names <- ls_lm22_css_file_names[!ls_lm22_css_file_names %in% c("heatmaps")]
@@ -481,8 +481,8 @@ ls_lm22_res <- foreach(i=ls_lm22_css_file_names,
       filename = i,
       topN = 20,
       meta_col="LM22",
-      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/"),
-      css_dir=paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/"),
+      plot_out_dir = paste0(opt$out_dir,"/LM22/"),
+      css_dir=paste0(opt$dir_group_comp,"/compare_LM22/mesa_css_outputs/"),
       comparison_label = "LM22"
       )
   }
@@ -500,7 +500,7 @@ make_pheatmap(df_lm22_res$event, "LM22_diff_splicing_heatmap", metadata, all_PS 
 
 # Get all outputs from compare sample sets 1 vs all comparisons
 ls_lm6_css_file_names <- list.files(
-                                  paste0(opt$out_dir,
+                                  paste0(opt$dir_group_comp,
                                   "/compare_LM6/mesa_css_outputs/"),
                                   pattern = ".tsv")
 ls_lm6_css_file_names <- ls_lm6_css_file_names[!ls_lm6_css_file_names %in% c("heatmaps")]
@@ -512,8 +512,8 @@ ls_lm6_res <- foreach(i=ls_lm6_css_file_names,
       filename = i,
       topN = 20,
       meta_col="LM6",
-      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM6/"),
-      css_dir=paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/"),
+      plot_out_dir = paste0(opt$out_dir,"/LM6/"),
+      css_dir=paste0(opt$dir_group_comp,"/compare_LM6/mesa_css_outputs/"),
       comparison_label = "LM6"
       )
   }
@@ -566,7 +566,7 @@ ls_within_res <- foreach(i=names(ls_within_cell_types),
         ls_cell_types = ls_within_cell_types[[i]],
         topN = 20,
         label = i,
-        css_dir = paste0(opt$out_dir, "/compare_within_type/mesa_css_outputs/"),
+        css_dir = paste0(opt$dir_within_comp, "/mesa_css_outputs/"),
         meta_col = "LM22")
 
       }
@@ -587,45 +587,43 @@ df_combined_res <- dplyr::bind_rows(list("lm6"  = df_lm6_res,
 print(df_combined_res)
 
 write.table(df_combined_res,
-            file=paste0(opt$out_dir,"/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
+            file=paste0(opt$out_dir,"/lm22_lm6_withinType_combinedRefMat.tsv"),
             sep = "\t",row.names = FALSE, quote=F)
 
 # Make heatmap using top events
 make_pheatmap(df_combined_res$event, "LM6_LM22_withinType_splicing_heatmap", metadata, all_PS)
 
-# ######################################
-# # UMAPs of PS using top events
-# ######################################
+######################################
+# UMAPs of PS using top events
+######################################
+# Drop genes with low variance.
+allPS_var <- apply(all_PS_top_junctions[, -1], 1, var)
+print(length(allPS_var))
 
-#
-# # Drop genes with low variance.
-# allPS_var <- apply(all_PS_top_junctions[, -1], 1, var)
-# print(length(allPS_var))
-#
-# # For gene I used median (50% quantile) as the cutoff
-# # For splicing using 75% due to there being many more rows)
-# # trying 25
-# PS_param <- quantile(allPS_var, c(.25), na.rm=T)
-# print(PS_param)
-#
-# df_allPS_filt <- all_PS_top_junctions[allPS_var > PS_param & !is.na(allPS_var), ]
-# print(dim(df_allPS_filt))
-#
-# # Transpose and format
-# df_allPS_filt_t <- as.data.frame(t(df_allPS_filt))
-# rownames(df_allPS_filt_t) <- colnames(df_allPS_filt)
-#
-# print(dim(df_allPS_filt))
-# print(dim(df_allPS_filt_t))
-# # PCA.
-# all.ps.prcomp.out = as.data.frame(prcomp(na.omit(df_allPS_filt_t), center=T,  scale = T)$x)
-#
-# # Making variations of UMAPs with different numbers of neighbors
-# lapply(c(15,20,25,30), make_umap, meta_col="data_source",
-#   df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
-# lapply(c(15,20,25,30), make_umap, meta_col="LM22",
-#   df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
-# lapply(c(15,20,25,30), make_umap, meta_col="sigil_general",
-#   df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
-# lapply(c(15,20,25,30), make_umap, meta_col="LM6",
-#   df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
+# For gene I used median (50% quantile) as the cutoff
+# For splicing using 75% due to there being many more rows)
+# trying 25
+PS_param <- quantile(allPS_var, c(.25), na.rm=T)
+print(PS_param)
+
+df_allPS_filt <- all_PS_top_junctions[allPS_var > PS_param & !is.na(allPS_var), ]
+print(dim(df_allPS_filt))
+
+# Transpose and format
+df_allPS_filt_t <- as.data.frame(t(df_allPS_filt))
+rownames(df_allPS_filt_t) <- colnames(df_allPS_filt)
+
+print(dim(df_allPS_filt))
+print(dim(df_allPS_filt_t))
+# PCA.
+all.ps.prcomp.out = as.data.frame(prcomp(na.omit(df_allPS_filt_t), center=T,  scale = T)$x)
+
+# Making variations of UMAPs with different numbers of neighbors
+lapply(c(15,20,25,30), make_umap, meta_col="data_source",
+  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
+lapply(c(15,20,25,30), make_umap, meta_col="LM22",
+  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
+lapply(c(15,20,25,30), make_umap, meta_col="sigil_general",
+  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
+lapply(c(15,20,25,30), make_umap, meta_col="LM6",
+  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
