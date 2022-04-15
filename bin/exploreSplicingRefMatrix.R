@@ -171,6 +171,7 @@ df_spliceRefMatrix <- readr::read_tsv(file = opt$spliceRefMatrix)
 print(head(df_spliceRefMatrix))
 print(dim(df_spliceRefMatrix))
 
+
 df_all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1) 
 # df_all_PS <- df_all_PS %>% mutate_if(is.character,as.numeric)
 
@@ -233,37 +234,37 @@ write.csv(df_LM22_med_z, paste0(opt$out_dir,"/LM22_med_zscore.csv") )
 # ls_IL_junctions <- df_spliceRefMatrix$overlapping[grep("IL", df_spliceRefMatrix$overlapping)]
 # print(ls_IL_junctions)
 
-print("List of genes:")
-print(sort(unique(df_spliceRefMatrix$overlapping)))
-df_spliceRefMatrix %>%
-  filter(overlapping == "DICER1") %>%
-  select(event)
+# print("List of genes:")
+# print(sort(unique(df_spliceRefMatrix$overlapping)))
+# df_spliceRefMatrix %>%
+#   filter(overlapping == "DICER1") %>%
+#   select(event)
   
-ls_immune_genes <- c("CD83","CD300A","CD44","IL32","IL7R")
-ls_immune_junctions <- df_spliceRefMatrix$event[df_spliceRefMatrix$overlapping %in% ls_immune_genes]
+# ls_immune_genes <- c("CD83","CD300A","CD44","IL32","IL7R")
+# ls_immune_junctions <- df_spliceRefMatrix$event[df_spliceRefMatrix$overlapping %in% ls_immune_genes]
 
-print(ls_immune_junctions)
+# print(ls_immune_junctions)
 
-df_LM22_med_immune_junctions <- df_LM22_med %>%
-  rownames_to_column("col") %>%
-  filter(col %in% ls_immune_junctions) %>%
-  column_to_rownames("col")
+# df_LM22_med_immune_junctions <- df_LM22_med %>%
+#   rownames_to_column("col") %>%
+#   filter(col %in% ls_immune_junctions) %>%
+#   column_to_rownames("col")
 
-print(df_LM22_med_immune_junctions)
+# print(df_LM22_med_immune_junctions)
 
-heatmap_res <- pheatmap(
-        main = paste0(" "),
-        df_LM22_med_immune_junctions,
-        scale = "row",
-        show_rownames=T,
-        show_colnames=T,
-        na_col = "grey"
-        )
+# heatmap_res <- pheatmap(
+#         main = paste0(" "),
+#         df_LM22_med_immune_junctions,
+#         scale = "row",
+#         show_rownames=T,
+#         show_colnames=T,
+#         na_col = "grey"
+#         )
 
-save_pheatmap_pdf(
-        heatmap_res,
-        paste0(opt$out_dir,"/CD_IL_genes_heatmap_med.pdf")
-        )
+# save_pheatmap_pdf(
+#         heatmap_res,
+#         paste0(opt$out_dir,"/CD_IL_genes_heatmap_med.pdf")
+#         )
 
 # print(df_spliceRefMatrix[df_spliceRefMatrix$overlapping %in% ls_immune_genes,])
 

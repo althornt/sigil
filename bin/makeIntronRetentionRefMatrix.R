@@ -336,13 +336,13 @@ option_list <- list(
     c("-g", "--dir_group_comp"),
     type = "character",
     default = NULL,
-    help = ""),
+    help = "path to css outptus from runMESAcompare"),
 
    optparse::make_option(
     c("-w", "--dir_within_comp"),
     type = "character",
     default = NULL,
-    help = ""),
+    help = "path to css outputs from compare within type"),
 
   optparse::make_option(
     c("-o", "--out_dir"),
@@ -373,26 +373,6 @@ all_PS_meta <- rbind(all_PS, df_sample_annotations)
 df_clusters <- read.table(file = opt$mesa_cluster, sep="\t", header = FALSE)
 
 # Make output directories
-# if (!dir.exists(paste0(opt$out_dir,"/LM22/volcanos"))){
-#   dir.create(paste0(opt$out_dir,"/LM22/volcanos"),
-#    recursive = TRUE, showWarnings = TRUE)
-# }
-
-# if (!dir.exists(paste0(opt$out_dir,"/LM6/volcanos"))){
-#   dir.create(paste0(opt$out_dir,"/LM6/volcanos"),
-#    recursive = TRUE, showWarnings = TRUE)
-# }
-
-# if (!dir.exists(paste0(opt$out_dir,"/within_type/volcanos"))){
-#   dir.create(paste0(opt$out_dir,"/within_type/volcanos"),
-#    recursive = TRUE, showWarnings = TRUE)
-# }
-
-# if (!dir.exists(paste0(opt$out_dir,"/UMAPs"))){
-#   dir.create(paste0(opt$out_dir,"/UMAPs"),
-#    recursive = TRUE, showWarnings = TRUE)
-# }
-
 ls_out_paths <- list("/LM22/volcanos","/LM6/volcanos","/within_type/volcanos", "/UMAPs" )
 for (path in ls_out_paths){
 
