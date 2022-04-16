@@ -38,8 +38,6 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path, plot_name) {
   # Merge UMAP results with metadata
   umap.out.merge = merge(umap.out, df_metadata)
 
-  print(meta_col)
-
   # Plot UMAP
   plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
     geom_point(size = 2) +
@@ -124,13 +122,13 @@ df_to_UMAP <- function(input_df, output_dir, output_name){
 
 
   # Plot variations of UMAPs with different numbers of neighbors
-  lapply(c(20), make_umap, meta_col="data_source",
+  lapply(c(20, 30), make_umap, meta_col="data_source",
     df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
-  lapply(c(20), make_umap, meta_col="LM22",
+  lapply(c(20, 30), make_umap, meta_col="LM22",
     df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
-  lapply(c(20), make_umap, meta_col="sigil_general",
+  lapply(c(20, 30), make_umap, meta_col="sigil_general",
     df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
-  lapply(c(20), make_umap, meta_col="LM6",
+  lapply(c(20, 30), make_umap, meta_col="LM6",
     df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
 
 }
@@ -363,6 +361,7 @@ df_splice_ref <- read.csv(file= paste0(
                                 opt$spliceDir,
                                 "ref_matrix_PS/lm22_lm6_withinType_combinedRefMat.tsv"),
                           sep = "\t",header=TRUE) 
+
 # Merge cols to add LM tag (within type uses LM22 groups )
 df_splice_ref <- df_splice_ref %>%
   mutate(cell_type_group = ifelse(group=="LM6",
@@ -407,8 +406,33 @@ df_all_PS <- df_all_PS %>% mutate_if(is.character,as.numeric)
 
 print(head(df_all_PS))
 print(dim(df_all_PS))
+
+# Read in MESA intron retention reference matrix
+df_IR_ref <- read.csv(file= paste0(
+                                opt$spliceDir,
+                                "ref_matrix_IR/lm22_lm6_withinType_combinedRefMat.tsv"),
+                          sep = "\t",header=TRUE) 
+print(head(df_IR_ref))
+print(dim(df_IR_ref))
+
+# Merge cols to add LM tag (within type uses LM22 groups )
+df_IR_ref <- df_IR_ref %>%
+  mutate(cell_type_group = ifelse(group=="LM6",
+                                paste(cell_type, "LM6", sep = "_"),
+                                paste(cell_type, "LM22", sep = "_")))
+
+# Read in MESA intron retention 
+df_all_IR <- read.table(file = paste0(
+                          opt$spliceDir,
+                          "/batch_corr_mesa_ir_table_intron_retention_LM22.tsv"),
+                          sep="\t", header = TRUE, row.names=1) 
+df_all_IR <- df_all_IR %>% mutate_if(is.character,as.numeric)
+
+print(head(df_all_IR))
+print(dim(df_all_IR))
+
 ######################
-# UMAPS
+# PCA and UMAPS
 #######################
 
 # Gene UMAP
@@ -431,11 +455,27 @@ df_PS_ref_log <- as.data.frame(log2(df_PS_ref +1))
 print(dim(df_PS_ref_log))
 df_to_UMAP(df_PS_ref_log, paste0(opt$out_dir, "/dim_red"), "splice_ref" )
 
+# IR UMAP
+df_IR_ref <- df_all_IR %>%
+  rownames_to_column("event") %>%
+  filter(event %in% df_IR_ref$event) %>%
+  column_to_rownames("event")
+# print(head(df_PS_ref))
+print(dim(df_IR_ref))
+df_IR_reflog <- as.data.frame(log2(df_IR_ref +1))
+print(dim(df_IR_reflog))
+df_to_UMAP(df_IR_reflog, paste0(opt$out_dir, "/dim_red"), "IR_ref" )
+
 # Gene and splice UMAP
 df_gene_ref_PS_ref <- rbind(df_exp_ref,df_PS_ref_log )
 print(dim(df_PS_ref))
 df_to_UMAP(df_gene_ref_PS_ref,paste0(opt$out_dir, "/dim_red"), "gene_and_splice_ref" )
-quit()
+
+# Gene and splice and IR UMAP
+df_gene_ref_PS_ref_IR_ref <- rbind(df_gene_ref_PS_ref,df_IR_reflog )
+print(dim(df_gene_ref_PS_ref_IR_ref))
+df_to_UMAP(df_gene_ref_PS_ref_IR_ref,paste0(opt$out_dir, "/dim_red"), "gene_and_splice_and_IR_ref" )
+
 #############
 # MAIN PLOT: 
 ##############################
