@@ -592,38 +592,3 @@ write.table(df_combined_res,
 
 # Make heatmap using top events
 make_pheatmap(df_combined_res$event, "LM6_LM22_withinType_splicing_heatmap", metadata, all_PS)
-
-######################################
-# UMAPs of PS using top events
-######################################
-# Drop genes with low variance.
-allPS_var <- apply(all_PS_top_junctions[, -1], 1, var)
-print(length(allPS_var))
-
-# For gene I used median (50% quantile) as the cutoff
-# For splicing using 75% due to there being many more rows)
-# trying 25
-PS_param <- quantile(allPS_var, c(.25), na.rm=T)
-print(PS_param)
-
-df_allPS_filt <- all_PS_top_junctions[allPS_var > PS_param & !is.na(allPS_var), ]
-print(dim(df_allPS_filt))
-
-# Transpose and format
-df_allPS_filt_t <- as.data.frame(t(df_allPS_filt))
-rownames(df_allPS_filt_t) <- colnames(df_allPS_filt)
-
-print(dim(df_allPS_filt))
-print(dim(df_allPS_filt_t))
-# PCA.
-all.ps.prcomp.out = as.data.frame(prcomp(na.omit(df_allPS_filt_t), center=T,  scale = T)$x)
-
-# Making variations of UMAPs with different numbers of neighbors
-lapply(c(15,20,25,30), make_umap, meta_col="data_source",
-  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
-lapply(c(15,20,25,30), make_umap, meta_col="LM22",
-  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
-lapply(c(15,20,25,30), make_umap, meta_col="sigil_general",
-  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")
-lapply(c(15,20,25,30), make_umap, meta_col="LM6",
-  df_PCA = all.ps.prcomp.out, out_path = "ref_matrix/UMAPs/UMAP")

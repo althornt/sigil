@@ -339,8 +339,8 @@ opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
 # Make output directories
-if (!dir.exists(file.path(opt$out_dir,"/refMatrix/"))){
-  dir.create(file.path(opt$out_dir,"/refMatrix/"),
+if (!dir.exists(file.path(opt$out_dir,"/ref_matrix/"))){
+  dir.create(file.path(opt$out_dir,"/ref_matrix/"),
               recursive = TRUE, showWarnings = TRUE)}
 if (!dir.exists(file.path(opt$out_dir,"/volcano_plots/"))){
   dir.create(file.path(opt$out_dir,"/volcano_plots/"),
