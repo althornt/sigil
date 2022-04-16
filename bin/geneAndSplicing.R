@@ -20,7 +20,7 @@ registerDoParallel(cl)
 # Functions
 #########################
 
-make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
+make_umap <- function(num_neighbor,meta_col,df_PCA,out_path, plot_name) {
 
   set.seed(123)
 
@@ -28,6 +28,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
   n <- length(unique(df_metadata[[meta_col]]))
   qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
   pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+  # print(pal)
 
   # Run UMAP
   umap.out <- umap(df_PCA, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
@@ -36,6 +37,8 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
 
   # Merge UMAP results with metadata
   umap.out.merge = merge(umap.out, df_metadata)
+
+  print(meta_col)
 
   # Plot UMAP
   plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
@@ -46,13 +49,57 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
     labs(title= paste("Cell types, n_neighbors =",num_neighbor, sep = ' '))
 
   # Save UMAP plot
-  ggsave(file.path(opt$out_dir,
-                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
+  ggsave(file.path(out_path,
+                   paste(plot_name,meta_col,num_neighbor,"PCA.UMAP","png", sep = '.')),
          device = "png",
          width = 12,
          dpi = 300)
 }
-df_to_UMAP <- function(input_df, output_path){
+
+make_PCA <- function(df_PCA, out_path,plot_name, meta_col){
+  set.seed(123)
+
+  # Make color palette
+  n <- length(unique(df_metadata[[meta_col]]))
+  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+  # print(head(df_PCA))
+  # print(tail(df_PCA))
+  # print(dim(df_PCA))
+
+  df_metadata <- as.data.frame(df_metadata) %>%
+    filter(Run %in% rownames(df_PCA) )%>%
+    tibble::column_to_rownames("Run")
+
+  # print(head(df_metadata))
+  # print(head(df_PCA))
+
+  # Merge PCA results with metadata
+  df_PCA <- data.frame(x = df_PCA[,1],  y = df_PCA[,2])
+  pca.out.merge = cbind(df_PCA, df_metadata)
+
+  # print(head(pca.out.merge))
+  # print(tail(pca.out.merge))
+  # print(dim(pca.out.merge))
+
+  # Plot PCA
+  plt <- ggplot(pca.out.merge, aes(x, y, color = get(meta_col))) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="bottom",legend.title = element_blank()) +
+    scale_color_manual(values=pal) +
+    labs(title= "", sep = ' ')
+
+  # Save plot
+  ggsave(file.path(out_path,
+                   paste(plot_name,meta_col,"PCA","png", sep = '.')),
+         device = "png",
+         width = 12,
+         dpi = 300)
+}
+
+df_to_UMAP <- function(input_df, output_dir, output_name){
 
   var <- apply(input_df[, -1], 1, var)
   param <- quantile(var, c(.1), na.rm=T)
@@ -62,23 +109,29 @@ df_to_UMAP <- function(input_df, output_path){
   input_df_filt_t <- as.data.frame(t(input_df_filt))
   rownames(input_df_filt_t) <- colnames(input_df)
 
-  print("----------------------------")
-  print(dim(input_df))
-  print(dim(input_df_filt))
-  print(dim(input_df_filt_t))
+  print("Samples with NA, which will be dropped in PCA and UMAPs:")
+  print(which(rowSums(is.na(input_df_filt_t))>0))
+
   # PCA
   prcomp.out = as.data.frame(prcomp(na.omit(input_df_filt_t), center=T,  scale = T)$x)
   print(dim(prcomp.out))
+  
+  # Plot PCAs
+  for (meta in list("data_source", "LM22", "LM6", "sigil_general")){
+    make_PCA(df_PCA = prcomp.out, out_path = paste0(output_dir, "/PCA/"), 
+            plot_name = output_name, meta_col = paste0(meta))
+    }
 
-  # Making variations of UMAPs with different numbers of neighbors
+
+  # Plot variations of UMAPs with different numbers of neighbors
   lapply(c(20), make_umap, meta_col="data_source",
-    df_PCA = prcomp.out, out_path = paste0(output_path))
+    df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
   lapply(c(20), make_umap, meta_col="LM22",
-    df_PCA = prcomp.out, out_path = paste0(output_path))
+    df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
   lapply(c(20), make_umap, meta_col="sigil_general",
-    df_PCA = prcomp.out, out_path = paste0(output_path))
+    df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
   lapply(c(20), make_umap, meta_col="LM6",
-    df_PCA = prcomp.out, out_path = paste0(output_path))
+    df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
 
 }
 
@@ -290,10 +343,12 @@ print(opt$geneDir)
 # if (!dir.exists(file.path(opt$out_dir,"/LM6_scatterplots/"))){
 #   dir.create(file.path(opt$out_dir,"/LM6_scatterplots/"),
 #               recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/UMAPs/"))){
-  dir.create(file.path(opt$out_dir,"/UMAPs/"),
+if (!dir.exists(file.path(opt$out_dir,"/dim_red/PCA/"))){
+  dir.create(file.path(opt$out_dir,"/dim_red/PCA/"),
               recursive = TRUE, showWarnings = TRUE)}
-
+if (!dir.exists(file.path(opt$out_dir,"/dim_red/UMAP/"))){
+  dir.create(file.path(opt$out_dir,"/dim_red/UMAP/"),
+              recursive = TRUE, showWarnings = TRUE)}
 # Read in files 
 
 # Metadata
@@ -306,7 +361,7 @@ df_sample_annotations <- df_metadata %>%
 # Events in splice reference matrix 
 df_splice_ref <- read.csv(file= paste0(
                                 opt$spliceDir,
-                                "/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
+                                "ref_matrix_PS/lm22_lm6_withinType_combinedRefMat.tsv"),
                           sep = "\t",header=TRUE) 
 # Merge cols to add LM tag (within type uses LM22 groups )
 df_splice_ref <- df_splice_ref %>%
@@ -321,7 +376,7 @@ print(unique(df_splice_ref$group))
 # Genes in gene reference matrix 
 df_gene_ref <- read.csv(file= paste0(
                               opt$geneDir,
-                              "/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
+                              "ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
                          sep = "\t",header=TRUE) %>%
               rename(gene = X)
 
@@ -363,7 +418,7 @@ df_exp_ref <- df_exp %>%
   tibble::column_to_rownames('gene')
 # print(head(df_exp_ref))
 print(dim(df_exp_ref))
-df_to_UMAP(df_exp_ref, "UMAPs/gene_ref_PCA_UMAP" )
+df_to_UMAP(df_exp_ref, paste0(opt$out_dir, "/dim_red"), "gene_ref" )
 
 # Splice UMAP
 df_PS_ref <- df_all_PS %>%
@@ -373,13 +428,14 @@ df_PS_ref <- df_all_PS %>%
 # print(head(df_PS_ref))
 print(dim(df_PS_ref))
 df_PS_ref_log <- as.data.frame(log2(df_PS_ref +1))
-df_to_UMAP(df_PS_ref_log, "UMAPs/splice_ref_PCA_UMAP" )
+print(dim(df_PS_ref_log))
+df_to_UMAP(df_PS_ref_log, paste0(opt$out_dir, "/dim_red"), "splice_ref" )
 
 # Gene and splice UMAP
 df_gene_ref_PS_ref <- rbind(df_exp_ref,df_PS_ref_log )
 print(dim(df_PS_ref))
-df_to_UMAP(df_gene_ref_PS_ref, "UMAPs/gene_and_splice_ref_PCA_UMAP" )
-
+df_to_UMAP(df_gene_ref_PS_ref,paste0(opt$out_dir, "/dim_red"), "gene_and_splice_ref" )
+quit()
 #############
 # MAIN PLOT: 
 ##############################
