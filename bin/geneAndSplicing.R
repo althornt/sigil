@@ -303,6 +303,57 @@ calcGroupMed <- function(df_exp, ls_gene, LM_type){
   return(df_med)
 }
 
+add_z_to_ref <- function(ref_df){
+  # Function= Add gene, IR, and Splice z-score to an IR or Splice ref df
+  
+  # All genes that were in splice ref matrix
+  df_splice_ref_genes <- unique(ref_df$overlapping)
+  print(length(df_splice_ref_genes))
+
+  # Add col to show if that gene was also in gene ref 
+  ref_df <- ref_df %>% 
+    mutate(in_gene_ref = ifelse(overlapping %in% df_gene_ref$gene, paste(overlapping), ""))
+
+  ref_df['gene_z'] <- ref_df['splice_z'] <- ref_df['IR_z'] <- NA
+
+  # Adding gene z_scores to splice ref df
+  for (gene in df_splice_ref_genes){
+    #  For each gene get the cell_types the splice event was signifcant in
+    df_  <- ref_df %>% filter(overlapping == gene)
+
+    # Check if gene in gene exp data (splicing can have lists for overlaps "AC129492.1,AC129492.4")
+    if (gene %in% rownames(df_exp_LM6_LM22_med_z)){
+      
+      # Iterate over cell types and look up gene z score
+      for (gene_cell in as.vector(unlist(unique(df_$cell_type_group)))){
+        z <- df_exp_LM6_LM22_med_z[gene, gene_cell] 
+        # Add gene z to each corresponding splice ref rows
+        ref_df <- ref_df %>%
+          mutate(gene_z = ifelse(((overlapping==gene) & (cell_type_group==gene_cell)), z, gene_z))
+      }
+    } 
+  }
+
+  # Adding splice z_scores and IR z scores to splice ref df
+  for (this_event in ref_df$event){
+    df_  <- ref_df %>% filter(event == this_event)
+    # Iterate over cell types and look up Z scores 
+    for (splice_cell in as.vector(unlist(unique(df_$cell_type_group)))){
+      splice_z_val <- df_splice_LM6_LM22_med_z[this_event, splice_cell] 
+      IR_z_val <- df_IR_LM6_LM22_med_z[this_event, splice_cell] 
+
+      # Add zscores to ref df
+      ref_df <- ref_df %>%
+        mutate(splice_z = ifelse(((event==this_event) & (cell_type_group==splice_cell)), splice_z_val, splice_z)) %>%
+        mutate(IR_z = ifelse(((event==this_event) & (cell_type_group==splice_cell)), IR_z_val, IR_z)) 
+        
+  }
+  }
+
+  return(ref_df)
+  
+}
+
 # Arguments
 option_list <- list(
   optparse::make_option(
@@ -600,95 +651,44 @@ print(dim(df_IR_ref %>% filter(cell_type_group %in% colnames(df_IR_LM6_LM22_med_
 ###########################################################################
 # Adding all z-scores into df of splice ref events and IR ref events 
 ###########################################################################
-
-add_z_to_ref <- function(ref_df){
-  # Function= Add gene, IR, and Splice z-score to an IR or Splice ref df
-  
-  # All genes that were in splice ref matrix
-  df_splice_ref_genes <- unique(ref_df$overlapping)
-  print(length(df_splice_ref_genes))
-
-  # Add col to show if that gene was also in gene ref 
-  ref_df <- ref_df %>% 
-    mutate(in_gene_ref = ifelse(overlapping %in% df_gene_ref$gene, paste(overlapping), ""))
-
-  ref_df['gene_z'] <- ref_df['splice_z'] <- ref_df['IR_z'] <- NA
-
-  # Adding gene z_scores to splice ref df
-  for (gene in df_splice_ref_genes){
-    #  For each gene get the cell_types the splice event was signifcant in
-    df_  <- ref_df %>% filter(overlapping == gene)
-
-    # Check if gene in gene exp data (splicing can have lists for overlaps "AC129492.1,AC129492.4")
-    if (gene %in% rownames(df_exp_LM6_LM22_med_z)){
-      
-      # Iterate over cell types and look up gene z score
-      for (gene_cell in as.vector(unlist(unique(df_$cell_type_group)))){
-        z <- df_exp_LM6_LM22_med_z[gene, gene_cell] 
-        # Add gene z to each corresponding splice ref rows
-        ref_df <- ref_df %>%
-          mutate(gene_z = ifelse(((overlapping==gene) & (cell_type_group==gene_cell)), z, gene_z))
-      }
-    } 
-  }
-
-  # Adding splice z_scores and IR z scores to splice ref df
-  for (this_event in ref_df$event){
-    df_  <- ref_df %>% filter(event == this_event)
-    # Iterate over cell types and look up Z scores 
-    for (splice_cell in as.vector(unlist(unique(df_$cell_type_group)))){
-      splice_z_val <- df_splice_LM6_LM22_med_z[this_event, splice_cell] 
-      IR_z_val <- df_IR_LM6_LM22_med_z[this_event, splice_cell] 
-
-      # Add zscores to ref df
-      ref_df <- ref_df %>%
-        mutate(splice_z = ifelse(((event==this_event) & (cell_type_group==splice_cell)), splice_z_val, splice_z)) %>%
-        mutate(IR_z = ifelse(((event==this_event) & (cell_type_group==splice_cell)), IR_z_val, IR_z)) 
-        
-  }
-  }
-
-  return(ref_df)
-  
-}
-
 df_splice_ref <- add_z_to_ref(ref_df = df_splice_ref )
 df_IR_ref <- add_z_to_ref(ref_df = df_IR_ref )
 
 print(head(df_splice_ref))
 print(head(df_IR_ref))
+print("------------------------------------")
 
-################################################################################
-# Quantify number of splice change with little gene change
-###############################################################################
-df_splice_ref$high_ratio <- NA
-df_splice_ref <- df_splice_ref %>%
-    mutate(ratio = abs(splice_z/gene_z)) %>%
-    mutate(high_ratio = ifelse(ratio > 5,
-                                paste(overlapping),
-                                high_ratio)) %>%
-    arrange(desc(ratio))
+# ################################################################################
+# # Quantify number of splice change with little gene change
+# ###############################################################################
+# df_splice_ref$high_ratio <- NA
+# df_splice_ref <- df_splice_ref %>%
+#     mutate(ratio = abs(splice_z/gene_z)) %>%
+#     mutate(high_ratio = ifelse(ratio > 5,
+#                                 paste(overlapping),
+#                                 high_ratio)) %>%
+#     arrange(desc(ratio))
 
-print("splice ref mat")
-print(head(df_splice_ref, n = 50))
-# print(tail(df_splice_ref, n = 50))
+# print("splice ref mat")
+# print(head(df_splice_ref, n = 50))
+# # print(tail(df_splice_ref, n = 50))
 
-lowratio <- df_splice_ref %>%
-  drop_na(ratio) %>%
-  filter(ratio < 5) %>%
-  arrange(ratio) %>%
-  head(n = 100) 
+# lowratio <- df_splice_ref %>%
+#   drop_na(ratio) %>%
+#   filter(ratio < 5) %>%
+#   arrange(ratio) %>%
+#   head(n = 100) 
 
-# df_splice_ref %>%
-#   filter(overlapping == "CSF2RA")
+# # df_splice_ref %>%
+# #   filter(overlapping == "CSF2RA")
 
-perc_event_high_ratio <- sum(!is.na(df_splice_ref$high_ratio))/nrow(df_splice_ref)
-print("Percent of splice ref events with a splice z score to gene score ratio over 5")
-print(perc_event_high_ratio)
-for (i in unique(df_splice_ref$high_ratio)){
-  cat(i)
-  cat("\n")
-}
+# perc_event_high_ratio <- sum(!is.na(df_splice_ref$high_ratio))/nrow(df_splice_ref)
+# print("Percent of splice ref events with a splice z score to gene score ratio over 5")
+# print(perc_event_high_ratio)
+# for (i in unique(df_splice_ref$high_ratio)){
+#   cat(i)
+#   cat("\n")
+# }
 
 # for (i in unique(lowratio$overlapping)){
 #   cat(i)
@@ -698,76 +698,76 @@ for (i in unique(df_splice_ref$high_ratio)){
 #####################################################
 # Scatter plot all splice events vs gene or IR
 #####################################################
-for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref", "high_ratio")){
+# for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref", "high_ratio")){
 
-  # Splice vs Gene________________________________________________________________
-  p_vs_gene <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
-    geom_point(size=.5) +
-    labs(title= "") + 
-    geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
-    geom_text(
-              label= df_splice_ref[[label_type]],
-              nudge_x = 0.05, nudge_y = 0.05,
-              check_overlap =F, col = "black", size = 1
-            ) +
-    theme_minimal() +
-    theme(legend.position="bottom", 
-          legend.title = element_text(size = 5), 
-          legend.text = element_text(size = 5),
-          axis.title.x=element_text(size=7),
-          axis.title.y=element_text(size=7))  +
-    guides(color = guide_legend(nrow = 2))
+#   # Splice vs Gene________________________________________________________________
+#   p_vs_gene <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
+#     geom_point(size=.5) +
+#     labs(title= "") + 
+#     geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
+#     geom_text(
+#               label= df_splice_ref[[label_type]],
+#               nudge_x = 0.05, nudge_y = 0.05,
+#               check_overlap =F, col = "black", size = 1
+#             ) +
+#     theme_minimal() +
+#     theme(legend.position="bottom", 
+#           legend.title = element_text(size = 5), 
+#           legend.text = element_text(size = 5),
+#           axis.title.x=element_text(size=7),
+#           axis.title.y=element_text(size=7))  +
+#     guides(color = guide_legend(nrow = 2))
 
-  ggsave(plot = p_vs_gene, width = 12, height = 7, dpi = 400,
-        filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, ".png"))
+#   ggsave(plot = p_vs_gene, width = 12, height = 7, dpi = 400,
+#         filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, ".png"))
 
-  # Splice vs Gene Zoomed ______________________________________________________
-  p_vs_gene_zoom <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
-    geom_point(size=2) +
-    labs(title= "") + 
-    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    geom_text(
-              label= df_splice_ref[[label_type]],
-              nudge_x = 0.01, nudge_y = 0.01,
-              check_overlap =F, col = "black", size = 3
-            ) +
-    theme_minimal() +
-    theme(legend.position="bottom", 
-          legend.title = element_text(size = 5), 
-          legend.text = element_text(size = 5),
-          axis.title.x=element_text(size=7),
-          axis.title.y=element_text(size=7))  +
-    guides(color = guide_legend(nrow = 2)) +
-    ylim(-1, 1) 
+#   # Splice vs Gene Zoomed ______________________________________________________
+#   p_vs_gene_zoom <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
+#     geom_point(size=2) +
+#     labs(title= "") + 
+#     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     geom_text(
+#               label= df_splice_ref[[label_type]],
+#               nudge_x = 0.01, nudge_y = 0.01,
+#               check_overlap =F, col = "black", size = 3
+#             ) +
+#     theme_minimal() +
+#     theme(legend.position="bottom", 
+#           legend.title = element_text(size = 5), 
+#           legend.text = element_text(size = 5),
+#           axis.title.x=element_text(size=7),
+#           axis.title.y=element_text(size=7))  +
+#     guides(color = guide_legend(nrow = 2)) +
+#     ylim(-1, 1) 
 
-  ggsave(plot = p_vs_gene_zoom, width = 12, height = 7, dpi = 400,
-        filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, "_zoomed.png"))
+#   ggsave(plot = p_vs_gene_zoom, width = 12, height = 7, dpi = 400,
+#         filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, "_zoomed.png"))
 
-  # Splice vs IR _____________________________________________________________
-  p_vs_IR <- ggplot(aes(x=splice_z, y=IR_z, color = cell_type), data=df_splice_ref)+ 
-    geom_point(size=.5) +
-    labs(title= "") + 
-    geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
-    geom_text(
-              label= df_splice_ref[[label_type]],
-              nudge_x = 0.05, nudge_y = 0.05,
-              check_overlap =F, col = "black", size = 1
-            ) +
-    theme_minimal() +
-    theme(legend.position="bottom", 
-          legend.title = element_text(size = 5), 
-          legend.text = element_text(size = 5),
-          axis.title.x=element_text(size=7),
-          axis.title.y=element_text(size=7))  +
-    guides(color = guide_legend(nrow = 2))
+#   # Splice vs IR _____________________________________________________________
+#   p_vs_IR <- ggplot(aes(x=splice_z, y=IR_z, color = cell_type), data=df_splice_ref)+ 
+#     geom_point(size=.5) +
+#     labs(title= "") + 
+#     geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
+#     geom_text(
+#               label= df_splice_ref[[label_type]],
+#               nudge_x = 0.05, nudge_y = 0.05,
+#               check_overlap =F, col = "black", size = 1
+#             ) +
+#     theme_minimal() +
+#     theme(legend.position="bottom", 
+#           legend.title = element_text(size = 5), 
+#           legend.text = element_text(size = 5),
+#           axis.title.x=element_text(size=7),
+#           axis.title.y=element_text(size=7))  +
+#     guides(color = guide_legend(nrow = 2))
 
-  ggsave(plot = p_vs_IR, width = 12, height = 7, dpi = 400,
-        filename = paste0(opt$out_dir, "/splice_ref_vs_IR_",label_type, ".png"))
+#   ggsave(plot = p_vs_IR, width = 12, height = 7, dpi = 400,
+#         filename = paste0(opt$out_dir, "/splice_ref_vs_IR_",label_type, ".png"))
 
-}
+# }
 
 
 # ########################################
@@ -812,76 +812,53 @@ for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref"
 # Scatter plot all IR events 
 #######################################
 
-for (label_type in c("cell_type", "event", "overlapping", "group")){
+# for (label_type in c("cell_type", "event", "overlapping", "group")){
 
-  # IR vs Gene________________________________________________________________
-  p_vs_gene <- ggplot(aes(x=IR_z, y=gene_z, color = cell_type), data=df_IR_ref)+ 
-    geom_point(size=.5) +
-    labs(title= "") + 
-    geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
-    geom_text(
-              label= df_IR_ref[[label_type]],
-              nudge_x = 0.05, nudge_y = 0.05,
-              check_overlap =F, col = "black", size = 1
-            ) +
-    theme_minimal() +
-    theme(legend.position="bottom", 
-          legend.title = element_text(size = 5), 
-          legend.text = element_text(size = 5),
-          axis.title.x=element_text(size=7),
-          axis.title.y=element_text(size=7))  +
-    guides(color = guide_legend(nrow = 2))
+#   # IR vs Gene________________________________________________________________
+#   p_vs_gene <- ggplot(aes(x=IR_z, y=gene_z, color = cell_type), data=df_IR_ref)+ 
+#     geom_point(size=.5) +
+#     labs(title= "") + 
+#     geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
+#     geom_text(
+#               label= df_IR_ref[[label_type]],
+#               nudge_x = 0.05, nudge_y = 0.05,
+#               check_overlap =F, col = "black", size = 1
+#             ) +
+#     theme_minimal() +
+#     theme(legend.position="bottom", 
+#           legend.title = element_text(size = 5), 
+#           legend.text = element_text(size = 5),
+#           axis.title.x=element_text(size=7),
+#           axis.title.y=element_text(size=7))  +
+#     guides(color = guide_legend(nrow = 2))
 
-  ggsave(plot = p_vs_gene, width = 12, height = 7, dpi = 400,
-        filename = paste0(opt$out_dir, "/IR_ref_vs_gene_",label_type, ".png"))
+#   ggsave(plot = p_vs_gene, width = 12, height = 7, dpi = 400,
+#         filename = paste0(opt$out_dir, "/IR_ref_vs_gene_",label_type, ".png"))
 
-  # # IR vs Splice  ______________________________________________________
-  # p_vs_gene_zoom <- ggplot(aes(x=IR_z, y=splice_z, color = cell_type), data=df_IR_ref)+ 
-  #   geom_point(size=2) +
-  #   labs(title= "") + 
-  #   geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-  #   geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-  #   geom_text(
-  #             label= df_IR_ref[[label_type]],
-  #             nudge_x = 0.01, nudge_y = 0.01,
-  #             check_overlap =F, col = "black", size = 3
-  #           ) +
-  #   theme_minimal() +
-  #   theme(legend.position="bottom", 
-  #         legend.title = element_text(size = 5), 
-  #         legend.text = element_text(size = 5),
-  #         axis.title.x=element_text(size=7),
-  #         axis.title.y=element_text(size=7))  +
-  #   guides(color = guide_legend(nrow = 2)) +
-  #   ylim(-1, 1) 
+#   # Splice vs IR _____________________________________________________________
+#   p_vs_IR <- ggplot(aes(x=IR_z, y=splice_z, color = cell_type), data=df_IR_ref)+ 
+#     geom_point(size=.5) +
+#     labs(title= "") + 
+#     geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
+#     geom_text(
+#               label= df_IR_ref[[label_type]],
+#               nudge_x = 0.05, nudge_y = 0.05,
+#               check_overlap =F, col = "black", size = 1
+#             ) +
+#     theme_minimal() +
+#     theme(legend.position="bottom", 
+#           legend.title = element_text(size = 5), 
+#           legend.text = element_text(size = 5),
+#           axis.title.x=element_text(size=7),
+#           axis.title.y=element_text(size=7))  +
+#     guides(color = guide_legend(nrow = 2))
 
-  # ggsave(plot = p_vs_gene_zoom, width = 12, height = 7, dpi = 400,
-  #       filename = paste0(opt$out_dir, "/splice_ref_vs_gene_",label_type, "_zoomed.png"))
+#   ggsave(plot = p_vs_IR, width = 12, height = 7, dpi = 400,
+#         filename = paste0(opt$out_dir, "/IR_ref_vs_splice_",label_type, ".png"))
 
-  # Splice vs IR _____________________________________________________________
-  p_vs_IR <- ggplot(aes(x=IR_z, y=splice_z, color = cell_type), data=df_IR_ref)+ 
-    geom_point(size=.5) +
-    labs(title= "") + 
-    geom_hline(yintercept = 0, size = .25, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .25, linetype='dotted', color = "grey") +
-    geom_text(
-              label= df_IR_ref[[label_type]],
-              nudge_x = 0.05, nudge_y = 0.05,
-              check_overlap =F, col = "black", size = 1
-            ) +
-    theme_minimal() +
-    theme(legend.position="bottom", 
-          legend.title = element_text(size = 5), 
-          legend.text = element_text(size = 5),
-          axis.title.x=element_text(size=7),
-          axis.title.y=element_text(size=7))  +
-    guides(color = guide_legend(nrow = 2))
-
-  ggsave(plot = p_vs_IR, width = 12, height = 7, dpi = 400,
-        filename = paste0(opt$out_dir, "/IR_ref_vs_splice_",label_type, ".png"))
-
-}
+# }
 
 # #################
 # # UpSet Plots
@@ -900,13 +877,15 @@ for (label_type in c("cell_type", "event", "overlapping", "group")){
      
 
 # ls_upsets <- list(
-#   # list(df_splice_ref, "event", paste0(opt$out_dir, "upsetplot_event2cell.pdf"), "NA"),
-#   # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upsetplot_eventgene2cell.pdf"), "NA"),
-#   # list(df_gene_ref, "gene", paste0(opt$out_dir, "upsetplot_DEG2cell.pdf", "NA")),
+#   # list(df_splice_ref, "event", paste0(opt$out_dir, "upset/upsetplot_event2cell.pdf"), "NA"),
+#   # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset/upsetplot_eventgene2cell.pdf"), "NA"),
+#   # list(df_gene_ref, "gene", paste0(opt$out_dir, "upset/upsetplot_DEG2cell.pdf", "NA")),
+#   list(df_IR_ref, "gene", paste0(opt$out_dir, "upset/upsetplot_IRgene2cell.pdf", "NA"))
 
-#   list(df_splice_ref, "event", paste0(opt$out_dir, "upsetplot_event2cell_Tcell.pdf"), T_cell_within_cell_types),
-#   list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upsetplot_eventgene2cell_Tcell.pdf"), T_cell_within_cell_types),
-#   list(df_gene_ref, "gene", paste0(opt$out_dir, "upsetplot_DEG2cell_Tcell.pdf"), T_cell_within_cell_types)
+
+#   # list(df_splice_ref, "event", paste0(opt$out_dir, "upset/upsetplot_event2cell_Tcell.pdf"), T_cell_within_cell_types),
+#   # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset/upsetplot_eventgene2cell_Tcell.pdf"), T_cell_within_cell_types),
+#   # list(df_gene_ref, "gene", paste0(opt$out_dir, "upset/upsetplot_DEG2cell_Tcell.pdf"), T_cell_within_cell_types)
 # )
 
 # foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
@@ -919,150 +898,18 @@ for (label_type in c("cell_type", "event", "overlapping", "group")){
 #   }
 
 
+# Upset plot
+# Genes affected by splice, IR, and gene
 
+print(length(unique(df_gene_ref$gene)))
+print(length(unique(df_splice_ref$overlapping)))
+print(length(unique(df_IR_ref$overlapping)))
 
+listInput <- list(gene = unique(df_gene_ref$gene),
+                 splice = unique(df_splice_ref$overlapping), 
+                 IR = unique(df_IR_ref$overlapping))
 
-
-
-
-
-##########################################
-# OLD
-##########################################
-# # Map events to their signifcant cell type
-# df_event2cell <- df_splice_ref %>%
-#     group_by(event) %>%
-#     summarize(context = list(cell_type)) %>%
-#     mutate(cell_types = map_chr(context, toString)) %>%
-#     select(event, cell_types) %>%
-#     as.data.frame()
-# print(head(df_event2cell))
-# print(dim(df_event2cell))
-
-# df_event2cell <- merge(x = df_event2cell, y = df_splice_ref, by="event") %>%
-#   distinct(event, .keep_all = TRUE)
-
-# print(head(df_event2cell))
-# print(dim(df_event2cell))
-
-# print("=====================================================================")
-
-# # Genes in gene reference matrix 
-# df_gene_ref <- read.csv(file= paste0(
-#                               opt$geneDir,
-#                               "/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
-#                          sep = "\t",header=TRUE) %>%
-#               rename(gene = X)
-# print("gene ref mat")
-# print(head(df_gene_ref))
-
-# print(unique(df_gene_ref$group))
-# print(dim(df_gene_ref))
-
-
-# # Map genes to to their signifcant cell type
-# df_DEG2cell <- df_gene_ref %>%
-#     group_by(gene) %>%
-#     summarize(context = list(cell_type)) %>%
-#     mutate(cell_types = map_chr(context, toString)) %>%
-#     select(gene, cell_types) %>%
-#     as.data.frame()
-
-# print(head(df_DEG2cell))
-# print(dim(df_DEG2cell))
-
-# #######################
-# # LM6 group z_scores
-# ########################
-
-# # Open LM6 splice z scores 
-# df_lm6_splice_z <- read.csv(file= paste0(opt$spliceDir,
-#                                       "explore_ref_matrix/LM6_med_zscore.csv"),
-#                             header=TRUE) %>%
-#                     rename(event = X)
-
-# # Add sig cell type and gene name
-# df_lm6_splice_z <-  merge(x=df_lm6_splice_z,y=df_event2cell,by="event",all=TRUE) %>%
-#     select( -column_label2,-group, -column_label, -cell_type) %>%
-#     rename(gene = overlapping)
-
-# print("----------------------------------------")
-# print(head(df_lm6_splice_z))
-# print(dim(df_lm6_splice_z))
-
-# # Open LM6 gene z scores 
-# df_lm6_gene_z <- read.csv(file= paste0(opt$geneDir,"explore_ref_matrix/LM6_med_zscore.csv"), header=TRUE) %>%
-#     rename(gene = X)
-# # Add  cell_type to z scores
-# df_lm6_gene_z <- merge(x=df_DEG2cell,y=df_lm6_gene_z,by="gene",all=TRUE) 
-# print("df_lm6_gene_z")
-# print(head(df_lm6_gene_z))
-# print(dim(df_lm6_gene_z))
-
-
-# # # Scatterplots 
-# # df_lm6_merged_z_long <- format_merge(df_lm6_gene_z,df_lm6_splice_z )
-# # print(head(df_lm6_merged_z_long))
-# # scatter_all(df_lm6_merged_z_long, paste0(opt$out_dir, "/lm6_scatter_all.png"))
-# # scatter_per_gene(df_lm6_merged_z_long, paste0(opt$out_dir, "/LM6_scatterplots/"))
-
-# # #######################
-# # # LM22
-# # ########################
-# # Open LM22 splice z scores 
-# df_lm22_splice_z <- read.csv(file= paste0(opt$spliceDir,
-#                                       "explore_ref_matrix/LM22_med_zscore.csv"),
-#                             header=TRUE) %>%
-#                     rename(event = X)
-
-# # Add sig cell type and gene name
-# df_lm22_splice_z <-  merge(x=df_lm22_splice_z,y=df_event2cell,by="event",all=TRUE) %>%
-#     select( -column_label2,-group, -column_label, -cell_type) %>%
-#     rename(gene = overlapping)
-
-# print("----------------------------------------")
-# print(head(df_lm22_splice_z))
-# print(dim(df_lm22_splice_z))
-
-# # Open LM22 gene z scores 
-# df_lm22_gene_z <- read.csv(file= paste0(opt$geneDir,"explore_ref_matrix/LM22_med_zscore.csv"), header=TRUE) %>%
-#     rename(gene = X)
-# # Add  cell_type to z scores
-# df_lm22_gene_z <- merge(x=df_DEG2cell,y=df_lm22_gene_z,by="gene",all=TRUE) 
-# print("df_lm22_gene_z")
-# print(head(df_lm22_gene_z))
-# print(dim(df_lm22_gene_z))
-
-# # # Scatterplots 
-# df_lm22_merged_z_long <- format_merge(df_lm22_gene_z,df_lm22_splice_z )
-# scatter_all(df_lm22_merged_z_long, paste0(opt$out_dir, "/lm22_scatter_all.png"))
-# scatter_per_gene(df_lm22_merged_z_long, paste0(opt$out_dir, "/LM22_scatterplots/"))
-
-##############################
-# Count splicing types 
-##############################
-	# - event - NA - no matched gene
-	# - event - matched gene not in gene ref matrix
-	# - event - matched gene in ref matrix same cell 
-	# - event - matched gene in ref matrix different cell 
-# print("Total number of events:")
-# print(nrow(df_splice_ref))
-
-# print("Total number of unique events:")
-# print(length(unique(df_splice_ref$event)))
-
-# print("Number of events with no gene:")
-# print( nrow(df_splice_ref %>% 
-#   filter(overlapping == "")))
-
-# df_merged_z <- df_lm22_splice_z  %>%
-#         inner_join(df_lm22_gene_z, by = c("gene"), suffix=c("_splice","_gene")) %>%
-#         select(event, gene, cell_types_splice, gene,cell_types_gene ) %>%
-#         arrange(gene)
-        
-# print("Number of events with matched gene in gene reference matrix:")
-# print(nrow(df_merged_z))
-
-# print("Number of spliced genes with matched gene in gene reference matrix:")
-# print(length(unique(df_merged_z$gene)))
-
+plotObject <- upset(fromList(listInput), order.by = "freq")
+pdf(file= paste0(opt$out_dir, "upsetplot_ref_genes_vs_splice_vs_IR.pdf"))
+print(plotObject)
+dev.off()
