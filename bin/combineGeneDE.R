@@ -22,7 +22,7 @@ registerDoParallel(cl)
 
 importMetaKallisto <- function(row){
   # Read metadata and add column for run
-  df_metadata <- read.csv(file.path(row[3])) %>%
+  df_metadata <- read.csv(file.path(row[3]), stringsAsFactors = FALSE) %>%
     dplyr::select(Run, sigil_general, LM22, LM6)
 
   # Add metadata to column
@@ -82,6 +82,9 @@ runDE_1_vs_all <- function(meta_col_to_use, cell_type_val) {
     dplyr::mutate(condition = ifelse(get(meta_col_to_use) == cell_type_val, "main", "other")) %>%
     tibble::column_to_rownames("Run")
 
+  # print(sampleTable)
+  print(dim(sampleTable))
+
   path_to_deseq2_folder <- paste0(opt$out_dir,"/compare_",meta_col_to_use,"/deseq2_outputs/")
   runDEseq2(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_folder)
 }
@@ -97,15 +100,57 @@ runDEseq2 <- function(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_
   print(str_cell_type_val)
   #Write output to file for checking (not read by script)
   write.csv(sampleTable,file.path(paste0(path_to_deseq2_folder,str_cell_type_val,"_sampletable.csv")))
-  print(sampleTable)
 
-  ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22[rownames(sampleTable)]
-  print(unique(sampleTable$data_source))
-  print(unique(sampleTable$type))
+  # ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22[rownames(sampleTable)]
+  # print(unique(sampleTable$data_source))
+  # print(unique(sampleTable$type))
 
-  txi.kallisto <- tximport(ls_kallisto_paths_lm22_, type = "kallisto",tx2gene = tx2gene,
+
+
+
+  # # print(ls_kallisto_paths_lm22)
+  # # print(rownames(sampleTable)) 
+  print(dim(sampleTable))
+  # # print(rownames(sampleTable))
+
+  print(length(ls_kallisto_paths_lm22))
+  # print(length(ls_kallisto_paths_lm22_))
+
+
+  # # # ls_kallisto_paths_lm22_ <- c()
+  # # for (i in ls_kallisto_paths_lm22){
+  # #   print(i)
+  # #   if (is.na(ls_kallisto_paths_lm22[i])){
+  # #     #     print(i)
+  # #     #     ls_kallisto_paths_lm22_  <- append(ls_kallisto_paths_lm22_, 
+  # #     #   
+  # # }}
+  # print("Done")
+  # print(tail(ls_kallisto_paths_lm22))
+  # print("-----------")
+  # # print(ls_kallisto_paths_lm22_)
+  # print(length(ls_kallisto_paths_lm22_))
+  # # print(ls_kallisto_paths_lm22_[!is.na(ls_kallisto_paths_lm22_)])
+
+  # # ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22_[!is.na(ls_kallisto_paths_lm22_)]
+  # print(ls_kallisto_paths_lm22_)
+
+  # print(length(ls_kallisto_paths_lm22_))
+
+  # print(sampleTable)
+
+  # diff <- names(ls_kallisto_paths_lm22_)[!(names(ls_kallisto_paths_lm22_) %in% rownames(sampleTable))]
+  # diff <- rownames(sampleTable)[!(rownames(sampleTable)) %in% names(ls_kallisto_paths_lm22_) ]
+  # print(diff)
+
+  txi.kallisto <- tximport(ls_kallisto_paths_lm22, type = "kallisto",tx2gene = tx2gene,
                     txOut = FALSE,ignoreTxVersion=TRUE,
                     countsFromAbundance = "scaledTPM")
+
+  # print(dim(txi.kallisto$counts))
+  print(colnames(txi.kallisto$counts))
+  print(rownames(sampleTable))
+  print("done")
 
   # Run DEseq and base the model sequencing type and  data source if possible
   if ((length(unique(sampleTable$data_source))==1) & (length(unique(sampleTable$type))==1)){
@@ -242,10 +287,23 @@ for (item in ls_kallisto_meta) {
 df_merged_metadata <- do.call("rbind", ls_meta)
 rownames(df_merged_metadata) <- c()
 
+print(df_merged_metadata$Run)
+
+# df_merged_metadata <- df_merged_metadata[order("Run"),] 
+df_merged_metadata <-df_merged_metadata %>%
+  arrange(Run)
+
+  
+
+print(df_merged_metadata$Run)
+
 # List of samples with LM22 labels
 ls_smpls_lm22 <- df_merged_metadata %>%
    dplyr::filter(LM22 != "") %>%
    dplyr::pull(Run)
+
+
+
 
 # Remove samples without LM22 labels
 df_merged_metadata_lm22 <- df_merged_metadata %>%
@@ -259,6 +317,15 @@ names(ls_kallisto_paths) <- unlist(ls_sample_names)
 
 # Remove kallisto paths without LM22 labels
 ls_kallisto_paths_lm22 <- ls_kallisto_paths[ls_smpls_lm22]
+
+print(ls_kallisto_paths_lm22)
+
+
+print(dim(ls_smpls_lm22))
+print(dim(df_merged_metadata))
+print(dim(df_merged_metadata_lm22))
+print(length(ls_smpls_lm22))
+print(length(ls_kallisto_paths_lm22))
 
 # Import counts with tximport
 if(all(file.exists(ls_kallisto_paths_lm22)) != TRUE)
@@ -283,43 +350,44 @@ write.csv(log2trans_dat,
          row.names = TRUE)
 
 metadata_summary <- df_merged_metadata_lm22 %>%
-  dplyr::count(LM22, data_source)
+  dplyr::arrange(LM22) %>%
+  dplyr::count(LM22, data_source) 
 write.csv(metadata_summary,
            file.path(file.path(opt$out_dir,"metadata_summary.csv")),
            row.names = FALSE)
 
-# ##################
-# # DESEQ2 LM6
-# ##################
-# # Run deseq2 on each LM6 cell type vs all others
-# if("LM6" %in% colnames(df_merged_metadata_lm22)){
-#   ls_lm6_cell_types <-  unique(df_merged_metadata_lm22[["LM6"]])
-#   ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
+##################
+# DESEQ2 LM6
+##################
+# Run deseq2 on each LM6 cell type vs all others
+if("LM6" %in% colnames(df_merged_metadata_lm22)){
+  ls_lm6_cell_types <-  unique(df_merged_metadata_lm22[["LM6"]])
+  ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
 
-#   print(ls_lm6_cell_types)
-#   print("-----")
-#   foreach(i=ls_lm6_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
-#     runDE_1_vs_all(
-#         cell_type_val = i,
-#         meta_col_to_use="LM6"
-#         )
-#     }
-# }
+  print(ls_lm6_cell_types)
+  # print("-----")
+  foreach(i=ls_lm6_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
+    runDE_1_vs_all(
+        cell_type_val = i,
+        meta_col_to_use="LM6"
+        )
+    }
+}
 
 # ##################
 # # DESEQ2 LM22
 # # ##################
-# # Run deseq2 on each LM22 cell type vs all others
-# if("LM22" %in% colnames(df_merged_metadata_lm22)){
-#   ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])
-#   print(ls_lm22_cell_types)
-#   foreach(i=ls_lm22_cell_types, .packages=  c('magrittr', 'DESeq2', 'tximport')) %dopar% {
-#     runDE_1_vs_all(
-#         cell_type_val = i,
-#         meta_col_to_use="LM22"
-#         )
-#       }
-# }
+# Run deseq2 on each LM22 cell type vs all others
+if("LM22" %in% colnames(df_merged_metadata_lm22)){
+  ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])
+  print(ls_lm22_cell_types)
+  foreach(i=ls_lm22_cell_types, .packages=  c('magrittr', 'DESeq2', 'tximport')) %dopar% {
+    runDE_1_vs_all(
+        cell_type_val = i,
+        meta_col_to_use="LM22"
+        )
+      }
+}
 
 ##################
 # Within Cell Type 
@@ -382,14 +450,14 @@ ls_within_cell_types <- list(
   list("Dendritic" ,dendritic_cell_types)
 )
 
-# # Run Deseq2 for one cell type vs all other samples
-# foreach(i=ls_within_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
-#   print("foreach")
-#   runDE_1_vs_all_within_type(
-#       ls_cell_types = i[2], 
-#       label= i[1]
-#       )
-#   }
+# Run Deseq2 for one cell type vs all other samples
+foreach(i=ls_within_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
+  print("foreach")
+  runDE_1_vs_all_within_type(
+      ls_cell_types = i[2], 
+      label= i[1]
+      )
+  }
 
 ###################################
 # UMAPs before batch correction
