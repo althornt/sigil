@@ -15,8 +15,6 @@ library(doParallel)
 cl <- makeCluster(detectCores() - 1, outfile = "")
 registerDoParallel(cl)
 
-# import::from("makeSplicingRefMatrix.R")
-# source("/mnt/sigil/bin/makeSplicingRefMatrix.R")
 make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   #' Make heatmap using the pheatmap package using the given events
   #' and data
@@ -80,7 +78,7 @@ volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
     # df_css$gg_label <- NA
     df_css <- df_css %>%
       dplyr::arrange(p.value) %>%
-      dplyr::mutate(gglabel = case_when(((p.value<.00001) | ((p.value < .01  ) & (abs(delta) > .3 )))~ get(col4label)))
+      dplyr::mutate(gglabel = case_when(((p.value<.00001) | ((p.value < .01  ) & (abs(delta) > .2 )))~ get(col4label)))
 
     # If given ls_point_color, make those points red
     df_css$point_color <- NA
@@ -99,7 +97,8 @@ volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
           xlim(-1.0, 1.0) +
           geom_text(
             label= df_css$gglabel,
-            nudge_x = 0.05, nudge_y = 0.05,
+            vjust="inward",hjust="inward",
+            # nudge_x = 0.05, nudge_y = 0.05,
             check_overlap =F, col = "darkgreen", size = 2
           ) +
           scale_color_manual(name = "",
@@ -118,14 +117,16 @@ volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
           xlim(-1.0, 1.0) +
           geom_text(
             label= df_css$gglabel,
-            nudge_x = 0.05, nudge_y = 0.05,
+            vjust="inward",hjust="inward",
+            # nudge_x = 0.05, nudge_y = 0.05,
             check_overlap =F, col = "darkgreen", size = 2
           )
 
     }
 
     ggsave(plot = p, filename = paste0(plot_out_dir,cell_type,
-                                      tag,"_",col4label,"_volcano.png"))
+                                      tag,"_",col4label,"_volcano.png"),
+                                      width = 12, height = 7)
 
   }
 
@@ -164,6 +165,49 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
   ggsave(plot = p, filename = paste0(out_dir,cell_type,"/",sig_event,".png"))
 
 }
+
+filter_top_junction <-  function(css_df){
+  print("input")
+  print(css_df %>% arrange(p.value) %>% head())
+
+  # get intersection of top 1000 junctions by pvalue and the ls_clusters 
+  top_css_df <- css_df  %>%
+      dplyr::filter(p.value <= .01 ) %>%
+      dplyr::filter(abs(delta) > .2 ) %>%
+      head(2000) 
+
+  print(head(top_css_df))
+  print(dim(top_css_df))
+
+  print(head(ls_clusters))
+  print(tail(ls_clusters))
+
+  print(typeof(ls_clusters))
+
+  ls_keep_junctions <- list()
+  for (c in ls_clusters) {
+      # This base R version is much faster than using dplyr
+      # Find junction with lowest p.value in the given cluster
+      css_df_events <- top_css_df[top_css_df$event  %in% as.list(c),]
+      css_df_top_junc <- css_df_events[order(css_df_events$p.value),][1,]
+      top_junc <- as.character(css_df_top_junc$event)
+      ls_keep_junctions <- append(ls_keep_junctions, top_junc)
+    }
+
+  # Filter df to top junctions
+  filt_css_df <-css_df %>%
+    dplyr::filter(event %in% unique(unlist(ls_keep_junctions)))
+
+  print("output")
+
+  print(filt_css_df %>% arrange(p.value) %>% head())
+  print("done")
+  print(dim(css_df))
+  print(dim(filt_css_df))
+  return(filt_css_df)
+}
+
+
 import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, comparison_label){
   #' Import results from MESA compare sample set script to get the top N
   #' significant events into lists
@@ -177,7 +221,6 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
   # Filename to string
   LM22_type <-  substr(filename, 1, nchar(filename)-4)
   print(LM22_type)
-
   # Make output directories
   if (!dir.exists(paste0(plot_out_dir,LM22_type))){
     dir.create(paste0(plot_out_dir,LM22_type),
@@ -194,17 +237,17 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
               LM22_type,"_all_junctions", list())
 
   # Filter to most significant junction per cluster
-  # df_filtered <- filter_top_junction(df_css)
-  # write.table(df_filtered,
-  #             file=paste0(plot_out_dir,LM22_type,"_css_output_top_junc_per_cluster.tsv"),
-  #             sep = "\t",row.names = FALSE, quote=F)
+  df_filtered <- filter_top_junction(df_css)
+  write.table(df_filtered,
+              file=paste0(plot_out_dir,LM22_type,"_css_output_top_junc_per_cluster.tsv"),
+              sep = "\t",row.names = FALSE, quote=F)
 
-  # # Make volcano plot after filtering
+  # Make volcano plot after filtering
   # volcano(df_filtered, paste0(plot_out_dir,"volcanos/"),
   #             LM22_type,"_filtered_junctions", list())
 
   # Get top negative delta events
-  top_sig_by_pval_negdelta <- df_css %>%
+  top_sig_by_pval_negdelta <- df_filtered %>%
       dplyr::filter(p.value <= .01 ) %>%
       dplyr::filter(delta < -.2 ) %>%
       dplyr::arrange(p.value) %>%
@@ -218,7 +261,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
         LM_type=meta_col, out_dir = plot_out_dir)
 
   # Get top positive delta events
-  top_sig_by_pval_posdelta <- df_css %>%
+  top_sig_by_pval_posdelta <- df_filtered %>%
     dplyr::filter(p.value <= .01) %>%
     dplyr::filter(delta > .2 ) %>%
     dplyr::arrange(p.value) %>%
@@ -236,9 +279,10 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
                                     ls_top_sig_by_pval_posdelta))
 
   # Make volcano plot labeling top_neg_and_pos
+  # volcano(df_filtered, paste0(plot_out_dir,"volcanos/"),
+  #         LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
   volcano(df_css, paste0(plot_out_dir,"volcanos/"),
           LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
-
   df_top_sig_neg_and_pos <- rbind(top_sig_by_pval_negdelta, top_sig_by_pval_posdelta)
 
   df_top_sig_neg_and_pos$group <- comparison_label
@@ -246,6 +290,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
 
   return(df_top_sig_neg_and_pos)
 }
+
 
 import_mesa_css_within<- function(ls_cell_types, topN,  label, css_dir, meta_col){
   #' Import results from MESA compare_sample_sets runs within a broader cell type
@@ -371,7 +416,37 @@ all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1)
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
 
 df_clusters <- read.table(file = opt$mesa_cluster, sep="\t", header = FALSE)
+# Remove rows where second column is empty (no ME Junction) and format
+# df_clusters_filter <- df_clusters %>% dplyr::filter(V2 != "")
+# df_clusters_filter$V2 <-  strsplit(as.character(df_clusters_filter$V2), ",")
 
+# # Make list of clusters by combining first col and the list in the second col
+# ls_clusters <- list()
+# for (row in 1:nrow(df_clusters_filter)) {
+#     event_main <- df_clusters_filter[row, "V1"]
+#     event_others  <- df_clusters_filter[row, "V2"]
+#     row_clusters <- unlist(append(as.vector(event_others),
+#                                       as.character(event_main)))
+#     ls_clusters <- append(ls_clusters, list(sort(row_clusters) ))
+# }
+
+df_clusters$V2 <-  strsplit(as.character(df_clusters$V2), ",")
+
+# Make list of clusters by combining first col and the list in the second col
+ls_clusters <- list()
+for (row in 1:nrow(df_clusters)) {
+    event_main <- df_clusters[row, "V1"]
+    event_others  <- df_clusters[row, "V2"]
+    row_clusters <- unlist(append(as.vector(event_others),
+                                      as.character(event_main)))
+    ls_clusters <- append(ls_clusters, list(sort(row_clusters) ))
+}
+
+# Reduce to unique clusters; remove A:B , B:A
+ls_clusters <- unique(ls_clusters)
+print("list of all clusters:")
+print(length(ls_clusters))
+print(tail(ls_clusters))
 # Make output directories
 ls_out_paths <- list("/LM22/volcanos","/LM6/volcanos","/within_type/volcanos", "/UMAPs" )
 for (path in ls_out_paths){
