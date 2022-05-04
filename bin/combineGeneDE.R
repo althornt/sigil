@@ -68,7 +68,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
                    paste0(out_path,meta_col,num_neighbor,"png", sep = '.')),
          device = "png",
          width = 12,
-         dpi = 300)
+         dpi = 400)
 
 }
 
@@ -100,57 +100,11 @@ runDEseq2 <- function(sampleTable,meta_col_to_use, cell_type_val,path_to_deseq2_
   print(str_cell_type_val)
   #Write output to file for checking (not read by script)
   write.csv(sampleTable,file.path(paste0(path_to_deseq2_folder,str_cell_type_val,"_sampletable.csv")))
+  ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22[rownames(sampleTable)]
 
-  # ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22[rownames(sampleTable)]
-  # print(unique(sampleTable$data_source))
-  # print(unique(sampleTable$type))
-
-
-
-
-  # # print(ls_kallisto_paths_lm22)
-  # # print(rownames(sampleTable)) 
-  print(dim(sampleTable))
-  # # print(rownames(sampleTable))
-
-  print(length(ls_kallisto_paths_lm22))
-  # print(length(ls_kallisto_paths_lm22_))
-
-
-  # # # ls_kallisto_paths_lm22_ <- c()
-  # # for (i in ls_kallisto_paths_lm22){
-  # #   print(i)
-  # #   if (is.na(ls_kallisto_paths_lm22[i])){
-  # #     #     print(i)
-  # #     #     ls_kallisto_paths_lm22_  <- append(ls_kallisto_paths_lm22_, 
-  # #     #   
-  # # }}
-  # print("Done")
-  # print(tail(ls_kallisto_paths_lm22))
-  # print("-----------")
-  # # print(ls_kallisto_paths_lm22_)
-  # print(length(ls_kallisto_paths_lm22_))
-  # # print(ls_kallisto_paths_lm22_[!is.na(ls_kallisto_paths_lm22_)])
-
-  # # ls_kallisto_paths_lm22_ <- ls_kallisto_paths_lm22_[!is.na(ls_kallisto_paths_lm22_)]
-  # print(ls_kallisto_paths_lm22_)
-
-  # print(length(ls_kallisto_paths_lm22_))
-
-  # print(sampleTable)
-
-  # diff <- names(ls_kallisto_paths_lm22_)[!(names(ls_kallisto_paths_lm22_) %in% rownames(sampleTable))]
-  # diff <- rownames(sampleTable)[!(rownames(sampleTable)) %in% names(ls_kallisto_paths_lm22_) ]
-  # print(diff)
-
-  txi.kallisto <- tximport(ls_kallisto_paths_lm22, type = "kallisto",tx2gene = tx2gene,
+  txi.kallisto <- tximport(ls_kallisto_paths_lm22_, type = "kallisto",tx2gene = tx2gene,
                     txOut = FALSE,ignoreTxVersion=TRUE,
                     countsFromAbundance = "scaledTPM")
-
-  # print(dim(txi.kallisto$counts))
-  print(colnames(txi.kallisto$counts))
-  print(rownames(sampleTable))
-  print("done")
 
   # Run DEseq and base the model sequencing type and  data source if possible
   if ((length(unique(sampleTable$data_source))==1) & (length(unique(sampleTable$type))==1)){
@@ -287,23 +241,14 @@ for (item in ls_kallisto_meta) {
 df_merged_metadata <- do.call("rbind", ls_meta)
 rownames(df_merged_metadata) <- c()
 
-print(df_merged_metadata$Run)
-
 # df_merged_metadata <- df_merged_metadata[order("Run"),] 
 df_merged_metadata <-df_merged_metadata %>%
   arrange(Run)
-
-  
-
-print(df_merged_metadata$Run)
 
 # List of samples with LM22 labels
 ls_smpls_lm22 <- df_merged_metadata %>%
    dplyr::filter(LM22 != "") %>%
    dplyr::pull(Run)
-
-
-
 
 # Remove samples without LM22 labels
 df_merged_metadata_lm22 <- df_merged_metadata %>%
@@ -317,15 +262,6 @@ names(ls_kallisto_paths) <- unlist(ls_sample_names)
 
 # Remove kallisto paths without LM22 labels
 ls_kallisto_paths_lm22 <- ls_kallisto_paths[ls_smpls_lm22]
-
-print(ls_kallisto_paths_lm22)
-
-
-print(dim(ls_smpls_lm22))
-print(dim(df_merged_metadata))
-print(dim(df_merged_metadata_lm22))
-print(length(ls_smpls_lm22))
-print(length(ls_kallisto_paths_lm22))
 
 # Import counts with tximport
 if(all(file.exists(ls_kallisto_paths_lm22)) != TRUE)
@@ -374,9 +310,9 @@ if("LM6" %in% colnames(df_merged_metadata_lm22)){
     }
 }
 
+##################
+# DESEQ2 LM22
 # ##################
-# # DESEQ2 LM22
-# # ##################
 # Run deseq2 on each LM22 cell type vs all others
 if("LM22" %in% colnames(df_merged_metadata_lm22)){
   ls_lm22_cell_types <-  unique(df_merged_metadata_lm22[["LM22"]])

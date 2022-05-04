@@ -26,40 +26,6 @@ registerDoParallel(cl)
 # Functions
 ##########################
 
-make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
-
-  set.seed(123)
-
-  # Make color palette
-  n <- length(unique(metadata[[meta_col]]))
-  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
-  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
-
-  # Run UMAP
-  umap.out <- umap(df_PCA, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
-  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
-  umap.out$Run <- rownames(df_PCA)
-
-  # Merge UMAP results with metadata
-  umap.out.merge = merge(umap.out, metadata)
-
-  # Plot UMAP
-  gg <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
-    geom_point(size = 2) +
-    theme_classic() +
-    theme(legend.position="bottom",legend.title = element_blank()) +
-    scale_color_manual(values=pal) +
-    labs(title= paste("UMAP MESA: Cell types, n_neighbors =",num_neighbor, sep = ' '))
-
-  # Save UMAP plot
-  ggsave(plot  = gg,
-        filename = file.path(opt$out_dir,
-                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
-         device = "png",
-         width = 12,
-         dpi = 300)
-}
-
 save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
   #' Function to save pheatmaps to a pdf file
   stopifnot(!missing(x))
@@ -97,7 +63,8 @@ volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
           xlim(-1.0, 1.0) +
           geom_text(
             label= df_css$gglabel,
-            nudge_x = 0.05, nudge_y = 0.05,
+            vjust="inward",hjust="inward",
+            # nudge_x = 0.05, nudge_y = 0.05,
             check_overlap =F, col = "darkgreen", size = 2
           ) +
           scale_color_manual(name = "",
@@ -116,7 +83,8 @@ volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
           xlim(-1.0, 1.0) +
           geom_text(
             label= df_css$gglabel,
-            nudge_x = 0.05, nudge_y = 0.05,
+            # nudge_x = 0.05, nudge_y = 0.05,
+            vjust="inward",hjust="inward",
             check_overlap =F, col = "darkgreen", size = 2
           )
 
@@ -130,6 +98,7 @@ volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
 }
 
 filter_top_junction <-  function(css_df){
+  
   ls_keep_junctions <- list()
   for (c in ls_clusters) {
       # This base R version is much faster than using dplyr

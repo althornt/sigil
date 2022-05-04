@@ -241,9 +241,33 @@ sudo nextflow run sigil_combine.nf \
     --manifest /mnt/files/sigil_res_manifest.txt \
     --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_v2_20211210
 
+# used wrong and non updated manifet??!??!
 sudo nextflow run sigil_combine.nf \
     --manifest /mnt/files/sigil_res_manifest.txt \
     --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_splicing_updatedSongMonaco_20220218
 
+sudo nextflow run sigil_combine.nf \
+    --manifest /mnt/files/sigil_res_manifest_20220226.txt \
+    --outdir /mnt/results_sigil_combine/sigil_results_dropped_samples_splicing_updatedSongMonaco_inferCombine_20220226
+
+sudo nextflow run sigil_build.nf \
+    --manifest /mnt/files/sigil_res_manifest_20220421.txt \
+    --outdir /mnt/results_sigil_combine/sigil_results_with_Calderon_20220421
+
+
+sudo nextflow run sigil_build.nf \
+    --manifest /mnt/files/sigil_res_manifest_20220427_droppedsongmono.txt \
+    --outdir /mnt/results_sigil_combine/sigil_results_dropped_song_mono_20220426
+
+
+sudo nextflow run sigil_build.nf \
+    --manifest /mnt/files/sigil_res_manifest_noSongmono_withCalderon_20220430.txt \
+    --outdir /mnt/results_sigil_combine/sigil_results_noSongmono_withCalderon_20220430
+
+
+sudo nextflow run sigil_build.nf  \
+  --manifest /mnt/files/sigil_res_manifest_noSongmono_Calderondroppedtreatment_20220503.txt  \
+  --outdir /mnt/results_sigil_combine/sigil_results_noSongmono_Calderondroppedtreatment_20220503
 
 ```
+

@@ -15,6 +15,10 @@ library(doParallel)
 cl <- makeCluster(detectCores() - 1, outfile = "")
 registerDoParallel(cl)
 
+# Note - the main difference between this script and the PS script is that
+# For intron retention you need to consider all junctions even those that do not have 
+# mutually exclusive junctions. 
+
 make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   #' Make heatmap using the pheatmap package using the given events
   #' and data
@@ -167,23 +171,15 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
 }
 
 filter_top_junction <-  function(css_df){
-  print("input")
-  print(css_df %>% arrange(p.value) %>% head())
-
   # get intersection of top 1000 junctions by pvalue and the ls_clusters 
   top_css_df <- css_df  %>%
       dplyr::filter(p.value <= .01 ) %>%
       dplyr::filter(abs(delta) > .2 ) %>%
       head(2000) 
 
-  print(head(top_css_df))
-  print(dim(top_css_df))
-
-  print(head(ls_clusters))
-  print(tail(ls_clusters))
-
-  print(typeof(ls_clusters))
-
+  # Note fixed this IR script to look for best junc per cluster from *all clusters*
+  # But can make this faster by reducing the ls_clusters I'm looping through below to 
+  # only clusters that contain a cluster from the top css_df above
   ls_keep_junctions <- list()
   for (c in ls_clusters) {
       # This base R version is much faster than using dplyr
@@ -198,12 +194,6 @@ filter_top_junction <-  function(css_df){
   filt_css_df <-css_df %>%
     dplyr::filter(event %in% unique(unlist(ls_keep_junctions)))
 
-  print("output")
-
-  print(filt_css_df %>% arrange(p.value) %>% head())
-  print("done")
-  print(dim(css_df))
-  print(dim(filt_css_df))
   return(filt_css_df)
 }
 
@@ -242,53 +232,50 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
               file=paste0(plot_out_dir,LM22_type,"_css_output_top_junc_per_cluster.tsv"),
               sep = "\t",row.names = FALSE, quote=F)
 
-  # Make volcano plot after filtering
-  # volcano(df_filtered, paste0(plot_out_dir,"volcanos/"),
-  #             LM22_type,"_filtered_junctions", list())
+  if (nrow(df_filtered) > 0){
 
-  # Get top negative delta events
-  top_sig_by_pval_negdelta <- df_filtered %>%
-      dplyr::filter(p.value <= .01 ) %>%
-      dplyr::filter(delta < -.2 ) %>%
+    # Get top negative delta events
+    top_sig_by_pval_negdelta <- df_filtered %>%
+        dplyr::filter(p.value <= .01 ) %>%
+        dplyr::filter(delta < -.2 ) %>%
+        dplyr::arrange(p.value) %>%
+        head(topN) %>%
+        select(event,overlapping)
+
+    ls_top_sig_by_pval_negdelta <- top_sig_by_pval_negdelta$event
+
+    # Make plots for top negative events
+    lapply(ls_top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
+          LM_type=meta_col, out_dir = plot_out_dir)
+
+    # Get top positive delta events
+    top_sig_by_pval_posdelta <- df_filtered %>%
+      dplyr::filter(p.value <= .01) %>%
+      dplyr::filter(delta > .2 ) %>%
       dplyr::arrange(p.value) %>%
       head(topN) %>%
       select(event,overlapping)
 
-  ls_top_sig_by_pval_negdelta <- top_sig_by_pval_negdelta$event
+    ls_top_sig_by_pval_posdelta <- top_sig_by_pval_posdelta$event
+    # Make plots for top positive events
+    lapply(ls_top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
+            LM_type=meta_col,
+            out_dir = plot_out_dir )
 
-  # Make plots for top negative events
-  lapply(ls_top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
-        LM_type=meta_col, out_dir = plot_out_dir)
+    # Combine lists
+    top_sig_neg_and_pos <- unlist(list(ls_top_sig_by_pval_negdelta,
+                                      ls_top_sig_by_pval_posdelta))
 
-  # Get top positive delta events
-  top_sig_by_pval_posdelta <- df_filtered %>%
-    dplyr::filter(p.value <= .01) %>%
-    dplyr::filter(delta > .2 ) %>%
-    dplyr::arrange(p.value) %>%
-    head(topN) %>%
-    select(event,overlapping)
+    # Make volcano plot labeling top_neg_and_pos
+    volcano(df_css, paste0(plot_out_dir,"volcanos/"),
+            LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
+    df_top_sig_neg_and_pos <- rbind(top_sig_by_pval_negdelta, top_sig_by_pval_posdelta)
 
-  ls_top_sig_by_pval_posdelta <- top_sig_by_pval_posdelta$event
-  # Make plots for top positive events
-  lapply(ls_top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
-          LM_type=meta_col,
-          out_dir = plot_out_dir )
+    df_top_sig_neg_and_pos$group <- comparison_label
+    df_top_sig_neg_and_pos$cell_type <- LM22_type
 
-  # Combine lists
-  top_sig_neg_and_pos <- unlist(list(ls_top_sig_by_pval_negdelta,
-                                    ls_top_sig_by_pval_posdelta))
-
-  # Make volcano plot labeling top_neg_and_pos
-  # volcano(df_filtered, paste0(plot_out_dir,"volcanos/"),
-  #         LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
-  volcano(df_css, paste0(plot_out_dir,"volcanos/"),
-          LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
-  df_top_sig_neg_and_pos <- rbind(top_sig_by_pval_negdelta, top_sig_by_pval_posdelta)
-
-  df_top_sig_neg_and_pos$group <- comparison_label
-  df_top_sig_neg_and_pos$cell_type <- LM22_type
-
-  return(df_top_sig_neg_and_pos)
+    return(df_top_sig_neg_and_pos)
+  }
 }
 
 
@@ -416,20 +403,6 @@ all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1)
 all_PS_meta <- rbind(all_PS, df_sample_annotations)
 
 df_clusters <- read.table(file = opt$mesa_cluster, sep="\t", header = FALSE)
-# Remove rows where second column is empty (no ME Junction) and format
-# df_clusters_filter <- df_clusters %>% dplyr::filter(V2 != "")
-# df_clusters_filter$V2 <-  strsplit(as.character(df_clusters_filter$V2), ",")
-
-# # Make list of clusters by combining first col and the list in the second col
-# ls_clusters <- list()
-# for (row in 1:nrow(df_clusters_filter)) {
-#     event_main <- df_clusters_filter[row, "V1"]
-#     event_others  <- df_clusters_filter[row, "V2"]
-#     row_clusters <- unlist(append(as.vector(event_others),
-#                                       as.character(event_main)))
-#     ls_clusters <- append(ls_clusters, list(sort(row_clusters) ))
-# }
-
 df_clusters$V2 <-  strsplit(as.character(df_clusters$V2), ",")
 
 # Make list of clusters by combining first col and the list in the second col
@@ -448,14 +421,12 @@ print("list of all clusters:")
 print(length(ls_clusters))
 print(tail(ls_clusters))
 # Make output directories
-ls_out_paths <- list("/LM22/volcanos","/LM6/volcanos","/within_type/volcanos", "/UMAPs" )
+ls_out_paths <- list("/LM22/volcanos","/LM6/volcanos","/within_type/volcanos")
 for (path in ls_out_paths){
-
   if (!dir.exists(paste0(opt$out_dir,path))){
     dir.create(paste0(opt$out_dir,path),
     recursive = TRUE, showWarnings = TRUE)
-}
-
+    }
 }
 
 ########################################

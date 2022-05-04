@@ -7,7 +7,7 @@
 nextflow.enable.dsl = 2
 
 // import modules
-include { COMBINE_GENE; COMBINE_MESA; } from './modules/combine'
+include { BUILD_GENE; BUILD_MESA; GENE_AND_SPLICING} from './modules/build'
 
 
 def helpMessage() {
@@ -34,14 +34,13 @@ workflow {
   main:
 
   //kallisto gene expression , DE, batch correction
-  // COMBINE_GENE(params.manifest)
+  BUILD_GENE(params.manifest)
 
   //MESA splicing
-  COMBINE_MESA(params.manifest, params.gtf)
+  // BUILD_MESA(params.manifest, params.gtf)
 
   //Gene and MESA splicing
-  // GENE_AND_SPLICING(params.manifest,
-                      // COMBINE_GENE.out.collect(),
-                      // COMBINE_MESA.out.collect())
+  // GENE_AND_SPLICING(params.manifest)
+                      
 
   }

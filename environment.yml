@@ -37,3 +37,4 @@ dependencies:
   - r-doParallel
   - r-foreach
   - r-UpSetR
+  - r-import
