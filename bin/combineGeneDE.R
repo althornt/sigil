@@ -56,7 +56,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
   umap.out.merge = merge(umap.out, df_merged_metadata_lm22)
 
   # Plot UMAP
-  ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
+  ggplot(umap.out.merge, aes(x, y, color = get(meta_col), shape=data_source)) +
     geom_point(size = 2) +
     theme_classic() +
     theme(legend.position="bottom",legend.title = element_blank()) +
@@ -65,11 +65,10 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
 
   # Save UMAP plot
   ggsave(file.path(opt$out_dir,
-                   paste0(out_path,meta_col,num_neighbor,"png", sep = '.')),
+                   paste(out_path,meta_col,num_neighbor,"png", sep = '.')),
          device = "png",
          width = 12,
          dpi = 400)
-
 }
 
 # Run Deseq2 for one cell type vs all other samples
@@ -417,6 +416,7 @@ lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
 lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
   df_PCA = prcomp.out, out_path = "UMAPs_pre_batch_correction/kallisto_PCA_UMAP")
+
 ####################################
 # UMAPs after batch correction
 ####################################
