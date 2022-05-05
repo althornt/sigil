@@ -67,7 +67,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
   umap.out.merge = merge(umap.out, df_merged_metadata_lm22)
 
   # Plot UMAP
-  plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
+  plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col)), shape=data_source) +
     geom_point(size = 2) +
     theme_classic() +
     theme(legend.position="bottom",legend.title = element_blank()) +
@@ -97,13 +97,13 @@ df_to_UMAP <- function(input_df, output_path){
   prcomp.out = as.data.frame(prcomp(na.omit(input_df_filt_t), center=T,  scale = T)$x)
 
   # Making variations of UMAPs with different numbers of neighbors
-  lapply(c(20), make_umap, meta_col="data_source",
+  lapply(c(5, 20), make_umap, meta_col="data_source",
     df_PCA = prcomp.out, out_path = paste0(output_path))
-  lapply(c(20), make_umap, meta_col="LM22",
+  lapply(c(5, 20), make_umap, meta_col="LM22",
     df_PCA = prcomp.out, out_path = paste0(output_path))
-  lapply(c(20), make_umap, meta_col="sigil_general",
+  lapply(c(5, 20), make_umap, meta_col="sigil_general",
     df_PCA = prcomp.out, out_path = paste0(output_path))
-  lapply(c(20), make_umap, meta_col="LM6",
+  lapply(c(5, 20), make_umap, meta_col="LM6",
     df_PCA = prcomp.out, out_path = paste0(output_path))
 }
 
@@ -165,15 +165,16 @@ if (!dir.exists(file.path(opt$out_dir,"/UMAPs_pre_batch_correction/"))){
 if (!dir.exists(file.path(opt$out_dir,"/UMAPs_post_batch_correction/"))){
   dir.create(file.path(opt$out_dir,"/UMAPs_post_batch_correction/"),
               recursive = TRUE, showWarnings = TRUE)}
-
-
+if (!dir.exists(file.path(opt$out_dir,"/UMAPs_by_source/"))){
+  dir.create(file.path(opt$out_dir,"/UMAPs_by_source/"),
+              recursive = TRUE, showWarnings = TRUE)}
 # Open manifest
 df_manifest <- read.csv(file = opt$manifest, sep = "\t", header=TRUE)
 print(df_manifest)
 
-#############################################
-# Read in mesa files from different sources
-#############################################
+# #############################################
+# # Read in mesa files from different sources
+# #############################################
 
 # Import and combine source metadata files
 ls_mesa_meta = apply(df_manifest, 1, importMetaMESA)
@@ -549,3 +550,24 @@ df_to_UMAP(df_merged_IR_batch_corr, "UMAPs_post_batch_correction/IR_PCA_UMAP")
 plot_before_after(df_merged_inc_counts, as.data.frame(df_merged_inc_counts_batch_corr), "hist_inclusionCounts_before_after_bc.png", "Inclusion count")
 plot_before_after(df_merged_allPS, as.data.frame(df_merged_allPS_batch_corr), "hist_PS_before_after_bc.png","PS")
 plot_before_after(df_merged_IR_PS, as.data.frame(df_merged_IR_batch_corr), "hist_IR_before_after_bc.png","Intron coverage")
+
+
+#################################################
+# UMAPs per data source using BC PS
+#################################################
+# Read meta data made in this script 
+# df_merged_metadata_lm22 <- read.csv(file.path(opt$out_dir,"lm22_metadata.csv"))
+ls_data_sources <- unique(df_merged_metadata_lm22$data_source)
+for (i in ls_data_sources){
+  df_meta_sub <- df_merged_metadata_lm22 %>%
+    filter(data_source ==i) 
+  ls_samples <- as.vector(df_meta_sub$Run)
+  # PS UMAP
+  df_PS_sub <- df_merged_allPS_batch_corr %>%
+    select(ls_samples) 
+  df_to_UMAP(df_PS_sub, paste0("UMAPs_by_source/",i,"_PS_batchcorr_PCA_UMAP"))
+  # IR UMAP
+  df_IR_sub <- df_merged_IR_batch_corr_lm22 %>%
+    select(ls_samples) 
+  df_to_UMAP(df_IR_sub, paste0("UMAPs_by_source/",i,"_IR_batchcorr_PCA_UMAP"))
+}
