@@ -25,7 +25,7 @@ registerDoParallel(cl)
 importMetaMESA <- function(row){
   # Read metadata and add column for run
   df_metadata <- read.csv(file.path(row[3])) %>%
-    dplyr::select(Run, sigil_general, LM22, LM6)
+    dplyr::select(Run, sigil_general, main_label, group_label)
 
   # Add metadata to column
   df_metadata$data_source <- row[1] # add name of data source
@@ -54,7 +54,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
   set.seed(123)
 
   # Make color palette
-  n <- length(unique(df_merged_metadata_lm22[[meta_col]]))
+  n <- length(unique(df_merged_metadata_labelled[[meta_col]]))
   qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
   pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
@@ -64,7 +64,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
   umap.out$Run <- rownames(df_PCA)
 
   # Merge UMAP results with metadata
-  umap.out.merge = merge(umap.out, df_merged_metadata_lm22)
+  umap.out.merge = merge(umap.out, df_merged_metadata_labelled)
 
   # Plot UMAP
   plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col)), shape=data_source) +
@@ -159,15 +159,19 @@ opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
 # Make output directories
-if (!dir.exists(file.path(opt$out_dir,"/UMAPs_pre_batch_correction/"))){
-  dir.create(file.path(opt$out_dir,"/UMAPs_pre_batch_correction/"),
-              recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/UMAPs_post_batch_correction/"))){
-  dir.create(file.path(opt$out_dir,"/UMAPs_post_batch_correction/"),
-              recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/UMAPs_by_source/"))){
-  dir.create(file.path(opt$out_dir,"/UMAPs_by_source/"),
-              recursive = TRUE, showWarnings = TRUE)}
+
+# Make output directories
+ls_out_paths <- list("/mesa_inclusion_counts_pre_batch_correction/",
+                    "/UMAPs_pre_batch_correction/",
+                     "/UMAPs_post_batch_correction/",
+                     "/UMAPs_by_source/")
+for (path in ls_out_paths){
+  if (!dir.exists(paste0(opt$out_dir,path))){
+    dir.create(paste0(opt$out_dir,path),
+    recursive = TRUE, showWarnings = TRUE)
+    }
+}
+
 # Open manifest
 df_manifest <- read.csv(file = opt$manifest, sep = "\t", header=TRUE)
 print(df_manifest)
@@ -196,18 +200,26 @@ for (item in ls_mesa_meta) {
 df_merged_metadata <- do.call("rbind", ls_meta)
 rownames(df_merged_metadata) <- c()
 
-# Remove samples without LM22 labels from metadata
-df_merged_metadata_lm22 <- df_merged_metadata %>%
-   dplyr::filter(LM22 != "")
-write.csv(df_merged_metadata_lm22,
-            file.path(file.path(opt$out_dir,"lm22_metadata.csv")),
+print(df_merged_metadata)
+print(dim(df_merged_metadata))
+
+
+# Remove samples without main and group labels from metadata
+df_merged_metadata_labelled <- df_merged_metadata %>%
+   dplyr::filter((main_label != "") & (group_label != ""))
+write.csv(df_merged_metadata_labelled,
+            file.path(file.path(opt$out_dir,"merged_metadata.csv")),
             row.names = FALSE, quote=F)
 
-# List of samples with LM22 label
-ls_smpls_lm22 <- as.character(df_merged_metadata_lm22$Run)
+# List of samples with main and group label
+ls_labelled_samples <- as.character(df_merged_metadata_labelled$Run)
+
+print(df_merged_metadata_labelled)
+print(dim(df_merged_metadata_labelled))
+
 
 # ####################################################
-# # Read in all individual mesa IR files and merge
+# # Read in all individual mesa IR cov files and merge
 # ####################################################
 # Get list of all _intron_coverage.txt files from all batches
 ls_mesa_IR_cov_files <- ls_mesa_IR_cov_file_names <- list()
@@ -222,6 +234,9 @@ for (dir in ls_mesa_IR_cov_dir){
 
 print(length(ls_mesa_IR_cov_files))
 names(ls_mesa_IR_cov_files) <- ls_mesa_IR_cov_file_names
+ls_mesa_IR_cov_files <- ls_mesa_IR_cov_files[ls_labelled_samples]
+
+print(length(ls_mesa_IR_cov_files))
 
 # Files to dfs
 ls_mesa_IR_cov_dfs <- foreach(i=ls_mesa_IR_cov_files,
@@ -284,31 +299,43 @@ foreach(i=ls_cols ) %dopar% {
 # #########################################
 # Note: Do not merge PS files or IR table files because
 # they need to be recalculated from merged counts/coverage
-mesa_file_names <- list(
-              list(ls_mesa_inc_count_files,
-                  "manifest_mesa_inclusionCounts_files.tsv","merged_mesa_inclusionCounts.tsv" ))
-              # list(ls_mesa_IR_table_files,
-              #    "manifest_mesa_IR_files.tsv","merged_mesa_ir_table_intron_retention.tsv" ))
+ls_mesa_inc_count_files_subset <- list()
+for (file in ls_mesa_inc_count_files){
+  # Parse file source name from full path
+  filename <- tail(unlist(stringr::str_split(stringr::str_split(
+                            file,
+                            "/mesa_out")[[1]][1], "/")), 1)
 
-merge <- foreach(i=mesa_file_names ) %dopar% {
+  # Subset to labelled samples and write to new file
+  df_inc <- read.table(file, header=T) 
+  df_inc_sub <- df_inc %>%
+    select("cluster", intersect(ls_labelled_samples, colnames(df_inc)))
 
-        # Write manifest needed for mesa select
-        write.table(as.data.frame(unlist(i[1])),
-          file=paste0(opt$out_dir,"/",i[2]),
-          col.names = FALSE,
-          row.names = FALSE,
-          quote = FALSE)
+  outfile <- paste0(opt$out_dir,"/mesa_inclusion_counts_pre_batch_correction/",
+                   filename, "mesa_inclusion_counts.tsv")
 
-        # Run mesa select to merge the mesa file
-        cmd <- paste0(
-          "mesa select -m ",
-                  opt$out_dir,"/",i[2], " -o ",
-                  opt$out_dir,"/",i[3], "  --join intersection 2>&1"
-                )
+  ls_mesa_inc_count_files_subset <- append(ls_mesa_inc_count_files_subset, outfile)
+  write.table(df_inc_sub, outfile, 
+              sep="\t", quote = FALSE, row.names = FALSE)   
+}
 
-        print(cmd)
-        system(cmd)
-    }
+# Write new subset files to a manifest needed for mesa select
+write.table(as.data.frame(unlist(ls_mesa_inc_count_files_subset)),
+    file=paste0(opt$out_dir,"/manifest_mesa_inclusionCounts_files.tsv"),
+    col.names = FALSE,
+    row.names = FALSE,
+    quote = FALSE)
+
+# Run mesa select to merge the mesa file
+cmd <- paste0(
+  "mesa select -m ",
+          opt$out_dir,"/manifest_mesa_inclusionCounts_files.tsv -o ",
+          opt$out_dir,"/merged_mesa_inclusionCounts --join intersection 2>&1"
+        )
+
+print(cmd)
+system(cmd)
+# -->>>
 
 # # Import each merged MESA file and check they have same number of samples
 df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_inclusionCounts.tsv"),
@@ -510,7 +537,7 @@ print(dim(df_merged_IR_batch_corr))
 
 # Drop non LM22 samples from mesa PS
 df_merged_IR_batch_corr_lm22 <- df_merged_IR_batch_corr %>%
-  dplyr::select(ls_smpls_lm22)
+  dplyr::select(ls_labelled_samples)
 rownames(df_merged_IR_batch_corr_lm22) <- rownames(df_merged_IR_batch_corr)
 
 print(head(df_merged_IR_batch_corr_lm22))
@@ -518,8 +545,8 @@ print(dim(df_merged_IR_batch_corr_lm22))
 
 write.table(
   df_merged_IR_batch_corr_lm22,
-  file.path(opt$out_dir,"batch_corr_mesa_ir_table_intron_retention_LM22.tsv"), quote=F,sep="\t", na="nan",
-  col.names = NA, row.names= TRUE)
+  file.path(opt$out_dir,"batch_corr_mesa_ir_table_intron_retention_LM22.tsv"),
+    quote=F,sep="\t", na="nan", col.names = NA, row.names= TRUE)
 
 ########################################################
 # Open PS after batch correction / write LM22 subset 
@@ -529,7 +556,7 @@ df_merged_allPS_batch_corr <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_al
 
 # Drop non LM22 samples from mesa PS
 df_merged_allPS_batch_corr_lm22 <- df_merged_allPS_batch_corr %>%
-  dplyr::select(ls_smpls_lm22)
+  dplyr::select(ls_labelled_samples)
 rownames(df_merged_allPS_batch_corr_lm22) <- rownames(df_merged_allPS_batch_corr)
 
 write.table(
@@ -551,15 +578,14 @@ plot_before_after(df_merged_inc_counts, as.data.frame(df_merged_inc_counts_batch
 plot_before_after(df_merged_allPS, as.data.frame(df_merged_allPS_batch_corr), "hist_PS_before_after_bc.png","PS")
 plot_before_after(df_merged_IR_PS, as.data.frame(df_merged_IR_batch_corr), "hist_IR_before_after_bc.png","Intron coverage")
 
-
 #################################################
 # UMAPs per data source using BC PS
 #################################################
 # Read meta data made in this script 
-# df_merged_metadata_lm22 <- read.csv(file.path(opt$out_dir,"lm22_metadata.csv"))
-ls_data_sources <- unique(df_merged_metadata_lm22$data_source)
+# df_merged_metadata_labelled <- read.csv(file.path(opt$out_dir,"lm22_metadata.csv"))
+ls_data_sources <- unique(df_merged_metadata_labelled$data_source)
 for (i in ls_data_sources){
-  df_meta_sub <- df_merged_metadata_lm22 %>%
+  df_meta_sub <- df_merged_metadata_labelled %>%
     filter(data_source ==i) 
   ls_samples <- as.vector(df_meta_sub$Run)
   # PS UMAP
