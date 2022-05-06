@@ -156,8 +156,6 @@ opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
 # Make output directories
-
-# Make output directories
 ls_out_paths <- list("/mesa_inclusion_counts_pre_batch_correction/",
                     "/UMAPs_pre_batch_correction/",
                      "/UMAPs_post_batch_correction/",

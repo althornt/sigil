@@ -64,7 +64,7 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, ls_gen_cell_types,
       opt$gtf, " 2>&1")
 
     system(cmd)
-    # print(cmd)
+    print(cmd)
 
   } else {
     print("Not running MESA compare_sample_sets because not at least 3 samples in each group...")
@@ -74,17 +74,22 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, ls_gen_cell_types,
 call_run_css_cell_type <- function(ls_cell_types, label){
   #' This function calls runCompareSampleSets_1_vs_all to compare within
   #' the given list of cell types
-  #' @params ls_cell_types - list of cell type names within category
-  #' @params label - string to use iin naming outputs
+  #' @param ls_cell_types - list of cell type names within category
+  #' @param label - string to use iin naming outputs
 
   print(label)
+
+   # Convert the given cell type to string with no spaces
+  label <- paste(unlist(strsplit(
+                                    as.character(label), split=" ")),
+                                    collapse="_")
 
   ls_cell_types <- unlist(ls_cell_types)
   print(ls_cell_types )
 
   # Get samples with this given cell type
   ls_samples_types <- metadata %>%
-    dplyr::filter(LM22 %in% ls_cell_types)
+    dplyr::filter(main_label %in% ls_cell_types)
 
   # Keep events with over 75% samples with data in EACH subset type
   # Loop through subsets to get the passing events and find intersect
@@ -92,7 +97,7 @@ call_run_css_cell_type <- function(ls_cell_types, label){
   for (val in ls_cell_types){
     # Filter metadata and PS df to samples of this type
     df_samples <- metadata  %>%
-      dplyr::filter(LM22 %in% val)
+      dplyr::filter(main_label %in% val)
     all_PS_nan_filt_sub <- all_PS_nan_filt %>%
       dplyr::select(as.vector(unlist(df_samples$Run)))
 
@@ -131,7 +136,7 @@ call_run_css_cell_type <- function(ls_cell_types, label){
   sapply(
     unlist(ls_cell_types),
     runCompareSampleSets_1_vs_all,
-    meta_col_to_use="LM22",
+    meta_col_to_use="main_label",
     ls_gen_cell_types=unlist(ls_cell_types),
     PS_path = path_all_PS_filt_out,
     USE.NAMES = TRUE)
@@ -169,23 +174,20 @@ opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
 # Make output directories
-if (!dir.exists(paste0(opt$out_dir,"/manifests/"))){
-  dir.create(paste0(opt$out_dir,"/manifests/"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-
-if (!dir.exists(paste0(opt$out_dir,"/mesa_css_outputs/"))){
-  dir.create(paste0(opt$out_dir,"/mesa_css_outputs"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-
-if (!dir.exists(paste0(opt$out_dir,"/celltype_subset_dfs/"))){
-  dir.create(paste0(opt$out_dir,"/celltype_subset_dfs/"),
-   recursive = TRUE, showWarnings = TRUE)
+ls_out_paths <- list(
+          "/manifests/", 
+          "/mesa_css_outputs/",
+          "/celltype_subset_dfs/"
+          )
+for (path in ls_out_paths){
+  if (!dir.exists(paste0(opt$out_dir,path))){
+    dir.create(paste0(opt$out_dir,path),
+    recursive = TRUE, showWarnings = TRUE)
+    }
 }
 
 # Open files
-metadata = read.csv(file = opt$metadata)
+metadata = read.csv(file = opt$metadata, stringsAsFactors=FALSE)
 df_all_PS = read.table(file = opt$mesa_PS, sep="\t", row.names = 1, header = TRUE)
 print(dim(df_all_PS))
 
@@ -208,72 +210,29 @@ write.table(x = all_PS_nan_filt, na="nan", row.names = TRUE, quote=FALSE,
 print("Number of junctions removed for having over 50% samples with Nans:")
 print(nrow(df_all_PS)- nrow(all_PS_nan_filt))
 
-######################
-# Cell type lists
-######################
-# Dont yet include types without samples or else nan filtering will break
 
-# T_cell_types <- list(
-#   "T cells CD8",
-#   "T cells CD4 naive",
-#   "T cells CD4 memory resting",
-#   "T cells CD4 memory  activated",
-#   "T cells follicular helper",
-#   "T cells regulatory (Tregs)",
-#   "T cells gamma delta")
-T_cell_types <- list(
-  "T cells CD8",
-  "T cells CD4 naive",
-  "T cells follicular helper",
-  "T cells regulatory (Tregs)",
-  "T cells gamma delta")
+# Match main cell type to group labels 
+ls_group_cell_types <- unlist(unique(metadata[["group_label"]]))
+ls_main_cell_types <- unlist(unique(metadata[["main_label"]]))
 
-# mon_mac_cell_types <- list(
-#   "Monocytes",
-#   "Macrophages M0",
-#   "Macrophages M1",
-#   "Macrophages M2")
-mon_mac_cell_types <- list(
-    "Monocytes",
-    "Macrophages M0",
-    "Macrophages M1")
+group2main <- list()
+for (i in ls_group_cell_types){
+  print(i)
+  m <- metadata %>%
+      filter(group_label == i) 
+  if (length(unique(m$main_label)) > 1) {
+      group2main<- append(group2main,list(list(i, unique(m$main_label)) ))
+  }
+}
 
-B_cell_types <- list(
-  "B cells naive",
-  "B cells memory")
+print(group2main)
 
-dendritic_cell_types <- list(
-  "Dendritic cells resting",
-  "Dendritic cells activated")
-
-# mast_cell_types <- list(
-#   "Mast cells resting",
-#   "Mast cells activated")
-
-# NK_cell_types <- list(
-#   "NK cells resting",
-#   "NK cells activated")
-
-####################################################
-# Run within cell type for each category
-####################################################
-# ls_within_cell_types <- list(
-#   "T_cell_types" = T_cell_types,
-#   "mon_mac_cell_types" = mon_mac_cell_types,
-#   "Bcell" = B_cell_types,
-#   "Dendritic" = dendritic_cell_types,
-#   "Mast" = mast_cell_types,
-#   "NK" = NK_cell_types)
-
-ls_within_cell_types <- list(
-  list("Tcell", T_cell_types),
-  list("Mon_Mac", mon_mac_cell_types),
-  list("Bcell", B_cell_types),
-  list("Dendritic" ,dendritic_cell_types)
-)
+# ####################################################
+# # Run 1 vs all within each group
+# ####################################################
 
 # Run in parallel
-foreach(i=ls_within_cell_types, .packages=c('magrittr','dplyr')
+foreach(i=group2main, .packages=c('magrittr','dplyr')
   )%dopar%{
           call_run_css_cell_type(
             ls_cell_types = i[2] , 
