@@ -179,7 +179,6 @@ print(nrow(df_all_PS)- nrow(all_PS_nan_filt))
 # Main Label Comparisons
 ##########################
 ls_main_cell_types <- unlist(unique(metadata[["main_label"]]))
-
 # Run MESA compare_sample_sets for each main type 
 foreach(i=ls_main_cell_types, .packages='magrittr') %dopar% {
   runCompareSampleSets_1_vs_all(

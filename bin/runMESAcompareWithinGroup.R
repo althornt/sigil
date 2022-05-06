@@ -230,7 +230,6 @@ print(group2main)
 # ####################################################
 # # Run 1 vs all within each group
 # ####################################################
-
 # Run in parallel
 foreach(i=group2main, .packages=c('magrittr','dplyr')
   )%dopar%{

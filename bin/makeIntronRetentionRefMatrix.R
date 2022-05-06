@@ -25,7 +25,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   #'
   #' @param ls_events - list of events of interest to use in heatmap
   #' @param label - label to use in output file path
-  #' @param df_meta - df of metadata with Run, val, and data_source, LM6, LM22 columns
+  #' @param df_meta - df of metadata with Run, val, and data_source, main_label, group_label
   #' @param df_PS - df of MESA all PS file
 
   # Filter MESA all PS file to events of interest
@@ -35,7 +35,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
     dplyr::select(noquote(order(colnames(.)))) %>%
     tibble::column_to_rownames('event')
 
-  for (val in list("LM22", "LM6")){
+  for (val in list("main_label", "group_label")){
       if (nrow(df_all_PS_sig_events) < 50){
         rowname_on_off = "T"
       } else { rowname_on_off = "F"}
@@ -209,11 +209,11 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
   #' negative and top N positive
 
   # Filename to string
-  LM22_type <-  substr(filename, 1, nchar(filename)-4)
-  print(LM22_type)
+  input_label <-  substr(filename, 1, nchar(filename)-4)
+  print(input_label)
   # Make output directories
-  if (!dir.exists(paste0(plot_out_dir,LM22_type))){
-    dir.create(paste0(plot_out_dir,LM22_type),
+  if (!dir.exists(paste0(plot_out_dir,input_label))){
+    dir.create(paste0(plot_out_dir,input_label),
      recursive = TRUE, showWarnings = TRUE)
   }
 
@@ -224,12 +224,12 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
 
   # Make volcano plot before filtering
   volcano(df_css, paste0(plot_out_dir,"volcanos/"),
-              LM22_type,"_all_junctions", list())
+              input_label,"_all_junctions", list())
 
   # Filter to most significant junction per cluster
   df_filtered <- filter_top_junction(df_css)
   write.table(df_filtered,
-              file=paste0(plot_out_dir,LM22_type,"_css_output_top_junc_per_cluster.tsv"),
+              file=paste0(plot_out_dir,input_label,"_css_output_top_junc_per_cluster.tsv"),
               sep = "\t",row.names = FALSE, quote=F)
 
   if (nrow(df_filtered) > 0){
@@ -245,7 +245,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
     ls_top_sig_by_pval_negdelta <- top_sig_by_pval_negdelta$event
 
     # Make plots for top negative events
-    lapply(ls_top_sig_by_pval_negdelta,  plot_event, cell_type = LM22_type,
+    lapply(ls_top_sig_by_pval_negdelta,  plot_event, cell_type = input_label,
           LM_type=meta_col, out_dir = plot_out_dir)
 
     # Get top positive delta events
@@ -258,7 +258,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
 
     ls_top_sig_by_pval_posdelta <- top_sig_by_pval_posdelta$event
     # Make plots for top positive events
-    lapply(ls_top_sig_by_pval_posdelta,  plot_event, cell_type = LM22_type,
+    lapply(ls_top_sig_by_pval_posdelta,  plot_event, cell_type = input_label,
             LM_type=meta_col,
             out_dir = plot_out_dir )
 
@@ -268,11 +268,11 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
 
     # Make volcano plot labeling top_neg_and_pos
     volcano(df_css, paste0(plot_out_dir,"volcanos/"),
-            LM22_type,"_filtered_junctions", top_sig_neg_and_pos)
+            input_label,"_filtered_junctions", top_sig_neg_and_pos)
     df_top_sig_neg_and_pos <- rbind(top_sig_by_pval_negdelta, top_sig_by_pval_posdelta)
 
     df_top_sig_neg_and_pos$group <- comparison_label
-    df_top_sig_neg_and_pos$cell_type <- LM22_type
+    df_top_sig_neg_and_pos$cell_type <- input_label
 
     return(df_top_sig_neg_and_pos)
   }
@@ -285,18 +285,28 @@ import_mesa_css_within<- function(ls_cell_types, topN,  label, css_dir, meta_col
   #' plots, make heatmaps of the events. This function calls import_mesa_css(),
   #' unpack_import_css_res(), and make_pheatmap()
   #'
-  #' @param ls_cell_types - list of LM22 cell-types that were compared in
+  #' @param ls_cell_types - list of main label cell-types that were compared in
   #' compareWithinType.R script
   #' @param topN - integer; how many of the top splicing events to use
   #' @param label - string to use to represent cell type in output files
   #' @return ls_top_events - list containing 3 list - top positive events, top
   #' negative events, and top negative and positive
 
+  print("ls_cell_types")
+  print(ls_cell_types)
+  print("label")
+  print(label)
+  print("css_dir")
+  print(css_dir)
+  print("meta_col")
+  print(meta_col)
 
   # Get output files from compareWithinType script
   ls_css_file_names <- list.files(css_dir,pattern = ".tsv")
-
+  print("ls_css_file_names")
   print(ls_css_file_names)
+
+  stopifnot(length(ls_css_file_names) >0)
 
   # For input cell type list , convert to filename
   ls_cell_types_file <- c()
@@ -314,7 +324,7 @@ import_mesa_css_within<- function(ls_cell_types, topN,  label, css_dir, meta_col
                     topN=topN,
                     import_mesa_css,
                     meta_col =meta_col,
-                    plot_out_dir =  paste0(opt$out_dir,"/within_type/"),
+                    plot_out_dir =  paste0(opt$out_dir,"/within_group/"),
                     css_dir =  css_dir,
                     comparison_label = "withinType")
 
@@ -331,7 +341,7 @@ import_mesa_css_within<- function(ls_cell_types, topN,  label, css_dir, meta_col
 
   # Filter metadata
   df_metadata_subset <- metadata %>%
-    dplyr::filter(LM22 %in% ls_cell_types) %>%
+    dplyr::filter(main_label %in% ls_cell_types) %>%
     droplevels(.) %>%
     dplyr::arrange(Run)
 
@@ -393,9 +403,9 @@ opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
 # Open files
-metadata <- read.csv(file = opt$metadata)
+metadata = read.csv(file = opt$metadata, stringsAsFactors=FALSE)
 df_sample_annotations <- metadata %>%
-  dplyr::select(Run,LM22,LM6, sigil_general, data_source) %>%
+  dplyr::select(Run,main_label,group_label, sigil_general, data_source) %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
@@ -420,8 +430,9 @@ ls_clusters <- unique(ls_clusters)
 print("list of all clusters:")
 print(length(ls_clusters))
 print(tail(ls_clusters))
+
 # Make output directories
-ls_out_paths <- list("/LM22/volcanos","/LM6/volcanos","/within_type/volcanos")
+ls_out_paths <- list("/main_label/volcanos","/group_label/volcanos","/within_group/volcanos")
 for (path in ls_out_paths){
   if (!dir.exists(paste0(opt$out_dir,path))){
     dir.create(paste0(opt$out_dir,path),
@@ -430,133 +441,114 @@ for (path in ls_out_paths){
 }
 
 ########################################
-# Import LM22 1 vs all comparisons
+# Import main_label 1 vs all comparisons
 #######################################
 
 # Get all outputs from compare sample sets 1 vs all comparisons
-ls_lm22_css_file_names <- list.files(
+ls_main_label_css_file_names <- list.files(
                                   paste0(opt$dir_group_comp,
-                                  "/compare_LM22/mesa_css_outputs/"),
+                                  "/compare_main_label/mesa_css_outputs/"),
                                   pattern = ".tsv")
-ls_lm22_css_file_names <- ls_lm22_css_file_names[!ls_lm22_css_file_names %in% c("heatmaps")]
-print(ls_lm22_css_file_names)
+
+print(ls_main_label_css_file_names)
 # Import, find signficant events and plot each one
-ls_lm22_res <- foreach(i=ls_lm22_css_file_names,
+ls_main_label_res <- foreach(i=ls_main_label_css_file_names,
                       .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
     import_mesa_css(
       filename = i,
       topN = 20,
-      meta_col="LM22",
-      plot_out_dir = paste0(opt$out_dir,"/LM22/"),
-      css_dir=paste0(opt$dir_group_comp,"/compare_LM22/mesa_css_outputs/"),
-      comparison_label = "LM22"
+      meta_col="main_label",
+      plot_out_dir = paste0(opt$out_dir,"/main_label/"),
+      css_dir=paste0(opt$dir_group_comp,"/compare_main_label/mesa_css_outputs/"),
+      comparison_label = "main_label"
       )
   }
 
-df_lm22_res <- dplyr::bind_rows(ls_lm22_res)
-print(head(df_lm22_res))
-print(dim(df_lm22_res))
+df_main_label_res <- dplyr::bind_rows(ls_main_label_res)
+print(head(df_main_label_res))
+print(dim(df_main_label_res))
 
 # Make heatmap using top events
-make_pheatmap(df_lm22_res$event, "LM22_diff_IR_heatmap", metadata, all_PS )
-
+make_pheatmap(df_main_label_res$event, "main_label_diff_IR_heatmap", metadata, all_PS )
 
 ########################################
-# Import LM6 1 vs all comparisons
+# Import group_label 1 vs all comparisons
 #######################################
 
 # Get all outputs from compare sample sets 1 vs all comparisons
-ls_lm6_css_file_names <- list.files(
+ls_group_label_css_file_names <- list.files(
                                   paste0(opt$dir_group_comp,
-                                  "/compare_LM6/mesa_css_outputs/"),
+                                  "/compare_group_label/mesa_css_outputs/"),
                                   pattern = ".tsv")
-# ls_lm6_css_file_names <- ls_lm6_css_file_names[!ls_lm6_css_file_names %in% c("heatmaps")]
 
 # Import, find signficant events and plot each one
-ls_lm6_res <- foreach(i=ls_lm6_css_file_names,
+ls_group_label_res <- foreach(i=ls_group_label_css_file_names,
                       .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
     import_mesa_css(
       filename = i,
       topN = 20,
-      meta_col="LM6",
-      plot_out_dir = paste0(opt$out_dir,"/LM6/"),
-      css_dir=paste0(opt$dir_group_comp,"/compare_LM6/mesa_css_outputs/"),
-      comparison_label = "LM6"
+      meta_col="group_label",
+      plot_out_dir = paste0(opt$out_dir,"/group_label/"),
+      css_dir=paste0(opt$dir_group_comp,"/compare_group_label/mesa_css_outputs/"),
+      comparison_label = "group_label"
       )
   }
 
-df_lm6_res <- dplyr::bind_rows(ls_lm6_res)
-print(head(df_lm6_res))
-print(dim(df_lm6_res))
+df_group_label_res <- dplyr::bind_rows(ls_group_label_res)
+print(head(df_group_label_res))
+print(dim(df_group_label_res))
 
 # Make heatmap using top events
-make_pheatmap(df_lm6_res$event, "LM6_diff_IR_heatmap", metadata, all_PS)
+make_pheatmap(df_group_label_res$event, "group_label_diff_IR_heatmap", metadata, all_PS)
 
 ########################################
 # Import within comparisons
 #######################################
-# mast_cell_types <- list(
-#   "Mast cells resting",
-#   "Mast cells activated")
 
-# NK_cell_types <- list(
-#   "NK cells resting",
-#   "NK cells activated")
+# Match main cell type to group labels 
+ls_group_cell_types <- unlist(unique(metadata[["group_label"]]))
+ls_main_cell_types <- unlist(unique(metadata[["main_label"]]))
 
-ls_within_cell_types <- list(
-  "Tcell" = list(
-    "T cells CD8",
-    "T cells CD4 naive",
-    #   "T cells CD4 memory resting",
-    #   "T cells CD4 memory  activated",
-    "T cells follicular helper",
-    "T cells regulatory (Tregs)",
-    "T cells gamma delta"),
-  "Mon_Mac" = list(
-      "Monocytes",
-      "Macrophages M0",
-      "Macrophages M1"
-      # "Macrophages M2"
-      ),
-  "Bcell" = list(
-    "B cells naive",
-    "B cells memory"),
-  "Dendritic" = list(
-    "Dendritic cells resting",
-    "Dendritic cells activated"))
+group2main <- list()
+for (i in ls_group_cell_types){
 
+  m <- metadata %>%
+      filter(group_label == i) 
+  if (length(unique(m$main_label)) > 1) {
+      group2main<- append(group2main,list(list(i, unique(m$main_label)) ))
+  }
+}
 
-ls_within_res <- foreach(i=names(ls_within_cell_types),
-                        .packages=c('magrittr','dplyr','ggplot2','pheatmap')) %dopar% {
-
-      import_mesa_css_within(
-        ls_cell_types = ls_within_cell_types[[i]],
-        topN = 20,
-        label = i,
-        css_dir = paste0(opt$dir_within_comp, "/mesa_css_outputs/"),
-        meta_col = "LM22")
-
+# Run in parallel
+ls_within_res <- foreach(i=group2main, .packages=c('magrittr','dplyr','ggplot2','pheatmap')
+  )%dopar%{
+    import_mesa_css_within(
+      ls_cell_types = i[[2]] , 
+      label = i[[1]], 
+      topN = 20,
+      css_dir = paste0(opt$dir_within_comp, "/mesa_css_outputs/"),
+      meta_col = "main_label")
       }
 
 df_within_res <- dplyr::bind_rows(ls_within_res, .id = "column_label")
 print(df_within_res)
 
 # Make heatmap using top events
-make_pheatmap(df_within_res$event, "withinType_IR_heatmap", metadata, all_PS)
+make_pheatmap(df_within_res$event, "withinGroup_IR_heatmap", metadata, all_PS)
 
 ########################################
 # Combined reference matrix
 ######################################
-df_combined_res <- dplyr::bind_rows(list("lm6"  = df_lm6_res,
-                                        "lm22"= df_lm22_res,
-                                        "within" = df_within_res),
+df_combined_res <- dplyr::bind_rows(list("group_label"  = df_group_label_res,
+                                        "main_label"= df_main_label_res,
+                                        "within_group" = df_within_res),
                                         .id = "column_label2")
 print(df_combined_res)
 
 write.table(df_combined_res,
-            file=paste0(opt$out_dir,"/lm22_lm6_withinType_combinedRefMat.tsv"),
+            file=paste0(opt$out_dir,"/combined_main_group_withingroup_combinedRefMat.tsv"),
             sep = "\t",row.names = FALSE, quote=F)
 
 # Make heatmap using top events
-make_pheatmap(df_combined_res$event, "LM6_LM22_withinType_IR_heatmap", metadata, all_PS)
+make_pheatmap(df_combined_res$event, "combined_main_group_withingroup_IR_heatmap", metadata, all_PS)
 

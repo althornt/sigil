@@ -46,7 +46,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   #'
   #' @param ls_events - list of events of interest to use in heatmap
   #' @param label - label to use in output file path
-  #' @param df_meta - df of metadata with Run, val, and data_source, LM6, LM22 columns
+  #' @param df_meta - df of metadata with Run, val, and data_source, group_label, main_label columns
   #' @param df_PS - df of MESA all PS file
 
   # Filter MESA all PS file to events of interest
@@ -58,7 +58,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
 
   # print(df_all_PS_sig_events)
 
-  for (val in list("LM22", "LM6")){
+  for (val in list("main_label", "group_label")){
       if (nrow(df_all_PS_sig_events) < 50){
         rowname_on_off = "T"
       } else { rowname_on_off = "F"}
@@ -86,20 +86,20 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
         paste0(opt$out_dir,"/",label,"_",val,"_rowname",rowname_on_off,".pdf"))
       }
 }
-calcGroupMed <- function(df_PS, LM_type){
-  str_LM <- as.character(LM_type)
+calcGroupMed <- function(df_PS, label_type){
+  str_label <- as.character(label_type)
 
   #transpose df, summarize to median of each group
   df_t_med <- df_all_PS_ref_events %>%
     rownames_to_column("rowname") %>%   #transpose
     gather(var, value, -rowname) %>% 
     spread(rowname, value) %>%
-    filter(get(LM_type) != "") %>%     #remove samples without a LM grouping
-    select(c(paste0(str_LM),"var",df_spliceRefMatrix$event )) %>% #keep LM col and junctions
+    filter(get(label_type) != "") %>%     #remove samples without a label grouping
+    select(c(paste0(str_label),"var",df_spliceRefMatrix$event )) %>% #keep label col and junctions
     mutate_at(df_spliceRefMatrix$event, as.numeric) %>% # convert to numeric
-    group_by_at(LM_type) %>%
+    group_by_at(label_type) %>%
     summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
-    column_to_rownames(paste(str_LM)) %>%
+    column_to_rownames(paste(str_label)) %>%
     as.data.frame(.) %>%
     select_if(~ !any(is.na(.))) #remove NA
 
@@ -124,7 +124,7 @@ calcGroupMed <- function(df_PS, LM_type){
 
   save_pheatmap_pdf(
           heatmap_res,
-          paste0(opt$out_dir,"/",paste(LM_type),"_med_heatmap.pdf")
+          paste0(opt$out_dir,"/",paste(label_type),"_med_heatmap.pdf")
           )
 
   return(df_med)
@@ -181,7 +181,7 @@ print(head(df_all_PS))
 
 metadata <- read.csv(file = opt$metadata)
 df_sample_annotations <- metadata %>%
-  dplyr::select(Run,LM22,LM6, sigil_general, data_source) %>%
+  dplyr::select(Run,main_label,group_label, sigil_general, data_source) %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
@@ -201,28 +201,28 @@ print(dim(df_all_PS_ref_events))
 print("Number of unique events:")
 print(length(unique(df_spliceRefMatrix$event)))
 ls_bed <- as.vector(sapply( unique(df_spliceRefMatrix$event), junc2bed))
-writeLines(ls_bed, paste0(opt$out_dir,"/spliceRefMatrix.bed"))
+writeLines(ls_bed, paste0(opt$out_dir,"/IR_RefMatrix.bed"))
 
 ######################################################
 # RefMat with medians + z-score
 ######################################################
 # Calculate group medians and make heatmap then z-score
-df_LM6_med <- calcGroupMed(df_all_PS_ref_events, "LM6")
-df_LM6_med_z <- t(scale(t(df_LM6_med)))
+df_group_label_med <- calcGroupMed(df_all_PS_ref_events, "group_label")
+df_group_label_med_z <- t(scale(t(df_group_label_med)))
 
-df_LM22_med <- calcGroupMed(df_all_PS_ref_events, "LM22")
-df_LM22_med_z <- t(scale(t(df_LM22_med)))
+df_main_label_med <- calcGroupMed(df_all_PS_ref_events, "main_label")
+df_main_label_med_z <- t(scale(t(df_main_label_med)))
 
-print(dim(df_LM6_med))
-print(dim(df_LM6_med_z))
+print(dim(df_group_label_med))
+print(dim(df_group_label_med_z))
 
-print(dim(df_LM22_med))
-print(dim(df_LM22_med_z))
+print(dim(df_main_label_med))
+print(dim(df_main_label_med_z))
 
-write.csv(df_LM6_med, paste0(opt$out_dir,"/LM6_med.csv") )
-write.csv(df_LM6_med_z, paste0(opt$out_dir,"/LM6_med_zscore.csv") )
-write.csv(df_LM22_med, paste0(opt$out_dir,"/LM22_med.csv") )
-write.csv(df_LM22_med_z, paste0(opt$out_dir,"/LM22_med_zscore.csv") )
+write.csv(df_group_label_med, paste0(opt$out_dir,"/group_label_med.csv") )
+write.csv(df_group_label_med_z, paste0(opt$out_dir,"/group_label_med_zscore.csv") )
+write.csv(df_main_label_med, paste0(opt$out_dir,"/main_label_med.csv") )
+write.csv(df_main_label_med_z, paste0(opt$out_dir,"/main_label_med_zscore.csv") )
 
 # ########################################################
 # # Make subsets from gene lists
@@ -335,7 +335,6 @@ ggplot(df_hist_event, aes(x=n)) +
   ggtitle("Counts per event in the splicing reference matrix") 
 ggsave( paste0(opt$out_dir,"/hist_count_per_event.png"))
 
-print("---------------------------------------------------------------------------------")
 
 
 
