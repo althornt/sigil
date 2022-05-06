@@ -67,7 +67,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
   umap.out.merge = merge(umap.out, df_merged_metadata_labelled)
 
   # Plot UMAP
-  plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col)), shape=data_source) +
+  plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col), shape=data_source)) +
     geom_point(size = 2) +
     theme_classic() +
     theme(legend.position="bottom",legend.title = element_blank()) +
@@ -99,11 +99,11 @@ df_to_UMAP <- function(input_df, output_path){
   # Making variations of UMAPs with different numbers of neighbors
   lapply(c(5, 20), make_umap, meta_col="data_source",
     df_PCA = prcomp.out, out_path = paste0(output_path))
-  lapply(c(5, 20), make_umap, meta_col="LM22",
+  lapply(c(5, 20), make_umap, meta_col="main_label",
+    df_PCA = prcomp.out, out_path = paste0(output_path))
+  lapply(c(5, 20), make_umap, meta_col="group_label",
     df_PCA = prcomp.out, out_path = paste0(output_path))
   lapply(c(5, 20), make_umap, meta_col="sigil_general",
-    df_PCA = prcomp.out, out_path = paste0(output_path))
-  lapply(c(5, 20), make_umap, meta_col="LM6",
     df_PCA = prcomp.out, out_path = paste0(output_path))
 }
 
@@ -128,10 +128,7 @@ plot_before_after <- function(df_before, df_after, filename, val){
           labels = c('before','after')) +
       xlab(paste(val))
 
-
   ggsave(plot = p, filename = paste0(opt$out_dir,"/",filename))
-
-
 }
 
 ###################
@@ -216,7 +213,6 @@ ls_labelled_samples <- as.character(df_merged_metadata_labelled$Run)
 
 print(df_merged_metadata_labelled)
 print(dim(df_merged_metadata_labelled))
-
 
 # ####################################################
 # # Read in all individual mesa IR cov files and merge
@@ -330,16 +326,18 @@ write.table(as.data.frame(unlist(ls_mesa_inc_count_files_subset)),
 cmd <- paste0(
   "mesa select -m ",
           opt$out_dir,"/manifest_mesa_inclusionCounts_files.tsv -o ",
-          opt$out_dir,"/merged_mesa_inclusionCounts --join intersection 2>&1"
+          opt$out_dir,"/merged_mesa_inclusionCounts.tsv --join intersection 2>&1"
         )
 
 print(cmd)
 system(cmd)
-# -->>>
 
-# # Import each merged MESA file and check they have same number of samples
+# Import each merged MESA file and check they have same number of samples
 df_merged_inc_counts <- read.table(paste0(opt$out_dir,"/merged_mesa_inclusionCounts.tsv"),
                                     row.names = 1, header=T)
+
+print(dim(df_merged_inc_counts))
+
 # ######################################
 # # Convert Merged count file to PS
 # ######################################
@@ -407,8 +405,8 @@ print(dim(df_log2trans_IR_cov))
 # Limma remove batch effect
 df_mesa_IR_cov_merge_log2_batch_corr <- limma::removeBatchEffect(
                                   df_log2trans_IR_cov,
-                                  batch = df_merged_metadata$data_source,
-                                  batch2 = df_merged_metadata$type
+                                  batch = df_merged_metadata_labelled$data_source,
+                                  batch2 = df_merged_metadata_labelled$type
                                   )
 
 print(dim(df_mesa_IR_cov_merge_log2_batch_corr))
@@ -473,8 +471,8 @@ df_log2trans_inc_counts <- as.data.frame(log2(df_merged_inc_counts +1))
 # Limma remove batch effect
 df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
                                   df_log2trans_inc_counts,
-                                  batch = df_merged_metadata$data_source,
-                                  batch2 = df_merged_metadata$type
+                                  batch = df_merged_metadata_labelled$data_source,
+                                  batch2 = df_merged_metadata_labelled$type
                                   )
 
 # Undo log2(x+1) with 2^x - 1
@@ -487,10 +485,8 @@ df_merged_inc_counts_batch_corr[df_merged_inc_counts_batch_corr < 1 ] <- 0
 print(head(df_merged_inc_counts_batch_corr))
 print(dim(df_merged_inc_counts_batch_corr))
 
-
 df_merged_inc_counts_batch_corr <- as.data.frame(df_merged_inc_counts_batch_corr) %>% 
   tibble::rownames_to_column("cluster")
-
 
 write.table(
   df_merged_inc_counts_batch_corr,
@@ -527,7 +523,6 @@ cmd <- paste0("mesa ir_table -i ", opt$out_dir,
 print(cmd)
 system(cmd)
 
-
 df_merged_IR_batch_corr <- read.table(paste0(opt$out_dir,
                               "/batch_corr_mesa_ir_table_intron_retention.tsv"),
                               row.names = 1, header=T) 
@@ -535,34 +530,16 @@ df_merged_IR_batch_corr <- read.table(paste0(opt$out_dir,
 print(head(df_merged_IR_batch_corr))
 print(dim(df_merged_IR_batch_corr))
 
-# Drop non LM22 samples from mesa PS
-df_merged_IR_batch_corr_lm22 <- df_merged_IR_batch_corr %>%
-  dplyr::select(ls_labelled_samples)
-rownames(df_merged_IR_batch_corr_lm22) <- rownames(df_merged_IR_batch_corr)
-
-print(head(df_merged_IR_batch_corr_lm22))
-print(dim(df_merged_IR_batch_corr_lm22))
-
 write.table(
-  df_merged_IR_batch_corr_lm22,
-  file.path(opt$out_dir,"batch_corr_mesa_ir_table_intron_retention_LM22.tsv"),
+  df_merged_IR_batch_corr,
+  file.path(opt$out_dir,"batch_corr_mesa_ir_table_intron_retention.tsv"),
     quote=F,sep="\t", na="nan", col.names = NA, row.names= TRUE)
 
 ########################################################
-# Open PS after batch correction / write LM22 subset 
+# Open PS after batch correction
 #########################################################
 df_merged_allPS_batch_corr <- read.table(paste0(opt$out_dir,"/batch_corr_mesa_allPS.tsv"),
                               row.names = 1, header=T)
-
-# Drop non LM22 samples from mesa PS
-df_merged_allPS_batch_corr_lm22 <- df_merged_allPS_batch_corr %>%
-  dplyr::select(ls_labelled_samples)
-rownames(df_merged_allPS_batch_corr_lm22) <- rownames(df_merged_allPS_batch_corr)
-
-write.table(
-  df_merged_allPS_batch_corr_lm22,
-  file.path(opt$out_dir,"batch_corr_mesa_allPS_LM22.tsv"), quote=F,sep="\t", na="nan",
-  col.names = NA, row.names= TRUE)
 
 ######################################
 # UMAPs after batch correction
@@ -582,7 +559,7 @@ plot_before_after(df_merged_IR_PS, as.data.frame(df_merged_IR_batch_corr), "hist
 # UMAPs per data source using BC PS
 #################################################
 # Read meta data made in this script 
-# df_merged_metadata_labelled <- read.csv(file.path(opt$out_dir,"lm22_metadata.csv"))
+# df_merged_metadata_labelled <- read.csv(file.path(opt$out_dir,"merged_metadata.csv"))
 ls_data_sources <- unique(df_merged_metadata_labelled$data_source)
 for (i in ls_data_sources){
   df_meta_sub <- df_merged_metadata_labelled %>%
@@ -593,7 +570,7 @@ for (i in ls_data_sources){
     select(ls_samples) 
   df_to_UMAP(df_PS_sub, paste0("UMAPs_by_source/",i,"_PS_batchcorr_PCA_UMAP"))
   # IR UMAP
-  df_IR_sub <- df_merged_IR_batch_corr_lm22 %>%
+  df_IR_sub <- df_merged_IR_batch_corr %>%
     select(ls_samples) 
   df_to_UMAP(df_IR_sub, paste0("UMAPs_by_source/",i,"_IR_batchcorr_PCA_UMAP"))
 }
