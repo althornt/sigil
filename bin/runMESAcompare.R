@@ -86,7 +86,7 @@ runCompareSampleSets_1_vs_all <- function(meta_col_to_use, cell_type_val){
     print("running MESA compare...")
 
     # Run MESA compare_sample_sets command ; 2>&1 sends standard error standard output
-    # Can use batch_corr_mesa_allPS_LM22_nan_filt for both LM6 and LM22 comparisons
+    # Can use batch_corr_mesa_allPS_nan_filt for both main label and group label comparisons
     cmd <- paste0(
       "mesa compare_sample_sets --psiMESA ",path_all_PS_filt_out,
       " -m1 ",opt$out_dir,"/compare_",meta_col_to_use,"/manifests/",str_cell_type_val,".tsv",
@@ -130,33 +130,19 @@ opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
 # Make output directories
-if (!dir.exists(paste0(opt$out_dir,"/compare_LM22/manifests/"))){
-  dir.create(paste0(opt$out_dir,"/compare_LM22/manifests/"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-
-if (!dir.exists(paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/"))){
-  dir.create(paste0(opt$out_dir,"/compare_LM22/mesa_css_outputs/"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-
-if (!dir.exists(paste0(opt$out_dir,"/compare_LM22/celltype_subset_dfs/"))){
-  dir.create(paste0(opt$out_dir,"/compare_LM22/celltype_subset_dfs/"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-
-if (!dir.exists(paste0(opt$out_dir,"/compare_LM6/manifests/"))){
-  dir.create(paste0(opt$out_dir,"/compare_LM6/manifests/"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-
-if (!dir.exists(paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/"))){
-  dir.create(paste0(opt$out_dir,"/compare_LM6/mesa_css_outputs/"),
-   recursive = TRUE, showWarnings = TRUE)
-}
-if (!dir.exists(paste0(opt$out_dir,"/compare_LM6/celltype_subset_dfs/"))){
-  dir.create(paste0(opt$out_dir,"/compare_LM6/celltype_subset_dfs/"),
-   recursive = TRUE, showWarnings = TRUE)
+ls_out_paths <- list(
+          "/compare_main_label/manifests/", 
+          "/compare_main_label/mesa_css_outputs/",
+          "/compare_main_label/celltype_subset_dfs/",
+          "/compare_group_label/manifests/",
+          "/compare_group_label/mesa_css_outputs/", 
+           "/compare_group_label/celltype_subset_dfs/"
+          )
+for (path in ls_out_paths){
+  if (!dir.exists(paste0(opt$out_dir,path))){
+    dir.create(paste0(opt$out_dir,path),
+    recursive = TRUE, showWarnings = TRUE)
+    }
 }
 
 # Open files
@@ -188,31 +174,30 @@ write.table(x = data.frame("cluster"=rownames(all_PS_nan_filt),all_PS_nan_filt),
 print("Number of junctions removed for having over 75% samples with Nans:")
 print(nrow(df_all_PS)- nrow(all_PS_nan_filt))
 
-###################
-# LM22
-###################
-if("LM22" %in% colnames(metadata)){
-  ls_lm22_cell_types <- unique(metadata[["LM22"]])
 
-  # Run MESA compare_sample_sets for each LM22 subtype 
-  foreach(i=ls_lm22_cell_types, .packages='magrittr') %dopar% {
-    runCompareSampleSets_1_vs_all(
-        cell_type_val = i,
-        meta_col_to_use="LM22")}
-}
+##########################
+# Main Label Comparisons
+##########################
+ls_main_cell_types <- unlist(unique(metadata[["main_label"]]))
 
-##################
-# LM6
-##################
-if("LM6" %in% colnames(metadata)){
-  ls_lm6_cell_types <- unique(metadata[["LM6"]])
-  ls_lm6_cell_types <- ls_lm6_cell_types[ls_lm6_cell_types != ""]
+# Run MESA compare_sample_sets for each main type 
+foreach(i=ls_main_cell_types, .packages='magrittr') %dopar% {
+  runCompareSampleSets_1_vs_all(
+      cell_type_val = i,
+      meta_col_to_use="main_label")}
 
-  # Run MESA compare_sample_sets for each LM6 subtype 
-  foreach(i=ls_lm6_cell_types, .packages='magrittr') %dopar% {
-    runCompareSampleSets_1_vs_all(
-        cell_type_val = i,
-        meta_col_to_use="LM6")}
-}
 
+print(typeof(ls_main_cell_types))
+###########################
+# Group Label Comparisons
+###########################
+ls_group_cell_types <- unlist(unique(metadata[["group_label"]]))
+# Remove labels that are reused from main to avoid redoing the same comparison
+ls_group_cell_types <- ls_group_cell_types[!ls_group_cell_types %in% ls_main_cell_types]
+
+# Run MESA compare_sample_sets for each group type 
+foreach(i=ls_group_cell_types, .packages='magrittr') %dopar% {
+  runCompareSampleSets_1_vs_all(
+      cell_type_val = i,
+      meta_col_to_use="group_label")}
 
