@@ -37,10 +37,10 @@ workflow {
   BUILD_GENE(params.manifest)
 
   //MESA splicing
-  // BUILD_MESA(params.manifest, params.gtf)
+  BUILD_MESA(params.manifest, params.gtf)
 
   //Gene and MESA splicing
   // GENE_AND_SPLICING(params.manifest)
+  GENE_AND_SPLICING(params.manifest, BUILD_GENE.out.collect(), BUILD_MESA.out.collect())
                       
-
   }

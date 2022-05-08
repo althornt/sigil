@@ -51,7 +51,7 @@ process MESA {
         --strand inferCombine
 
     # Run MESA quant
-    mesa quant -m mesa_manifest.txt -o mesa --drim --maxLength  50000 \
+    mesa quant -m mesa_manifest.txt -o mesa --maxLength  50000 \
         --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
         --minEntropy 1 2> error.txt
 
@@ -113,7 +113,7 @@ process MESA_ONLY {
 
 
     # Run MESA quant
-    mesa quant -m mesa_manifest.txt -o mesa --drim --maxLength  50000 \
+    mesa quant -m mesa_manifest.txt -o mesa --maxLength  50000 \
         --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
         --minEntropy 1 2> error.txt
 
@@ -148,7 +148,7 @@ process MESA_QUANT_ONLY {
     mkdir -p ${params.outdir}/mesa_out
 
     # Run MESA quant
-    mesa quant -m $bed_manifest -o mesa --drim --maxLength  50000 \
+    mesa quant -m $bed_manifest -o mesa --maxLength  50000 \
         --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
         --minEntropy 1 2> error.txt
 
@@ -180,7 +180,7 @@ process MESA_IR_ONLY {
     """
     mkdir -p ${params.outdir}/mesa_out
 
-    mesa quant -m $bed_manifest -o mesa --drim --maxLength  50000 \
+    mesa quant -m $bed_manifest -o mesa --maxLength  50000 \
         --minLength 50 --minOverhang 5 --minUnique 5 --lowCoverageNan \
         --minEntropy 1 2> error.txt
 
