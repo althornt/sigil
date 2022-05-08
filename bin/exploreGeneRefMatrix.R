@@ -30,7 +30,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   #'
   #' @param ls_events - list of events of interest to use in heatmap
   #' @param label - label to use in output file path
-  #' @param df_meta - df of metadata with Run, val, and data_source, LM6, LM22 columns
+  #' @param df_meta - df of metadata with Run, val, and data_source, main_label, group_label columns
   #' @param df_PS - df of MESA all PS file
 
   # Filter MESA all PS file to events of interest
@@ -42,7 +42,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
 
   # print(df_all_PS_sig_events)
 
-  for (val in list("LM22", "LM6")){
+  for (val in list("main_label", "group_label")){
       if (nrow(df_all_PS_sig_events) < 50){
         rowname_on_off = "T"
       } else { rowname_on_off = "F"}
@@ -174,7 +174,7 @@ print(dim(df_exp))
 # Metadata
 metadata <- read.csv(file = opt$metadata)
 df_sample_annotations <- metadata %>%
-  dplyr::select(Run,LM22,LM6, sigil_general, data_source) %>%
+  dplyr::select(Run,main_label, group_label, sigil_general, data_source) %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
@@ -195,45 +195,45 @@ df_sample_annotations <- metadata %>%
 ######################################################
 
 # Calculate group medians and make heatmap then z-score
-df_LM6_med <- calcGroupMed(df_exp, unlist(df_geneRefMatrix$X), "LM6")
-df_LM6_med_z <- t(scale(t(df_LM6_med)))
+df_group_label_med <- calcGroupMed(df_exp, unlist(df_geneRefMatrix$X), "group_label")
+df_group_label_med_z <- t(scale(t(df_group_label_med)))
 
-df_LM22_med <- calcGroupMed(df_exp, unlist(df_geneRefMatrix$X), "LM22")
-df_LM22_med_z <- t(scale(t(df_LM22_med)))
+df_main_label_med <- calcGroupMed(df_exp, unlist(df_geneRefMatrix$X), "main_label")
+df_main_label_med_z <- t(scale(t(df_main_label_med)))
 
-print(dim(df_LM6_med))
-print(dim(df_LM6_med_z))
+print(dim(df_group_label_med))
+print(dim(df_group_label_med_z))
 
-print(dim(df_LM22_med))
-print(dim(df_LM22_med_z))
+print(dim(df_main_label_med))
+print(dim(df_main_label_med_z))
 
-write.csv(df_LM6_med, paste0(opt$out_dir,"/LM6_med.csv"))
-write.csv(df_LM6_med_z, paste0(opt$out_dir,"/LM6_med_zscore.csv"))
-write.csv(df_LM22_med, paste0(opt$out_dir,"/LM22_med.csv") )
-write.csv(df_LM22_med_z, paste0(opt$out_dir,"/LM22_med_zscore.csv"))
+write.csv(df_group_label_med, paste0(opt$out_dir,"/group_label_med.csv"))
+write.csv(df_group_label_med_z, paste0(opt$out_dir,"/group_label_med_zscore.csv"))
+write.csv(df_main_label_med, paste0(opt$out_dir,"/main_label_med.csv") )
+write.csv(df_main_label_med_z, paste0(opt$out_dir,"/main_label_med_zscore.csv"))
 ######################################################
 # Count gene occurances in matrix
 ######################################################
 
-# print(head(df_geneRefMatrix))
+print(head(df_geneRefMatrix))
 
-# df_geneRefMatrix_count <- df_geneRefMatrix %>%
-#     group_by(X) %>%
-#     summarize(context = list(cell_type)) %>%
-#   mutate(cell_types = map_chr(context, toString)) %>%
-#   select(X,cell_types) 
+df_geneRefMatrix_count <- df_geneRefMatrix %>%
+    group_by(X) %>%
+    summarize(context = list(cell_type)) %>%
+  mutate(cell_types = map_chr(context, toString)) %>%
+  select(X,cell_types) 
 
-# write.csv(df_geneRefMatrix_count, 
-#             paste0(opt$out_dir,"/gene_occurances.csv"))
+write.csv(df_geneRefMatrix_count, 
+            paste0(opt$out_dir,"/gene_occurances.csv"))
 
-# # Plot distribution of counts per gene 
-# df_hist_gene <- df_geneRefMatrix %>% 
-#   count(X, sort = TRUE) 
-# ggplot(df_hist_gene, aes(x=n)) + 
-#   geom_histogram() + 
-#   scale_x_continuous(breaks = round(seq(min(df_hist_gene$n), max(df_hist_gene$n), by = 1),1)) +
-#   ggtitle("Counts per gene in the gene reference matrix") 
-# ggsave( paste0(opt$out_dir,"/hist_count_per_gene.png"))
+# Plot distribution of counts per gene 
+df_hist_gene <- df_geneRefMatrix %>% 
+  count(X, sort = TRUE) 
+ggplot(df_hist_gene, aes(x=n)) + 
+  geom_histogram() + 
+  scale_x_continuous(breaks = round(seq(min(df_hist_gene$n), max(df_hist_gene$n), by = 1),1)) +
+  ggtitle("Counts per gene in the gene reference matrix") 
+ggsave( paste0(opt$out_dir,"/hist_count_per_gene.png"))
 
 # ######################################################
 # # Z-score all genes
@@ -241,19 +241,19 @@ write.csv(df_LM22_med_z, paste0(opt$out_dir,"/LM22_med_zscore.csv"))
 
 # this takes way too llong 
 # Calculate group medians and make heatmap then z-score
-# df_LM6_med_all_genes <- calcGroupMed(df_exp, unlist(rownames(df_exp)), "LM6")
-# df_LM6_med_z_all_genes <- t(scale(t(df_LM6_med__all_genes)))
+# df_group_label_med_all_genes <- calcGroupMed(df_exp, unlist(rownames(df_exp)), "group_label")
+# df_group_label_med_z_all_genes <- t(scale(t(df_group_label_med__all_genes)))
 
-# df_LM22_med_all_genes <- calcGroupMed(df_exp, unlist(rownames(df_exp)), "LM22")
-# df_LM22_med_z__all_genes <- t(scale(t(df_LM22_med__all_genes)))
+# df_main_label_med_all_genes <- calcGroupMed(df_exp, unlist(rownames(df_exp)), "main_label")
+# df_main_label_med_z__all_genes <- t(scale(t(df_main_label_med__all_genes)))
 
-# print(dim(df_LM6_med_all_genes))
-# print(dim(df_LM6_med_z_all_genes))
+# print(dim(df_group_label_med_all_genes))
+# print(dim(df_group_label_med_z_all_genes))
 
-# print(dim(df_LM22_med_all_genes))
-# print(dim(df_LM22_med_z_all_genes))
+# print(dim(df_main_label_med_all_genes))
+# print(dim(df_main_label_med_z_all_genes))
 
-# write.csv(df_LM6_med_all_genes, paste0(opt$out_dir,"/LM6_med_all_genes.csv"))
-# write.csv(df_LM6_med_z_all_genes, paste0(opt$out_dir,"/LM6_med_zscore_all_genes.csv"))
-# write.csv(df_LM22_med_all_genes, paste0(opt$out_dir,"/LM22_med_all_genes.csv") )
-# write.csv(df_LM22_med_z_all_genes, paste0(opt$out_dir,"/LM22_med_zscore_all_genes.csv"))
+# write.csv(df_group_label_med_all_genes, paste0(opt$out_dir,"/group_label_med_all_genes.csv"))
+# write.csv(df_group_label_med_z_all_genes, paste0(opt$out_dir,"/group_label_med_zscore_all_genes.csv"))
+# write.csv(df_main_label_med_all_genes, paste0(opt$out_dir,"/main_label_med_all_genes.csv") )
+# write.csv(df_main_label_med_z_all_genes, paste0(opt$out_dir,"/main_label_med_zscore_all_genes.csv"))

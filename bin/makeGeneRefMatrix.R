@@ -31,7 +31,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
   #'
   #' @param ls_events - list of events of interest to use in heatmap
   #' @param label - label to use in output file path
-  #' @param df_meta - df of metadata with Run, val, and data_source, LM6, LM22 columns
+  #' @param df_meta - df of metadata with Run, val, and data_source, group_label, main_label columns
   #' @param df_PS - df of MESA all PS file
 
   # Filter MESA all PS file to events of interest
@@ -46,7 +46,7 @@ make_pheatmap <- function(ls_events, label, df_meta, df_PS){
                                           
   rownames(df_all_PS_sig_events_mat) <- rownames(df_all_PS_sig_events)
 
-  for (val in list("LM22", "LM6")){
+  for (val in list("main_label", "group_label")){
       if (nrow(df_all_PS_sig_events) < 50){
         rowname_on_off = "T"
       } else { rowname_on_off = "F"}
@@ -126,7 +126,7 @@ make_umap <- function(num_neighbor,meta_col,df,out_path) {
          dpi = 300)
 
 }
-plot_event <- function(sig_event, cell_type, out_dir, LM_type){
+plot_event <- function(sig_event, cell_type, out_dir, str_label){
   #' Make jitter plot for a given event in all samples
   #'
   #' @param sig_event - string for the significant event to ploit
@@ -136,20 +136,20 @@ plot_event <- function(sig_event, cell_type, out_dir, LM_type){
 
   df <- df_log2tpm_meta %>%
     tibble::rownames_to_column("gene") %>%
-    dplyr::filter(gene %in% list(paste0(sig_event), paste0(LM_type), "data_source"))%>%
+    dplyr::filter(gene %in% list(paste0(sig_event), paste0(str_label), "data_source"))%>%
     t() %>%
     as.data.frame()
 
   df_ <- df # copy df
-  colnames(df_) <- c( "exp", paste0(LM_type), "data_source") #add column names from first row
+  colnames(df_) <- c( "exp", paste0(str_label), "data_source") #add column names from first row
 
   df_ <- df_[-1,] %>% # drop first row 
           # dplyr::filter(PS != "NaN") %>% #drop samples with Nan
-          dplyr::filter(get(LM_type) != "") #drop samaples with out the cell type label
+          dplyr::filter(get(str_label) != "") #drop samaples with out the cell type label
 
   df_$exp <- as.numeric(as.character(df_$exp))
 
-  p <- ggplot( df_, aes(x = get(LM_type), y = exp, color=data_source)) +
+  p <- ggplot( df_, aes(x = get(str_label), y = exp, color=data_source)) +
       # geom_violin() +
       geom_jitter(position=position_jitter(0.15), alpha = 0.5, size = 2) +
       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
@@ -192,7 +192,7 @@ import_deseq2 <- function(filename, topN, plot_out_dir, deseq2_dir, meta_col, co
 
   # Make plots for top negative events
   lapply(df_topN_DEG_down_reg$X,  plot_event, cell_type = LM22_type,
-        LM_type=meta_col, out_dir = plot_out_dir)
+        str_label=meta_col, out_dir = plot_out_dir)
 
   # Get top negative delta events
   df_topN_DEG_up_reg <- df_res %>%
@@ -204,7 +204,7 @@ import_deseq2 <- function(filename, topN, plot_out_dir, deseq2_dir, meta_col, co
 
   # Make plots for top positive events
   lapply(df_topN_DEG_up_reg$X,  plot_event, cell_type = LM22_type,
-        LM_type=meta_col, out_dir = plot_out_dir)
+        str_label=meta_col, out_dir = plot_out_dir)
 
   # Combine lists
   top_sig_neg_and_pos <- unlist(list(df_topN_DEG_down_reg$X,
@@ -253,7 +253,7 @@ import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_co
   #' plots, make heatmaps of the events. This function calls import_deseq2(),
   #' unpack_import_css_res(), and make_pheatmap()
   #'
-  #' @param ls_cell_types - list of LM22 cell-types that were compared in
+  #' @param ls_cell_types - list of  cell-types that were compared in
   #' compareWithinType.R script
   #' @param topN - integer; how many of the top splicing events to use
   #' @param label - string to use to represent cell type in output files
@@ -263,6 +263,9 @@ import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_co
 
   # Get output files from compareWithinType script
   ls_css_file_names <- list.files(deseq2_dir,pattern = ".csv")
+  print(ls_css_file_names)
+  print(label)
+
 
   # For input cell type list , convert to filename
   ls_cell_types_file <- c()
@@ -280,9 +283,9 @@ import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_co
                     topN=topN,
                     import_deseq2,
                     meta_col =meta_col,
-                    plot_out_dir =  paste0(opt$out_dir,"/ref_matrix/within_type/"),
+                    plot_out_dir =  paste0(opt$out_dir,"/ref_matrix/within_group/"),
                     deseq2_dir =  deseq2_dir,
-                    comparison_label = "withinType")
+                    comparison_label = "within_group")
 
   # If only 2 CSS files, they should have identical resuls
   # (comparing A vs B then B) , so only return the results of one
@@ -297,7 +300,7 @@ import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_co
 
   # Filter metadata
   df_metadata_subset <- df_metadata %>%
-    dplyr::filter(LM22 %in% ls_cell_types) %>%
+    dplyr::filter(main_label %in% ls_cell_types) %>%
     droplevels(.) %>%
     dplyr::arrange(Run)
 
@@ -345,17 +348,12 @@ if (!dir.exists(file.path(opt$out_dir,"/ref_matrix/"))){
 if (!dir.exists(file.path(opt$out_dir,"/volcano_plots/"))){
   dir.create(file.path(opt$out_dir,"/volcano_plots/"),
               recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/UMAPs_DEG/"))){
-  dir.create(file.path(opt$out_dir,"/UMAPs_DEG/"),
-              recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/heatmaps_DEG/"))){
-  dir.create(file.path(opt$out_dir,"/heatmaps_DEG/"),
-              recursive = TRUE, showWarnings = TRUE)}
+
 
 # Open files
-df_metadata <- read.csv(file = paste0(opt$in_dir,"/metadata.csv"), header=TRUE)
+df_metadata <- read.csv(file = paste0(opt$in_dir,"/metadata.csv"), header=TRUE, stringsAsFactors = FALSE)
 df_sample_annotations <- df_metadata %>%
-  dplyr::select(Run,LM22,LM6, sigil_general, data_source) %>%
+  dplyr::select(Run,main_label,group_label, sigil_general, data_source) %>%
   tibble::column_to_rownames("Run") %>%
   t()
 df_log2tpm_batch_corrrected <- read.csv(
@@ -365,124 +363,110 @@ df_log2tpm_batch_corrrected <- read.csv(
 df_log2tpm_meta <- rbind(df_log2tpm_batch_corrrected, df_sample_annotations)
 
 ########################################
-# Import LM22 1 vs all comparisons
+# Import main_label 1 vs all comparisons
 #######################################
 
 # Get all outputs from compare sample sets 1 vs all comparisons
-ls_lm22_de_file_names <- list.files(
-                                  paste0(opt$out_dir,"/compare_LM22/deseq2_outputs/"),
+ls_main_label_de_file_names <- list.files(
+                                  paste0(opt$out_dir,"/compare_main_label/deseq2_outputs/"),
                                   pattern = ".csv")
 
 ls_cell_types_file <- list()
-for (val in unique(list(df_metadata$LM22))){
+for (val in unique(list(df_metadata$main_label))){
     new_val <- paste0(gsub(" ","_", val), ".csv")
     ls_cell_types_file <- append(ls_cell_types_file, new_val)
   }
 
-ls_de_file_names_cell_type  <- unlist(intersect(ls_lm22_de_file_names, ls_cell_types_file))
+ls_de_file_names_cell_type  <- unlist(intersect(ls_main_label_de_file_names, ls_cell_types_file))
 
 # Import, find signficant events and plot each one
-ls_lm22_res <- foreach(i=ls_de_file_names_cell_type,
+ls_main_label_res <- foreach(i=ls_de_file_names_cell_type,
                       .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
     import_deseq2(
       filename = i,
       topN = 20,
-      meta_col="LM22",
-      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM22/"),
-      deseq2_dir=paste0(opt$out_dir,"/compare_LM22/deseq2_outputs/"),
-      comparison_label = "LM22"
+      meta_col="main_label",
+      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/main_label/"),
+      deseq2_dir=paste0(opt$out_dir,"/compare_main_label/deseq2_outputs/"),
+      comparison_label = "main_label"
       )
   }
 
-df_lm22_res <- dplyr::bind_rows(ls_lm22_res)
-print("LM22")
-print(head(df_lm22_res))
-print(dim(df_lm22_res))
+df_main_label_res <- dplyr::bind_rows(ls_main_label_res)
+print(head(df_main_label_res))
+print(dim(df_main_label_res))
 
 # Make heatmap using top events
-make_pheatmap(df_lm22_res$X, "LM22_diff_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected )
+make_pheatmap(df_main_label_res$X, "main_label_diff_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected )
 
 
 ########################################
-# Import LM6 1 vs all comparisons
+# Import group_label 1 vs all comparisons
 #######################################
 
 # Get all outputs from compare sample sets 1 vs all comparisons
-ls_lm6_de_file_names <- list.files(
-                                  paste0(opt$out_dir,"/compare_LM6/deseq2_outputs/"),
+ls_group_label_de_file_names <- list.files(
+                                  paste0(opt$out_dir,"/compare_group_label/deseq2_outputs/"),
                                   pattern = ".csv")
 
-ls_lm6_cell_types_file <- list()
-for (val in unique(list(df_metadata$LM6))){
+ls_group_label_cell_types_file <- list()
+for (val in unique(list(df_metadata$group_label))){
     new_val <- paste0(gsub(" ","_", val), ".csv")
-    ls_lm6_cell_types_file <- append(ls_lm6_cell_types_file, new_val)
+    ls_group_label_cell_types_file <- append(ls_group_label_cell_types_file, new_val)
   }
 
-ls_de_file_names_cell_type_lm6  <- unlist(intersect(ls_lm6_de_file_names, ls_lm6_cell_types_file))
+ls_de_file_names_cell_type_group_label  <- unlist(intersect(ls_group_label_de_file_names, ls_group_label_cell_types_file))
 
 # Import, find signficant events and plot each one
-ls_lm6_res <- foreach(i=ls_de_file_names_cell_type_lm6,
+ls_group_label_res <- foreach(i=ls_de_file_names_cell_type_group_label,
                       .packages=c('magrittr','dplyr','ggplot2')) %dopar% {
     import_deseq2(
       filename = i,
       topN = 20,
-      meta_col="LM6",
-      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/LM6/"),
-      deseq2_dir=paste0(opt$out_dir,"/compare_LM6/deseq2_outputs/"),
-      comparison_label = "LM6"
+      meta_col="group_label",
+      plot_out_dir = paste0(opt$out_dir,"/ref_matrix/group_label/"),
+      deseq2_dir=paste0(opt$out_dir,"/compare_group_label/deseq2_outputs/"),
+      comparison_label = "group_label"
       )
   }
 
-df_lm6_res <- dplyr::bind_rows(ls_lm6_res)
-print("LM6")
-print(head(df_lm6_res))
-print(dim(df_lm6_res))
+df_group_label_res <- dplyr::bind_rows(ls_group_label_res)
+print(head(df_group_label_res))
+print(dim(df_group_label_res))
 
 # Make heatmap using top events
-make_pheatmap(df_lm6_res$X, "LM6_diff_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected )
+make_pheatmap(df_group_label_res$X, "group_label_diff_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected )
 
 ########################################
 # Import within type comparisons
 # #######################################
-# mast_cell_types <- list(
-#   "Mast cells resting",
-#   "Mast cells activated")
+# Match main cell type to group labels 
+ls_group_cell_types <- unlist(unique(df_metadata[["group_label"]]))
+ls_main_cell_types <- unlist(unique(df_metadata[["main_label"]]))
 
-# NK_cell_types <- list(
-#   "NK cells resting",
-#   "NK cells activated")
+group2main <- list()
+for (i in ls_group_cell_types){
+  print(i)
 
-ls_within_cell_types <- list(
-  "Tcell" = list(
-    "T cells CD8",
-    "T cells CD4 naive",
-    #   "T cells CD4 memory resting",
-    #   "T cells CD4 memory  activated",
-    "T cells follicular helper",
-    "T cells regulatory (Tregs)",
-    "T cells gamma delta"),
-  "Mon_Mac" = list(
-      "Monocytes",
-      "Macrophages M0",
-      "Macrophages M1"
-      # "Macrophages M2"
-      ),
-  "Bcell" = list(
-    "B cells naive",
-    "B cells memory"),
-  "Dendritic" = list(
-    "Dendritic cells resting",
-    "Dendritic cells activated"))
+  m <- df_metadata %>%
+      filter(group_label == i) 
+  if (length(unique(m$main_label)) > 1) {
+      group2main<- append(group2main,list(list(i, unique(m$main_label)) ))
+  }
+}
 
-ls_within_res <- foreach(i=names(ls_within_cell_types),
+print(group2main)
+print("ppppppppp")
+# Run in parallel
+ls_within_res <- foreach(i=group2main,
                         .packages=c('magrittr','dplyr','ggplot2','pheatmap')) %dopar% {
 
       import_deseq2_within(
-        ls_cell_types = ls_within_cell_types[[i]],
+        ls_cell_types = i[[2]],
         topN = 20,
-        label = i,
-        deseq2_dir = paste0(opt$out_dir, "/compare_within_type/deseq2_outputs/"),
-        meta_col = "LM22")
+        label = i[[1]],
+        deseq2_dir = paste0(opt$out_dir, "/compare_within_group/deseq2_outputs/"),
+        meta_col = "main_label")
 
       }
 
@@ -492,63 +476,23 @@ print(head(df_within_res))
 print(dim(df_within_res))
 
 # # Make heatmap using top events
-make_pheatmap(df_within_res$X, "withinType_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected)
+make_pheatmap(df_within_res$X, "within_group_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected)
 
 ########################################
 # Combined reference matrix
 ######################################
-df_combined_res <- dplyr::bind_rows(list("lm6"  = df_lm6_res,
-                                        "lm22"= df_lm22_res,
-                                        "within" = df_within_res),
+df_combined_res <- dplyr::bind_rows(list("group_label"  = df_group_label_res,
+                                        "main_label"= df_main_label_res,
+                                        "within_group" = df_within_res),
                                         .id = "column_label2")
 print("df_combined_res")
 print(head(df_combined_res))
 print(dim(df_combined_res))
 
 write.table(df_combined_res,
-            file=paste0(opt$out_dir,"/ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
+            file=paste0(opt$out_dir,"/ref_matrix/combined_main_group_withingroup_combinedRefMat.tsv"),
             sep = "\t",row.names = FALSE, quote=F)
 
 # Make heatmap using top events
-make_pheatmap(df_combined_res$X, "LM6_LM22_withinType_gene_heatmap", df_metadata, df_log2tpm_batch_corrrected)
-
-
-# ##################################
-# # UMAPs and heatmaps using DEG
-# ##################################
-# # Using all genes for reference
-# lapply(c(25,30), make_umap, meta_col="LM22",
-#     df = df_log2tpm_batch_corrrected, out_path = "UMAPs_DEG/all_genes")
-
-# # Filter df to top DEG and UMAP and heatmap
-# df_log2tpm_batch_corrrected_topDEG <- df_log2tpm_batch_corrrected %>%
-#     dplyr::filter(X %in% ls_res_topN_DEG_by_pval)
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
-#     df = df_log2tpm_batch_corrrected_topDEG, out_path = "UMAPs_DEG/top_DEG_by_pval")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
-#     df = df_log2tpm_batch_corrrected_topDEG, out_path = "UMAPs_DEG/top_DEG_by_pval")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
-#     df = df_log2tpm_batch_corrrected_topDEG, out_path = "UMAPs_DEG/top_DEG_by_pval")
-# list2heatmap(ls_res_topN_DEG_by_pval, "All top DEG","/heatmaps_DEG/top_DEG_by_pval" )
-
-# # Filter df to top upregulated DEG and UMAP and heatmap
-# df_log2tpm_batch_corrrected_top_up_DEG <- df_log2tpm_batch_corrrected %>%
-#     dplyr::filter(X %in% ls_res_topN_upDEG)
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="LM22",
-#     df = df_log2tpm_batch_corrrected_top_up_DEG, out_path = "UMAPs_DEG/top_up_DEG")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
-#     df = df_log2tpm_batch_corrrected_top_up_DEG, out_path = "UMAPs_DEG/top_up_DEG")
-# lapply(c(5,10,15,20,25,30), make_umap, meta_col="sigil_general",
-#     df = df_log2tpm_batch_corrrected_top_up_DEG, out_path = "UMAPs_DEG/top_up_DEG")
-# list2heatmap(ls_res_topN_upDEG, "All top upregulated DEG", "/heatmaps_DEG/top_up_DEG")
-
-# # Filter df to top downregulated DEG and UMAP and heatmap
-# df_log2tpm_batch_corrrected_top_down_DEG <- df_log2tpm_batch_corrrected %>%
-#     dplyr::filter(X %in% ls_res_topN_downDEG)
-# lapply(c(5,10,15,20,25,30,35), make_umap, meta_col="LM22",
-#     df = df_log2tpm_batch_corrrected_top_down_DEG, out_path = "UMAPs_DEG/top_down_DEG")
-# lapply(c(5,10,15,20,25,30,35), make_umap, meta_col="data_source",
-#     df = df_log2tpm_batch_corrrected_top_down_DEG, out_path = "UMAPs_DEG/top_down_DEG")
-# lapply(c(5,10,15,20,25,30,35), make_umap, meta_col="sigil_general",
-#     df = df_log2tpm_batch_corrrected_top_down_DEG, out_path = "UMAPs_DEG/top_down_DEG")
-# list2heatmap(ls_res_topN_downDEG, "All top downregulated DEG", "/heatmaps_DEG/top_down_DEG")
+make_pheatmap(df_combined_res$X, "combined_main_group_withingroup_gene_heatmap", 
+              df_metadata, df_log2tpm_batch_corrrected)

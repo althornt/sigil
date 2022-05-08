@@ -46,11 +46,12 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path, plot_name) {
     theme_classic() +
     theme(legend.position="bottom",legend.title = element_blank()) +
     scale_color_manual(values=pal) +
-    labs(title= paste("Cell types, n_neighbors =",num_neighbor, sep = ' '))
+    labs(title= paste("Cell types, n_neighbors =",num_neighbor, sep = ' ')) 
+    # +
     # geom_text(
     #         label= umap.out.merge$Run,
-    #         vjust="inward",hjust="inward",
-    #         # nudge_x = 0.05, nudge_y = 0.05,
+    #         # vjust="inward",hjust="inward",
+    #         nudge_x = 0.05, nudge_y = 0.05,
     #         check_overlap =F, col = "darkgreen", size = 2
     #       )
 
@@ -123,7 +124,7 @@ df_to_UMAP <- function(input_df, output_dir, output_name){
   print(dim(prcomp.out))
   
   # Plot PCAs
-  for (meta in list("data_source", "LM22", "LM6", "sigil_general")){
+  for (meta in list("data_source", "main_label", "group_label", "sigil_general")){
     make_PCA(df_PCA = prcomp.out, out_path = paste0(output_dir, "/PCA/"), 
             plot_name = output_name, meta_col = paste0(meta))
     }
@@ -132,11 +133,11 @@ df_to_UMAP <- function(input_df, output_dir, output_name){
   # Plot variations of UMAPs with different numbers of neighbors
   lapply(c(20, 30), make_umap, meta_col="data_source",
     df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
-  lapply(c(20, 30), make_umap, meta_col="LM22",
+  lapply(c(20, 30), make_umap, meta_col="main_label",
     df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
   lapply(c(20, 30), make_umap, meta_col="sigil_general",
     df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
-  lapply(c(20, 30), make_umap, meta_col="LM6",
+  lapply(c(20, 30), make_umap, meta_col="group_label",
     df_PCA = prcomp.out, out_path = paste0(output_dir, "/UMAP/"), plot_name = output_name)
 
 }
@@ -330,11 +331,11 @@ add_z_to_ref <- function(ref_df){
     df_  <- ref_df %>% filter(overlapping == gene)
 
     # Check if gene in gene exp data (splicing can have lists for overlaps "AC129492.1,AC129492.4")
-    if (gene %in% rownames(df_exp_LM6_LM22_med_z)){
+    if (gene %in% rownames(df_exp_group_label_main_label_med_z)){
       
       # Iterate over cell types and look up gene z score
       for (gene_cell in as.vector(unlist(unique(df_$cell_type_group)))){
-        z <- df_exp_LM6_LM22_med_z[gene, gene_cell] 
+        z <- df_exp_group_label_main_label_med_z[gene, gene_cell] 
         # Add gene z to each corresponding splice ref rows
         ref_df <- ref_df %>%
           mutate(gene_z = ifelse(((overlapping==gene) & (cell_type_group==gene_cell)), z, gene_z))
@@ -347,8 +348,8 @@ add_z_to_ref <- function(ref_df){
     df_  <- ref_df %>% filter(event == this_event)
     # Iterate over cell types and look up Z scores 
     for (splice_cell in as.vector(unlist(unique(df_$cell_type_group)))){
-      splice_z_val <- df_splice_LM6_LM22_med_z[this_event, splice_cell] 
-      IR_z_val <- df_IR_LM6_LM22_med_z[this_event, splice_cell] 
+      splice_z_val <- df_splice_group_label_main_label_med_z[this_event, splice_cell] 
+      IR_z_val <- df_IR_group_label_main_label_med_z[this_event, splice_cell] 
 
       # Add zscores to ref df
       ref_df <- ref_df %>%
@@ -397,22 +398,15 @@ print(opt$spliceDir)
 print(opt$geneDir)
 
 # Make output directories
-# if (!dir.exists(file.path(opt$out_dir,"/LM6_scatterplots/"))){
-#   dir.create(file.path(opt$out_dir,"/LM6_scatterplots/"),
-#               recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/dim_red/PCA/"))){
-  dir.create(file.path(opt$out_dir,"/dim_red/PCA/"),
-              recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/dim_red/UMAP/"))){
-  dir.create(file.path(opt$out_dir,"/dim_red/UMAP/"),
-              recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(file.path(opt$out_dir,"/upset_plots/"))){
-  dir.create(file.path(opt$out_dir,"/upset_plots/"),
-              recursive = TRUE, showWarnings = TRUE)}
-
-if (!dir.exists(file.path(opt$out_dir,"/zscore_scatter_plots/"))){
-  dir.create(file.path(opt$out_dir,"/zscore_scatter_plots/"),
-              recursive = TRUE, showWarnings = TRUE)}
+ls_out_paths <- list("/dim_red/PCA/","/dim_red/UMAP/",
+                    "/upset_plots/","/upset_plots/",
+                    "/zscore_scatter_plots/")
+for (path in ls_out_paths){
+  if (!dir.exists(paste0(opt$out_dir,path))){
+    dir.create(paste0(opt$out_dir,path),
+    recursive = TRUE, showWarnings = TRUE)
+}
+}
 
 
 # Read in files 
@@ -420,21 +414,21 @@ if (!dir.exists(file.path(opt$out_dir,"/zscore_scatter_plots/"))){
 # Metadata
 df_metadata <- read.csv(file = opt$metadata)
 df_sample_annotations <- df_metadata %>%
-  dplyr::select(Run,LM22,LM6, sigil_general, data_source) %>%
+  dplyr::select(Run,main_label,group_label, sigil_general, data_source) %>%
   tibble::column_to_rownames("Run") %>%
   t()
 
 # Events in splice reference matrix 
 df_splice_ref <- read.csv(file= paste0(
                                 opt$spliceDir,
-                                "ref_matrix_PS/lm22_lm6_withinType_combinedRefMat.tsv"),
+                                "ref_matrix_PS/combined_main_group_withingroup_combinedRefMat.tsv"),
                           sep = "\t",header=TRUE) 
 
-# Merge cols to add LM tag (within type uses LM22 groups )
+# Merge cols to add LM tag (within type uses main_label groups )
 df_splice_ref <- df_splice_ref %>%
-  mutate(cell_type_group = ifelse(group=="LM6",
-                                paste(cell_type, "LM6", sep = "_"),
-                                paste(cell_type, "LM22", sep = "_")))
+  mutate(cell_type_group = ifelse(group=="group_label",
+                                paste(cell_type, "group_label", sep = "_"),
+                                paste(cell_type, "main_label", sep = "_")))
 print("splice ref mat")
 print(head(df_splice_ref))
 print(dim(df_splice_ref))
@@ -443,15 +437,15 @@ print(unique(df_splice_ref$group))
 # Genes in gene reference matrix 
 df_gene_ref <- read.csv(file= paste0(
                               opt$geneDir,
-                              "ref_matrix/lm22_lm6_withinType_combinedRefMat.tsv"),
+                              "ref_matrix/combined_main_group_withingroup_combinedRefMat.tsv"),
                          sep = "\t",header=TRUE) %>%
               rename(gene = X)
 
-# Merge cols to add LM tag (within type uses LM22 groups )
+# Merge cols to add LM tag (within type uses main_label groups )
 df_gene_ref <- df_gene_ref %>%
-  mutate(cell_type_group = ifelse(group=="LM6",
-                                paste(cell_type, "LM6", sep = "_"),
-                                paste(cell_type, "LM22", sep = "_")))
+  mutate(cell_type_group = ifelse(group=="group_label",
+                                paste(cell_type, "group_label", sep = "_"),
+                                paste(cell_type, "main_label", sep = "_")))
 print("gene ref mat")
 print(head(df_gene_ref))
 print(unique(df_gene_ref$group))
@@ -468,7 +462,7 @@ print(dim(df_exp))
 # Read in all MESA PS 
 df_all_PS <- read.table(file = paste0(
                           opt$spliceDir,
-                          "/batch_corr_mesa_allPS_LM22.tsv"),
+                          "/batch_corr_mesa_allPS.tsv"),
                           sep="\t", header = TRUE, row.names=1) 
 df_all_PS <- df_all_PS %>% mutate_if(is.character,as.numeric)
 
@@ -478,21 +472,21 @@ print(dim(df_all_PS))
 # Read in MESA intron retention reference matrix
 df_IR_ref <- read.csv(file= paste0(
                                 opt$spliceDir,
-                                "ref_matrix_IR/lm22_lm6_withinType_combinedRefMat.tsv"),
+                                "ref_matrix_IR/combined_main_group_withingroup_combinedRefMat.tsv"),
                           sep = "\t",header=TRUE) 
 print(head(df_IR_ref))
 print(dim(df_IR_ref))
 
-# Merge cols to add LM tag (within type uses LM22 groups )
+# Merge cols to add LM tag (within type uses main_label groups )
 df_IR_ref <- df_IR_ref %>%
-  mutate(cell_type_group = ifelse(group=="LM6",
-                                paste(cell_type, "LM6", sep = "_"),
-                                paste(cell_type, "LM22", sep = "_")))
+  mutate(cell_type_group = ifelse(group=="group_label",
+                                paste(cell_type, "group_label", sep = "_"),
+                                paste(cell_type, "main_label", sep = "_")))
 
 # Read in MESA intron retention 
 df_IR_table <- read.table(file = paste0(
                           opt$spliceDir,
-                          "/batch_corr_mesa_ir_table_intron_retention_LM22.tsv"),
+                          "/batch_corr_mesa_ir_table_intron_retention.tsv"),
                           sep="\t", header = TRUE, row.names=1) 
 df_IR_table <- df_IR_table %>% mutate_if(is.character,as.numeric)
 
@@ -548,20 +542,20 @@ df_to_UMAP(df_gene_ref_PS_ref_IR_ref,paste0(opt$out_dir, "/dim_red"), "gene_and_
 # Formating Gene Exp Z-score df
 #################################
 # Gene exp : get medians and z-score across group
-df_exp_LM22_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "LM22")
-df_exp_LM22_med_z <- t(scale(t(df_exp_LM22_med)))
-df_exp_LM6_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "LM6")
-df_exp_LM6_med_z <- t(scale(t(df_exp_LM6_med)))
+df_exp_main_label_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "main_label")
+df_exp_main_label_med_z <- t(scale(t(df_exp_main_label_med)))
+df_exp_group_label_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "group_label")
+df_exp_group_label_med_z <- t(scale(t(df_exp_group_label_med)))
 
-# Add LM6 / LM22 tags to column names because same cell name can be in both
-colnames(df_exp_LM22_med_z) <- paste(colnames(df_exp_LM22_med_z),"LM22",sep=" ")
-colnames(df_exp_LM6_med_z) <- paste(colnames(df_exp_LM6_med_z),"LM6",sep=" ")
+# Add group_label / main_label tags to column names because same cell name can be in both
+colnames(df_exp_main_label_med_z) <- paste(colnames(df_exp_main_label_med_z),"main_label",sep=" ")
+colnames(df_exp_group_label_med_z) <- paste(colnames(df_exp_group_label_med_z),"group_label",sep=" ")
 
-# Gene exp: Combine LM6 and LM22 dfs
-df_exp_LM6_LM22_med_z <- cbind(df_exp_LM6_med_z, df_exp_LM22_med_z)
+# Gene exp: Combine group_label and main_label dfs
+df_exp_group_label_main_label_med_z <- cbind(df_exp_group_label_med_z, df_exp_main_label_med_z)
 print("Combined......")
-print(head(df_exp_LM6_LM22_med_z))
-print(dim(df_exp_LM6_LM22_med_z))
+print(head(df_exp_group_label_main_label_med_z))
+print(dim(df_exp_group_label_main_label_med_z))
 
 # Replace spaces in names with _ to match other df
 str_conv_space <- function(in_str){
@@ -570,100 +564,100 @@ str_conv_space <- function(in_str){
 }
 
 # Replace spaces with _ to match other df
-new_exp_names <- unlist(lapply(colnames(df_exp_LM6_LM22_med_z),FUN= str_conv_space))
-colnames(df_exp_LM6_LM22_med_z) <- new_exp_names
-print(head(df_exp_LM6_LM22_med_z))
+new_exp_names <- unlist(lapply(colnames(df_exp_group_label_main_label_med_z),FUN= str_conv_space))
+colnames(df_exp_group_label_main_label_med_z) <- new_exp_names
+print(head(df_exp_group_label_main_label_med_z))
 
 # Confirm new columns str format matches ref mat rows
 # Add stop if not equal 
 print(dim(df_splice_ref))
-print(dim(df_splice_ref %>% filter(cell_type_group %in% colnames(df_exp_LM6_LM22_med_z))))
+print(dim(df_splice_ref %>% filter(cell_type_group %in% colnames(df_exp_group_label_main_label_med_z))))
 print("############################")
 
 ##################################
 # Formating Splice Z-score df
 #################################
-df_lm22_splice_z <- read.csv(file= paste0(opt$spliceDir,
-                                      "explore_ref_matrix_PS/LM22_med_zscore.csv"),
+df_main_label_splice_z <- read.csv(file= paste0(opt$spliceDir,
+                                      "explore_ref_matrix_PS/main_label_med_zscore.csv"),
                             header=TRUE, check.names=FALSE, row.names = 1)
 
 
-print(head(df_lm22_splice_z))
-df_lm6_splice_z <- read.csv(file= paste0(opt$spliceDir,
-                                      "explore_ref_matrix_PS/LM6_med_zscore.csv"),
+print(head(df_main_label_splice_z))
+df_group_label_splice_z <- read.csv(file= paste0(opt$spliceDir,
+                                      "explore_ref_matrix_PS/group_label_med_zscore.csv"),
                             header=TRUE, check.names=FALSE, row.names = 1) 
-print(head(df_lm6_splice_z))
+print(head(df_group_label_splice_z))
 
-# Add LM6 / LM22 tags to column names because same cell name can be in both
-colnames(df_lm22_splice_z) <- paste(colnames(df_lm22_splice_z),"LM22",sep=" ")
-colnames(df_lm6_splice_z) <- paste(colnames(df_lm6_splice_z),"LM6",sep=" ")
+# Add group_label / main_label tags to column names because same cell name can be in both
+colnames(df_main_label_splice_z) <- paste(colnames(df_main_label_splice_z),"main_label",sep=" ")
+colnames(df_group_label_splice_z) <- paste(colnames(df_group_label_splice_z),"group_label",sep=" ")
 
-print(head(df_lm6_splice_z))
-print(head(df_lm22_splice_z))
+print(head(df_group_label_splice_z))
+print(head(df_main_label_splice_z))
 
 # Merge by row.names (cant cbind due to different number of events likely due to NANs)
-df_splice_LM6_LM22_med_z <- merge(df_lm6_splice_z,df_lm22_splice_z,by=0) %>%
+df_splice_group_label_main_label_med_z <- merge(df_group_label_splice_z,df_main_label_splice_z,by=0) %>%
   column_to_rownames("Row.names")
 
-# Splice: Combine LM6 and LM22
-# df_splice_LM6_LM22_med_z <- cbind(df_lm6_splice_z, df_lm22_splice_z)
-print(dim(df_lm6_splice_z))
-print(dim(df_lm22_splice_z))
-print(dim(df_splice_LM6_LM22_med_z))
-print(head(df_splice_LM6_LM22_med_z))
+# Splice: Combine group_label and main_label
+# df_splice_group_label_main_label_med_z <- cbind(df_group_label_splice_z, df_main_label_splice_z)
+print(dim(df_group_label_splice_z))
+print(dim(df_main_label_splice_z))
+print(dim(df_splice_group_label_main_label_med_z))
+print(head(df_splice_group_label_main_label_med_z))
 
 # Replace spaces with _ to match other df
-new_splice_names <- unlist(lapply(colnames(df_splice_LM6_LM22_med_z),FUN= str_conv_space))
-colnames(df_splice_LM6_LM22_med_z) <- new_splice_names
-print(head(df_splice_LM6_LM22_med_z))
+new_splice_names <- unlist(lapply(colnames(df_splice_group_label_main_label_med_z),FUN= str_conv_space))
+colnames(df_splice_group_label_main_label_med_z) <- new_splice_names
+print(head(df_splice_group_label_main_label_med_z))
 
 # Check new columns str format matches ref mat rows
 # Add stop if not equal 
 print(dim(df_splice_ref))
-print(dim(df_splice_ref %>% filter(cell_type_group %in% colnames(df_splice_LM6_LM22_med_z))))
+print(dim(df_splice_ref %>% filter(cell_type_group %in% colnames(df_splice_group_label_main_label_med_z))))
 
 ##################################
 # Formating IR Z-score df
 #################################
-df_lm22_IR_z <- read.csv(file= paste0(opt$spliceDir,
-                                      "explore_ref_matrix_IR/LM22_med_zscore.csv"),
+df_main_label_IR_z <- read.csv(file= paste0(opt$spliceDir,
+                                      "explore_ref_matrix_IR/main_label_med_zscore.csv"),
                             header=TRUE, check.names=FALSE, row.names = 1)
 
 
-print(head(df_lm22_IR_z))
-df_lm6_IR_z <- read.csv(file= paste0(opt$spliceDir,
-                                      "explore_ref_matrix_IR/LM6_med_zscore.csv"),
+print(head(df_main_label_IR_z))
+df_group_label_IR_z <- read.csv(file= paste0(opt$spliceDir,
+                                      "explore_ref_matrix_IR/group_label_med_zscore.csv"),
                             header=TRUE, check.names=FALSE, row.names = 1) 
-print(head(df_lm6_IR_z))
+print(head(df_group_label_IR_z))
 
-# Add LM6 / LM22 tags to column names because same cell name can be in both
-colnames(df_lm22_IR_z) <- paste(colnames(df_lm22_IR_z),"LM22",sep=" ")
-colnames(df_lm6_IR_z) <- paste(colnames(df_lm6_IR_z),"LM6",sep=" ")
+# Add group_label / main_label tags to column names because same cell name can be in both
+colnames(df_main_label_IR_z) <- paste(colnames(df_main_label_IR_z),"main_label",sep=" ")
+colnames(df_group_label_IR_z) <- paste(colnames(df_group_label_IR_z),"group_label",sep=" ")
 
-print(head(df_lm6_IR_z))
-print(head(df_lm22_IR_z))
+print(head(df_group_label_IR_z))
+print(head(df_main_label_IR_z))
 
 # Merge by row.names (cant cbind due to different number of events likely due to NANs)
-df_IR_LM6_LM22_med_z <- merge(df_lm6_IR_z,df_lm22_IR_z,by=0) %>%
+df_IR_group_label_main_label_med_z <- merge(df_group_label_IR_z,df_main_label_IR_z,by=0) %>%
   column_to_rownames("Row.names")
 
-# IR: Combine LM6 and LM22
-# df_IR_LM6_LM22_med_z <- cbind(df_lm6_IR_z, df_lm22_IR_z)
-print(dim(df_lm6_IR_z))
-print(dim(df_lm22_IR_z))
-print(dim(df_IR_LM6_LM22_med_z))
-print(head(df_IR_LM6_LM22_med_z))
+# IR: Combine group_label and main_label
+# df_IR_group_label_main_label_med_z <- cbind(df_group_label_IR_z, df_main_label_IR_z)
+print(dim(df_group_label_IR_z))
+print(dim(df_main_label_IR_z))
+print(dim(df_IR_group_label_main_label_med_z))
+print(head(df_IR_group_label_main_label_med_z))
 
 # Replace spaces with _ to match other df
-new_IR_names <- unlist(lapply(colnames(df_IR_LM6_LM22_med_z),FUN= str_conv_space))
-colnames(df_IR_LM6_LM22_med_z) <- new_IR_names
-print(head(df_IR_LM6_LM22_med_z))
+new_IR_names <- unlist(lapply(colnames(df_IR_group_label_main_label_med_z),FUN= str_conv_space))
+colnames(df_IR_group_label_main_label_med_z) <- new_IR_names
+print(head(df_IR_group_label_main_label_med_z))
 
 # Check new columns str format matches ref mat rows
 # Add stop if not equal 
 print(dim(df_IR_ref))
 # print(head(df_IR_ref))
-print(dim(df_IR_ref %>% filter(cell_type_group %in% colnames(df_IR_LM6_LM22_med_z))))
+print(dim(df_IR_ref %>% filter(cell_type_group %in% colnames(df_IR_group_label_main_label_med_z))))
 
 ###########################################################################
 # Adding all z-scores into df of splice ref events and IR ref events 
