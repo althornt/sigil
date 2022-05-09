@@ -19,11 +19,12 @@ process STAR_ALIGN {
 
     """
 
-    STAR --genomeDir $star_index \
+     STAR --genomeDir $star_index \
      --readFilesIn $reads \
      --outSAMtype BAM SortedByCoordinate \
      --runThreadN $task.cpus \
-     --outWigType bedGraph \
+     --outWigType wiggle \
+     --outWigStrand Unstranded \
      --outFileNamePrefix $file_id \
      --twopassMode Basic \
      --readFilesCommand zcat \
