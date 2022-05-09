@@ -20,6 +20,7 @@ dependencies:
   - pysam==0.15.4
   - matplotlib
   - seaborn
+  - pyBigWig
   - R
   - bioconductor-DRIMSeq
   - bioconductor-deseq2
@@ -28,6 +29,7 @@ dependencies:
   - bioconductor-EnsDb.Hsapiens.v86
   - bioconductor-rhdf5
   - bioconductor-limma
+  - bioconductor-ComplexHeatmap
   - r-optparse
   - r-uwot
   - r-ggplot2
@@ -38,3 +40,13 @@ dependencies:
   - r-foreach
   - r-UpSetR
   - r-import
+  - r-foreach
+  - r-ggrepel
+  - r-patchwork
+
+
+
+
+
+
+

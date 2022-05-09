@@ -374,11 +374,25 @@ lapply(c(5,10,15,20,25,30), make_umap, meta_col="data_source",
 # UMAPs after batch correction
 ####################################
 # Batch correction
-log2trans_dat_batch_corr <- limma::removeBatchEffect(
+
+
+# Limma remove batch effect
+if ((length(unique(df_merged_metadata_labelled$data_source))==1)){
+    log2trans_dat_batch_corr <- log2trans_dat
+
+}  else if ((length(unique(df_merged_metadata_labelled$data_source))>1) & (length(unique(df_merged_metadata_labelled$type))==1)){
+    log2trans_dat_batch_corr <- limma::removeBatchEffect(
+                                  log2trans_dat,
+                                  batch = df_merged_metadata_labelled$data_source
+                                  )
+}  else if ((length(unique(df_merged_metadata_labelled$data_source))>1) & (length(unique(df_merged_metadata_labelled$type))>1)){
+    log2trans_dat_batch_corr <- limma::removeBatchEffect(
                                   log2trans_dat,
                                   batch = df_merged_metadata_labelled$data_source,
                                   batch2 = df_merged_metadata_labelled$type
                                   )
+    }
+
   write.csv(log2trans_dat_batch_corr,
            file.path(file.path(opt$out_dir,"combined_kallisto_log2tpm_batch_corrected.csv")),
            row.names = TRUE)

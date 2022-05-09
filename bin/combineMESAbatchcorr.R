@@ -401,11 +401,22 @@ print(dim(df_log2trans_IR_cov))
 
 
 # Limma remove batch effect
-df_mesa_IR_cov_merge_log2_batch_corr <- limma::removeBatchEffect(
+if ((length(unique(df_merged_metadata_labelled$data_source))==1)){
+    df_mesa_IR_cov_merge_log2_batch_corr <- df_log2trans_IR_cov
+
+}  else if ((length(unique(df_merged_metadata_labelled$data_source))>1) & (length(unique(df_merged_metadata_labelled$type))==1)){
+    df_mesa_IR_cov_merge_log2_batch_corr <- limma::removeBatchEffect(
+                                  df_log2trans_IR_cov,
+                                  batch = df_merged_metadata_labelled$data_source
+                                  )
+}  else if ((length(unique(df_merged_metadata_labelled$data_source))>1) & (length(unique(df_merged_metadata_labelled$type))>1)){
+    df_mesa_IR_cov_merge_log2_batch_corr <- limma::removeBatchEffect(
                                   df_log2trans_IR_cov,
                                   batch = df_merged_metadata_labelled$data_source,
                                   batch2 = df_merged_metadata_labelled$type
                                   )
+    }
+
 
 print(dim(df_mesa_IR_cov_merge_log2_batch_corr))
 
@@ -467,11 +478,28 @@ foreach (i = ls_cols , .packages=  'magrittr') %dopar% {
 df_log2trans_inc_counts <- as.data.frame(log2(df_merged_inc_counts +1))
 
 # Limma remove batch effect
-df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
+if ((length(unique(df_merged_metadata_labelled$data_source))==1)){
+    df_mesa_inc_count_merge_log2_batch_corr <- df_log2trans_inc_counts
+
+}  else if ((length(unique(df_merged_metadata_labelled$data_source))>1) & (length(unique(df_merged_metadata_labelled$type))==1)){
+    df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
+                                  df_log2trans_inc_counts,
+                                  batch = df_merged_metadata_labelled$data_source
+                                  )
+}  else if ((length(unique(df_merged_metadata_labelled$data_source))>1) & (length(unique(df_merged_metadata_labelled$type))>1)){
+    df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
                                   df_log2trans_inc_counts,
                                   batch = df_merged_metadata_labelled$data_source,
                                   batch2 = df_merged_metadata_labelled$type
                                   )
+    }
+
+# Limma remove batch effect
+# df_mesa_inc_count_merge_log2_batch_corr <- limma::removeBatchEffect(
+#                                   df_log2trans_inc_counts,
+#                                   batch = df_merged_metadata_labelled$data_source
+#                                   # batch2 = df_merged_metadata_labelled$type
+#                                   )
 
 # Undo log2(x+1) with 2^x - 1
 df_merged_inc_counts_batch_corr = 2^df_mesa_inc_count_merge_log2_batch_corr -1

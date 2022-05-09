@@ -269,5 +269,16 @@ sudo nextflow run sigil_build.nf  \
   --manifest /mnt/files/sigil_res_manifest_noSongmono_Calderondroppedtreatment_20220503.txt  \
   --outdir /mnt/results_sigil_combine/sigil_results_noSongmono_Calderondroppedtreatment_20220503
 
+sudo nextflow run sigil_build.nf  \
+  --manifest /mnt/files/sigil_res_manifest_newformat_20220504.txt  \
+  --outdir /mnt/results_sigil_combine/sigil_results_newformat_20220504
+
+
+sudo nextflow run sigil_build.nf  \
+  --manifest /mnt/files/sigil_res_manifest_noSongmono_Calderontreatment_20220505.txt  \
+  --outdir /mnt/results_sigil_combine/sigil_results_Calderontreatment_20220505
+
+
+
 ```
 
