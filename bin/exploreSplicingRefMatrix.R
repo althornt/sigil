@@ -17,7 +17,7 @@ registerDoParallel(cl)
 # Functions
 ################
 junc2bed <- function(junction){
-  chr = strsplit(junction, ":")[[1]][1]
+  chr = paste0("chr",strsplit(junction, ":")[[1]][1])
   range = strsplit(junction, ":")[[1]][2]
   range_start = strsplit(range, "-")[[1]][1]
   range_end = strsplit(range, "-")[[1]][2]
@@ -201,7 +201,7 @@ print(dim(df_all_PS_ref_events))
 print("Number of unique events:")
 print(length(unique(df_spliceRefMatrix$event)))
 ls_bed <- as.vector(sapply( unique(df_spliceRefMatrix$event), junc2bed))
-writeLines(ls_bed, paste0(opt$out_dir,"/IR_RefMatrix.bed"))
+writeLines(ls_bed, paste0(opt$out_dir,"/RefMatrix.bed"))
 
 ######################################################
 # RefMat with medians + z-score
