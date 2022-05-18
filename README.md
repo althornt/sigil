@@ -278,7 +278,17 @@ sudo nextflow run sigil_build.nf  \
   --manifest /mnt/files/sigil_res_manifest_noSongmono_Calderontreatment_20220505.txt  \
   --outdir /mnt/results_sigil_combine/sigil_results_Calderontreatment_20220505
 
+sudo nextflow run sigil_build.nf  \
+  --manifest /mnt/sigil_build_manifests/sigil_res_grant_SongChoi_20220507.txt  \
+  --outdir /mnt/results_sigil_combine/sigil_results_sigil_res_grant_SongChoi_20220507
 
+sudo nextflow run sigil_build.nf  \
+  --manifest /mnt/sigil_build_manifests/song_only.txt  \
+  --outdir /mnt/results_sigil_combine/test_new_bc_song_20220508
+
+sudo nextflow run sigil_build.nf  \
+  --manifest /mnt/sigil_build_manifests/sigil_res_SongChoiMonaco_20220515.txt  \
+  --outdir /mnt/results_sigil_combine/sigil_results_SongChoiMonaco_202205015_newmethod
 
 ```
 
