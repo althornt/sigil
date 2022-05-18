@@ -292,3 +292,27 @@ sudo nextflow run sigil_build.nf  \
 
 ```
 
+Bam to bigwigs 
+`sudo docker run -v /mnt:/mnt_ -ti althornt/sigl_prep:latest` 
+
+Song
+```
+./bam2bigwigs.R --manifest /mnt_/sra-manifest/SRP253519_SraRunTable_Song_grant.csv --bam_dir /mnt_/results/sigil_results_SRP253519_Song_20220507/star_out/ --out_dir /mnt_/sigil_tracks/Song/ --header /mnt_/sigil/files/header_edited.txt
+```
+
+Choi
+```
+./bam2bigwigs.R --manifest /mnt_/sra-manifest/SRP150419_SraRunTable_Choi_sigil.csv --bam_dir /mnt_/results/sigil_results_SRP150419_Choi_20211124/star_out --out_dir /mnt_/sigil_tracks/Choi/ --header /mnt_/sigil/files/header_edited.txt
+```
+
+Make browser trackDb file 
+`sudo docker run -v /mnt:/mnt_ -ti althornt/sigl_prep:latest` 
+
+Song
+```bash
+./maketrackDb.R --manifest /mnt_/sra-manifest/SRP253519_SraRunTable_Song_grant.csv \
+     --out_dir /mnt_/sigil_tracks/Song/ \
+     --public_path "http://public.gi.ucsc.edu/~althornt/Song_tracks/"
+```
+
+
