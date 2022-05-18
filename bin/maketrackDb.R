@@ -8,12 +8,6 @@ library(doParallel)
 # Arguments
 option_list <- list(
 
-  optparse::make_option(
-    c("-d", "--bam_dir"),
-    type = "character",
-    default = NULL,
-    help = "path to STAR directory containing STAR output directories per sample"),
-
 optparse::make_option(
     c("-m", "--manifest"),
     type = "character",
@@ -26,11 +20,12 @@ optparse::make_option(
     default = NULL,
     help = "path to write output directory"),
   
-  optparse::make_option(
-    c("-b", "--bam_header"),
+    optparse::make_option(
+    c("-p", "--public_path"),
     type = "character",
     default = NULL,
-    help = "new bam header")
+    help = "public path to dir where the bigwigs will exist")
+
   )
 
 # Read the arguments passed
@@ -40,36 +35,46 @@ opt <- optparse::parse_args(opt_parser)
 # registerDoParallel(cl)
 
 colors <- c(
-  "139,0,0", #	dark red	#8B0000	(139,0,0)
-  "165,42,42", #brown	#A52A2A	(165,42,42)
- 	"178,34,34",#	firebrick	#B22222	(178,34,34)
- 	"220,20,60", #crimson	#DC143C	(220,20,60)
- 	"255,0,0", #red	#FF0000	(255,0,0)
- 	"255,99,71", #tomato	#FF6347	(255,99,71)
- 	"255,127,80", # coral	#FF7F50	(255,127,80)
- 	"205,92,92", #indian red	#CD5C5C	(205,92,92)
- 	"240,128,128", #light coral	#F08080	(240,128,128)
- 	"233,150,122", #dark salmon	#E9967A	(233,150,122)
-  "250,128,114",	#salmon	#FA8072	(250,128,114)
- 	"255,160,122", #light salmon	#FFA07A	(255,160,122)
- 	"255,69,0", #orange red	#FF4500	(255,69,0)
- 	"255,140,0") #dark orange	#FF8C00	(255,140,0)
+  #  14 Song
+  # "139,0,0", #	dark red	#8B0000	(139,0,0)
+  # "165,42,42", #brown	#A52A2A	(165,42,42)
+ 	# "178,34,34",#	firebrick	#B22222	(178,34,34)
+ 	# "220,20,60", #crimson	#DC143C	(220,20,60)
+ 	# "255,0,0", #red	#FF0000	(255,0,0)
+ 	# "255,99,71", #tomato	#FF6347	(255,99,71)
+ 	# "255,127,80", # coral	#FF7F50	(255,127,80)
+ 	# "205,92,92", #indian red	#CD5C5C	(205,92,92)
+ 	# "240,128,128", #light coral	#F08080	(240,128,128)
+ 	# "233,150,122", #dark salmon	#E9967A	(233,150,122)
+  # "250,128,114",	#salmon	#FA8072	(250,128,114)
+ 	# "255,160,122", #light salmon	#FFA07A	(255,160,122)
+ 	# "255,69,0", #orange red	#FF4500	(255,69,0)
+ 	# "255,140,0") #dark orange	#FF8C00	(255,140,0))
  	
+
+
   #  orange	#FFA500	(255,165,0)
- 	# gold	#FFD700	(255,215,0)
- 	# dark golden rod	#B8860B	(184,134,11)
- 	# golden rod	#DAA520	(218,165,32)
- 	# pale golden rod	#EEE8AA	(238,232,170)
- 	# dark khaki	#BDB76B	(189,183,107)
- 	# khaki	#F0E68C	(240,230,140)
- 	# olive	#808000	(128,128,0)
- 	# yellow	#FFFF00	(255,255,0)
- 	# yellow green	#9ACD32	(154,205,50)
- 	# dark olive green	#556B2F	(85,107,47)
- 	# olive drab	#6B8E23	(107,142,35)
- 	# lawn green	#7CFC00	(124,252,0)
- 	# chartreuse	#7FFF00	(127,255,0)
- 	# green yellow	#ADFF2F	(173,255,47)
+
+
+  #  12 Choi
+ 	"255,215,0", #gold	#FFD700	(255,215,0)
+ 	"184,134,11", #dark golden rod	#B8860B	(184,134,11)
+ 	"218,165,32", #golden rod	#DAA520	(218,165,32)
+ 	"238,232,170", #pale golden rod	#EEE8AA	(238,232,170)
+ 	"189,183,107", #dark khaki	#BDB76B	(189,183,107)
+ 	"240,230,140", #khaki	#F0E68C	(240,230,140)
+ 	"128,128,0", #olive	#808000	(128,128,0)
+ 	"255,255,0", #yellow	#FFFF00	(255,255,0)
+ 	"154,205,50", #yellow green	#9ACD32	(154,205,50)
+ 	"85,107,47", #dark olive green	#556B2F	(85,107,47)
+ 	"107,142,35", #olive drab	#6B8E23	(107,142,35)
+ 	"124,252,0")
+   
+   
+    #lawn green	#7CFC00	(124,252,0)
+ 	# "127,255,0") #chartreuse	#7FFF00	(127,255,0)
+ 	
+   # green yellow	#ADFF2F	(173,255,47)
  	# dark green	#006400	(0,100,0)
  	# green	#008000	(0,128,0)
  	# forest green	#228B22	(34,139,34)
@@ -97,41 +102,44 @@ if (!dir.exists(file.path(opt$out_dir,"/bams_ucsc/"))){
 df_metadata <- read.csv(file = opt$manifest)
 print(head(df_metadata))
 
-print(length(unique(df_metadata$sigil_cell_type_treatment)))
-print(df_metadata$sigil_cell_type_treatment)
-
+print(length(unique(df_metadata$source_name)))
+print(df_metadata$source_name)
 print(colors)
 
 # Map colors to each label
-df_colormap <- data.frame(track_label=unique(df_metadata$sigil_cell_type_treatment),
+df_colormap <- data.frame(track_label=unique(df_metadata$source_name),
                              RGB=colors)
 
 print(df_colormap)
 
+#Check its existence
+if (file.exists(paste0(opt$out_dir,"/trackDb.txt"))) {
+  #Delete file if it exists
+  file.remove(paste0(opt$out_dir,"/trackDb.txt"))
+}
+
 outfile = file(paste0(opt$out_dir,"/trackDb.txt"), open = 'a') # open in “a”ppend mode
 
-
-public_path = "http://public.gi.ucsc.edu/~althornt/Song_tracks/"
 
 for (i in df_metadata$Run){
 
   source_name <- as.character(subset(df_metadata, Run ==i)$source_name)
   treatment <- as.character(subset(df_metadata, Run ==i)$treatment)
-  label <- as.character(subset(df_metadata, Run ==i)$sigil_cell_type_treatment)
-  color <- as.character(subset(df_colormap, track_label ==label)$RGB)
+  # label <- as.character(subset(df_metadata, Run ==i)$sigil_cell_type_treatment)
+  # color <- as.character(subset(df_colormap, track_label ==label)$RGB)
+  color <- as.character(subset(df_colormap, track_label ==source_name)$RGB)
 
   cat("track",i, '\n', file = outfile, sep = ' ', append = TRUE)
-  cat("bigDataUrl", paste0(public_path,i,".bw"), '\n', file = outfile, sep = ' ', append = TRUE)
-  cat("shortLabel",label, '\n', file = outfile, sep = ' ', append = TRUE)
+  cat("bigDataUrl", paste0(opt$public_path,i,".bw"), '\n', file = outfile, sep = ' ', append = TRUE)
+  cat("shortLabel",source_name, '\n', file = outfile, sep = ' ', append = TRUE)
   cat("longLabel", i,source_name, treatment,'\n', file = outfile, sep = ' ', append = TRUE)
   cat("type bigWig",'\n', file = outfile, sep = ' ', append = TRUE)
   cat("color",color, '\n', file = outfile, sep = ' ', append = TRUE)
-  cat("autoScale on",color, '\n', file = outfile, sep = ' ', append = TRUE)
+  cat("autoScale on", '\n', file = outfile, sep = ' ', append = TRUE)
 
   cat('\n',  file = outfile, sep = ' ', append = TRUE)
 
   # cat(i, '\n', file = 'filename', sep = '', append = TRUE)
-
 
 
 }
