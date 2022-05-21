@@ -23,6 +23,7 @@ dependencies:
   - pyBigWig
   - deepTools
   - fastp
+  - wiggletools
   - R
   - bioconductor-DRIMSeq
   - bioconductor-deseq2

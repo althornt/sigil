@@ -55,6 +55,10 @@ foreach(i=df_metadata$Run) %dopar%{
   bam_path <- file.path(opt$bam_dir, paste0("STAR_", i),
                   paste0(i,"Aligned.sortedByCoord.out.bam"))
 
+  # cmd0 <- paste0("samtools index ",bam_path)
+  # print(cmd0)
+  # system(cmd0)
+
   # Remove extra chroms ; and update header 
   cmd1 <- paste0("samtools view -b ", bam_path, 
                 " 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y MT | samtools reheader ",
@@ -69,7 +73,7 @@ foreach(i=df_metadata$Run) %dopar%{
 
   # Make bigwigs from bam 
   cmd3 <- paste0("bamCoverage -b ",opt$out_dir,"bams_ucsc/", i, ".bam -o ", 
-        opt$out_dir,"/bigwigs/",i,".bw --binSize 25 --normalizeUsing BPM ")
+        opt$out_dir,"/bigwigs/",i,".bw --binSize 5 ")
   print(cmd3)       
   system(cmd3)       
   }

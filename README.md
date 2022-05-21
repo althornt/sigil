@@ -292,7 +292,7 @@ sudo nextflow run sigil_build.nf  \
 
 ```
 
-Bam to bigwigs 
+# Bam to bigwigs 
 `sudo docker run -v /mnt:/mnt_ -ti althornt/sigl_prep:latest` 
 
 Song
@@ -305,14 +305,24 @@ Choi
 ./bam2bigwigs.R --manifest /mnt_/sra-manifest/SRP150419_SraRunTable_Choi_sigil.csv --bam_dir /mnt_/results/sigil_results_SRP150419_Choi_20211124/star_out --out_dir /mnt_/sigil_tracks/Choi/ --header /mnt_/sigil/files/header_edited.txt
 ```
 
-Make browser trackDb file 
-`sudo docker run -v /mnt:/mnt_ -ti althornt/sigl_prep:latest` 
-
-Song
-```bash
-./maketrackDb.R --manifest /mnt_/sra-manifest/SRP253519_SraRunTable_Song_grant.csv \
-     --out_dir /mnt_/sigil_tracks/Song/ \
-     --public_path "http://public.gi.ucsc.edu/~althornt/Song_tracks/"
+Monaco
+```
+./bam2bigwigs.R --manifest /mnt_/sra-manifest/SRP125125_SraRunTable_Monaco_sigil.csv --bam_dir /mnt_/results/sigil_results_SRP125125_Monaco_20211109/star_out --out_dir /mnt_/sigil_tracks/Monaco/ --header /mnt_/sigil/files/header_edited.txt
 ```
 
+# Make browser trackDb file 
+`sudo docker run -v /mnt:/mnt_ -ti althornt/sigl_prep:latest` 
 
+Choi
+```bash
+./maketrackDb.R --manifest /mnt_/sra-manifest/SRP150419_SraRunTable_Choi_sigil.csv \
+     --out_dir /mnt_/sigil_tracks/Choi/ \
+     --public_path "http://public.gi.ucsc.edu/~althornt/Choi_PMID30395284_tracks/"
+```
+
+Monaco 
+```bash
+./maketrackDb.R --manifest /mnt_/sra-manifest/SRP125125_SraRunTable_Monaco_sigil.csv \
+     --out_dir /mnt_/sigil_tracks/Monaco/ \
+     --public_path "http://public.gi.ucsc.edu/~althornt/Monaco_PMID30726743_tracks/"
+```
