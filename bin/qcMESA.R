@@ -9,6 +9,77 @@ library(RColorBrewer)
 # library(doParallel)
 # cl <- makeCluster(detectCores() - 1, outfile = "")
 # registerDoParallel(cl)
+mesatable_qc <-function(ls_mesa_files, out_prefix){
+
+  print("-----F start")
+  print(ls_mesa_files)
+  print(ls_source_names)
+  print("========================")
+  
+  df_summary = data.frame() 
+
+  for (i in seq_along(ls_mesa_files)){
+
+
+    source_name = ls_source_names[i]
+    print(source_name)
+
+    file_name = as.character(ls_mesa_files[i])
+    print(file_name)
+    if (!file.exists(file_name)){
+      next
+    }
+
+    df_allPS <- read.table(as.character(file_name), row.names = 1, header=T)
+    print(dim(df_allPS))
+
+    # Add dimensions of PS to summary table 
+    df_summary[source_name,"PS_nrow" ] <- nrow(df_allPS)
+    df_summary[source_name,"PS_ncol" ] <- ncol(df_allPS)
+
+    # # Count nan per sample and per junction
+    # high_nan_samples = names(column.nan.counts[column.nan.counts > (dim(df_allPS)[1]/2)])
+
+    # # df_summary[source_name,"PS_min_nan_col_count" ] <- min(column.nan.counts)
+    # # df_summary[source_name,"PS_max_nan_col_count" ] <- max(column.nan.counts)
+    # # df_summary[source_name,"PS_med_nan_col_count" ] <- median(column.nan.counts)
+
+    # Percent of nan in all df 
+    df_summary[source_name,"PS_perc_nan" ]<-sum(is.na(df_allPS))/prod(dim(df_allPS))
+    
+    # Percent nan in each sample 
+    df_summary[source_name,"PS_min_nan_col_perc" ] <- min(colMeans(is.na(df_allPS)))
+    df_summary[source_name,"PS_max_nan_col_perc" ] <- max(colMeans(is.na(df_allPS)))
+    df_summary[source_name,"PS_med_nan_col_perc" ] <- median(colMeans(is.na(df_allPS)))
+
+    # Plot hist of nan per sample in given data souce 
+    ggplot(NULL, aes(x=colMeans(is.na(df_allPS)))) + geom_histogram() + 
+            scale_x_continuous(limits = c( 0,1 )) + xlab("Percent NAN in sample") +
+            ggtitle(source_name) + geom_vline(xintercept = 0.5)
+
+    ggsave(file.path(opt$out_dir,
+            paste(out_prefix, source_name,"sample_nans", "png", sep = '.')),
+            device = "png",
+            width = 12,
+            dpi = 300)
+
+    # Percent nan in each junction
+    df_summary[source_name,"PS_min_nan_row_perc" ] <- min(rowMeans(is.na(df_allPS)))
+    df_summary[source_name,"PS_max_nan_row_perc" ] <- max(rowMeans(is.na(df_allPS)))
+    df_summary[source_name,"PS_med_nan_row_perc" ] <- median(rowMeans(is.na(df_allPS)))
+
+    # Plot hist of nan per junction in given data souce 
+    ggplot(NULL, aes(x=rowMeans(is.na(df_allPS)))) + geom_histogram() + 
+            scale_x_continuous(limits = c( 0,1 )) + xlab("Percent NAN in junction") +
+            ggtitle(source_name) + geom_vline(xintercept = 0.5)
+    ggsave(file.path(opt$out_dir,
+            paste(out_prefix, source_name,"junction_nans", "png", sep = '.')),
+            device = "png",
+            width = 12,
+            dpi = 300)
+      }
+  return(df_summary)
+  }
 
 importMetaMESA <- function(row){
   # Read metadata and add column for run
@@ -86,85 +157,16 @@ for (item in ls_mesa_meta) {
 df_merged_metadata <- do.call("rbind", ls_meta)
 rownames(df_merged_metadata) <- c()
 
-# print(ls_source_names)
-# print("--")
+###############################
+# Before nan adjust/filter
+###############################
 
-# print(ls_source_names[3])
+# Run qc function on PS tables 
+df_summary_PS <- mesatable_qc(ls_mesa_allPS_files,  "PS")
+print(df_summary_PS)
 
-# names(ls_mesa_allPS_files) <- ls_source_names
-# print(ls_mesa_allPS_files)
+# Run qc function on IR tables
+df_summary_IR <- mesatable_qc(ls_mesa_IR_table_files,  "IR")
+print(df_summary_IR)
 
-# print(names(ls_mesa_allPS_files))
-
-# quit()
-
-# columns= c("PS_nrow","PS_ncol") 
-# df_summary = data.frame(matrix( ncol = length(columns))) 
-# assign column names
-# colnames(df_summary) = columns
-# rownames(df_summary) = ls_source_names
-
-df_summary = data.frame() 
-print(df_summary)
-
-for (i in seq_along(ls_mesa_allPS_files)){
-    source_name = ls_source_names[i]
-    file_name = ls_mesa_allPS_files[i]
-    print(source_name)
-
-    df_allPS <- read.table(as.character(file_name), row.names = 1, header=T)
-    print(dim(df_allPS))
-
-    df_summary[source_name,"PS_nrow" ] <- nrow(df_allPS)
-    df_summary[source_name,"PS_ncol" ] <- ncol(df_allPS)
-
-    #count nan per sample and per junction
-    column.nan.counts <- colSums(is.na(df_allPS[,2:ncol(df_allPS)]))
-    row.nan.counts <- rowSums(is.na(df_allPS))
-    high_nan_samples = names(column.nan.counts[column.nan.counts > (dim(df_allPS)[1]/2)])
-
-    print(min(column.nan.counts))
-    print(max(column.nan.counts))
-    print(median(column.nan.counts))
-
-    df_summary[source_name,"PS_min_nan_col_count" ] <- min(column.nan.counts)
-    df_summary[source_name,"PS_max_nan_col_count" ] <- max(column.nan.counts)
-    df_summary[source_name,"PS_med_nan_col_count" ] <- median(column.nan.counts)
-
-    # Percent of nan in all df 
-    df_summary[source_name,"PS_perc_nan" ]<-sum(is.na(df_allPS))/prod(dim(df_allPS))
-    
-    df_summary[source_name,"PS_min_nan_col_perc" ] <- min(colMeans(is.na(df_allPS)))
-    df_summary[source_name,"PS_max_nan_col_perc" ] <- max(colMeans(is.na(df_allPS)))
-    df_summary[source_name,"PS_med_nan_col_perc" ] <- median(colMeans(is.na(df_allPS)))
-
-    #plot dist of nan per column
-    ggplot(NULL, aes(x=colMeans(is.na(df_allPS)))) + geom_histogram() + 
-            scale_x_continuous(limits = c( 0,1 )) + xlab("Percent NAN in sample") +
-            ggtitle(source_name) + geom_vline(xintercept = 0.5)
-
-    ggsave(file.path(opt$out_dir,
-            paste(source_name,"sample_nans", "png", sep = '.')),
-            device = "png",
-            width = 12,
-            dpi = 300)
-
-    # Percent nan in each junction
-    df_summary[source_name,"PS_min_nan_row_perc" ] <- min(rowMeans(is.na(df_allPS)))
-    df_summary[source_name,"PS_max_nan_row_perc" ] <- max(rowMeans(is.na(df_allPS)))
-    df_summary[source_name,"PS_med_nan_row_perc" ] <- median(rowMeans(is.na(df_allPS)))
-
-    #plot dist of nan per junction
-    ggplot(NULL, aes(x=rowMeans(is.na(df_allPS)))) + geom_histogram() + 
-            scale_x_continuous(limits = c( 0,1 )) + xlab("Percent NAN in junction") +
-            ggtitle(source_name) + geom_vline(xintercept = 0.5)
-    ggsave(file.path(opt$out_dir,
-            paste(source_name,"junction_nans", "png", sep = '.')),
-            device = "png",
-            width = 12,
-            dpi = 300)
-
-
-}
-
-print(df_summary)
+# For each df keep rows with less 20% nans then see how many overlapping nans remain 
