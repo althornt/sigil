@@ -10,14 +10,8 @@ library(RColorBrewer)
 # cl <- makeCluster(detectCores() - 1, outfile = "")
 # registerDoParallel(cl)
 mesatable_qc <-function(ls_mesa_files, out_prefix){
-
-  print("-----F start")
-  print(ls_mesa_files)
-  print(ls_source_names)
-  print("========================")
   
   df_summary = data.frame() 
-
   for (i in seq_along(ls_mesa_files)){
 
 
@@ -106,7 +100,8 @@ importMetaMESA <- function(row){
       "ls_mesa_IR_cov_dir" = res_IR_cov_dir_path,
       "metadata"=df_metadata,
       "ls_samples_run"=df_metadata$Run,
-      "source"=unique(df_metadata$data_source)))
+      "source"=unique(df_metadata$data_source),
+      "meta_file" = row[3]))
 }
 
 # Arguments
@@ -140,7 +135,7 @@ ls_mesa_meta = apply(df_manifest, 1, importMetaMESA)
 # Split into ls of mesa and metadata files for each data set
 ls_mesa_inc_count_files <- ls_mesa_allPS_files <- ls_mesa_cluster_files <- c()
 ls_mesa_IR_table_files <- ls_mesa_IR_cov_dir <- ls_meta <- ls_sample_names <- c()
-ls_source_names <- c()
+ls_source_names <- ls_metadata_files <- c()
 for (item in ls_mesa_meta) {
      ls_mesa_inc_count_files <- append(ls_mesa_inc_count_files, item[1])
      ls_mesa_allPS_files <- append(ls_mesa_allPS_files, item[2])
@@ -150,6 +145,7 @@ for (item in ls_mesa_meta) {
      ls_meta <- append(ls_meta, item[6])
      ls_sample_names <- append(ls_sample_names, item[7])
      ls_source_names <- append(ls_source_names, item[8]$source)
+     ls_metadata_files <- append(ls_metadata_files, item[9])
 
    }
 
@@ -161,12 +157,155 @@ rownames(df_merged_metadata) <- c()
 # Before nan adjust/filter
 ###############################
 
-# Run qc function on PS tables 
-df_summary_PS <- mesatable_qc(ls_mesa_allPS_files,  "PS")
-print(df_summary_PS)
+# # Run qc function on PS tables 
+# df_summary_PS <- mesatable_qc(ls_mesa_allPS_files,  "PS")
+# print(df_summary_PS)
 
-# Run qc function on IR tables
-df_summary_IR <- mesatable_qc(ls_mesa_IR_table_files,  "IR")
-print(df_summary_IR)
+# # Run qc function on IR tables
+# df_summary_IR <- mesatable_qc(ls_mesa_IR_table_files,  "IR")
+# print(df_summary_IR)
 
 # For each df keep rows with less 20% nans then see how many overlapping nans remain 
+
+#UMAP function labeling samples with high QC
+make_umap_qc <- function( num_neighbor,meta_col, df, tag , df_meta, source ) {
+
+  print(dim(df))
+
+
+
+  set.seed(123)
+  column.nan.counts <- colSums(is.na(df[,2:ncol(df)]))
+  high_nan_samples = names(column.nan.counts[column.nan.counts > (dim(df)[1]/2)])
+
+  #PCA
+  prcomp.out = as.data.frame(prcomp(as.data.frame(t(df)), scale = F)$x)
+  prcomp.out$Run = rownames(prcomp.out)
+  prcomp.out.merge = merge(prcomp.out, y = df_meta)
+
+  print(dim(df_meta))
+  print(dim(prcomp.out))
+  print(dim(prcomp.out.merge))
+
+
+  #make palette
+  n <- length(unique(df_meta[[meta_col]]))
+  # print(n)
+  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+  #umap
+  umap.out <- umap(prcomp.out, n_neighbors = num_neighbor, learning_rate = 0.5, init = "random")
+  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
+  umap.out$Run <- rownames(prcomp.out)
+
+  print(dim(umap.out))
+
+  #merge
+  umap.out.merge = merge(umap.out, df_meta)
+
+  print(dim(umap.out.merge))
+
+  # print(head(umap.out.merge))
+  print("gg:")
+
+
+  #plot
+  ggplot(umap.out.merge, aes(x, y, color = as.character(get(meta_col)))) +
+          geom_point(size = 2) +
+          theme_classic() +
+          theme(legend.position="bottom",legend.title = element_blank()) +
+          scale_color_manual(values=pal) +
+          labs(title= paste("UMAP MESA: Cell types, n_neighbors =",num_neighbor,tag, sep = ' '))
+          # +
+          # geom_text(aes(x, y, label = "NAN"), data = umap.out.merge[umap.out.merge$Run %in% high_nan_samples,],vjust = 0, nudge_y = 0.25)
+
+  #save
+  ggsave(file.path(opt$out_dir,
+          paste(source, "MESA_PCA_UMAP",meta_col,num_neighbor,tag,"nanqc.png", sep = '.')),
+          device = "png",
+          width = 12,
+          dpi = 300)
+
+  }
+
+for (i in seq_along(ls_mesa_allPS_files)){
+    source_name = ls_source_names[i]
+    metadata = read.csv(file = as.character(ls_metadata_files[i]))
+
+    print("------------------------------------")
+    print(source_name)
+
+    file_name = as.character(ls_mesa_allPS_files[i])
+    if (!file.exists(file_name)){
+      next
+    }
+
+    df_allPS <- read.table(as.character(file_name), row.names = 1, header=T)
+    print("dim before nan drop:")
+    print(dim(df_allPS))
+
+
+    #keep junctions where less than 20% of samples are nans
+    cutoff = ncol(df_allPS)*.20
+    df_allPS_clean = df_allPS[rowSums(is.na(df_allPS))<cutoff,]
+    print("dim after nan junction drop:")
+    print(dim(df_allPS_clean))
+    print("% na")
+    print(sum(is.na(df_allPS_clean))/prod(dim(df_allPS)))
+
+    #keep samples with less than 50% nan
+    s_cutoff = nrow(df_allPS_clean)*.50
+    print("dim after nan sample drop:")
+    #keep col if number of nans is less than %nan
+    df_allPS_clean = df_allPS_clean[,colSums(is.na(df_allPS_clean))<s_cutoff]
+    print(dim(df_allPS_clean))
+    print("% na after both drops")
+    print(sum(is.na(df_allPS_clean))/prod(dim(df_allPS)))
+
+
+    # replace remaining nan with row(junction) PS median
+    indx <- which(is.na(df_allPS_clean), arr.ind = TRUE)
+    df_allPS_clean[indx] <- apply(df_allPS_clean, 1, median, na.rm = TRUE)[indx[,"row"]]
+
+    print("dim after nan replace with median:")
+    print(dim(df_allPS_clean))
+
+    print("nan % before ")
+    print(sum(is.na(df_allPS))/prod(dim(df_allPS)))
+    print("nan % after ")
+    print(sum(is.na(df_allPS_clean))/prod(dim(df_allPS)))
+
+    # print("make umap")
+
+    if("group_label_qc" %in% colnames(metadata))
+    {
+      # lapply(c(5, 15, 25), make_umap_qc, meta_col="sigil_general", df = na.omit(df_allPS), tag="nan_dropped", df_meta = metadata, source = source_name)
+      # lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = na.omit(df_allPS), tag="nan_dropped", df_meta = metadata)
+      lapply(c(3, 5, 15, 25), make_umap_qc, meta_col="group_label_qc", df = df_allPS_clean, tag="nan_adjusted",  df_meta = metadata, source = source_name)
+    }
+
+     if("main_label_qc" %in% colnames(metadata))
+    {
+      # lapply(c(5, 15, 25), make_umap_qc, meta_col="sigil_general", df = na.omit(df_allPS), tag="nan_dropped", df_meta = metadata, source = source_name)
+      # lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = na.omit(df_allPS), tag="nan_dropped", df_meta = metadata)
+      lapply(c(3, 5, 15, 25), make_umap_qc, meta_col="main_label_qc", df = df_allPS_clean, tag="nan_adjusted",  df_meta = metadata, source = source_name)
+    }
+    
+
+     if("donor_qc" %in% colnames(metadata))
+    {
+      # lapply(c(5, 15, 25), make_umap_qc, meta_col="sigil_general", df = na.omit(df_allPS), tag="nan_dropped", df_meta = metadata, source = source_name)
+      # lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = na.omit(df_allPS), tag="nan_dropped", df_meta = metadata)
+      lapply(c(3, 5, 15, 25), make_umap_qc, meta_col="donor_qc", df = df_allPS_clean, tag="nan_adjusted",  df_meta = metadata, source = source_name)
+    }
+
+
+     if("treatment_qc" %in% colnames(metadata))
+    {
+      # lapply(c(5, 15, 25), make_umap_qc, meta_col="sigil_general", df = na.omit(df_allPS), tag="nan_dropped", df_meta = metadata, source = source_name)
+      # lapply(c(3,5,8,10,15,20,25), make_umap_qc, meta_col="sigil_general", df = na.omit(df_allPS), tag="nan_dropped", df_meta = metadata)
+      lapply(c(3, 5, 15, 25), make_umap_qc, meta_col="treatment_qc", df = df_allPS_clean, tag="nan_adjusted",  df_meta = metadata, source = source_name)
+    }
+
+}
