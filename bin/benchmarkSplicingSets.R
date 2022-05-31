@@ -24,6 +24,85 @@ library(ComplexHeatmap)
 ##########################
 # Functions
 ##########################
+
+ssgsea_acc <- function(dat.gct, out_dir){
+
+  dat.gct_scale <- t(scale(t(dat.gct))) # scale and center rows
+
+  # Drop gene sets that arent UP or DN
+  dat.gct_UPDN <- dat.gct_scale %>%
+      as.data.frame() %>%
+      tibble::rownames_to_column("Run") %>%
+      dplyr::filter( grepl('UP|DN', Run)) %>%
+      tibble::column_to_rownames("Run") 
+
+  # Add row for which set has max and min score in each sample 
+  max <- rownames(dat.gct_UPDN)[apply(dat.gct_UPDN,2,which.max)]
+  dat.gct_UPDN["max",] <- max
+  min <- rownames(dat.gct_UPDN)[apply(dat.gct_UPDN,2,which.min)]
+  dat.gct_UPDN["min",] <- min
+
+  dat.gct_UPDN["main_label", ] <- df_sample_annotations["main_label",]
+  dat.gct_UPDN["data_source", ] <- df_sample_annotations["data_source",]
+
+  # Transpose to compare label to max and min 
+  # check if max value is label + "UP"
+  # check if min value is label + "DN"
+  df_ <- dat.gct_UPDN %>%
+      t() %>%
+      as.data.frame() %>%
+      select(main_label,data_source, min, max) %>%
+      mutate(main_label_str = gsub(" ", "_", main_label)) %>%
+      mutate(max_match= ifelse((startsWith(as.character(max),
+                                          as.character(main_label_str)) & 
+                                  endsWith(as.character(max),
+                                          as.character("UP"))) , 1, 0)) %>%
+      mutate( min_match= ifelse((startsWith(as.character(min),
+                                          as.character(main_label_str)) & 
+                                  endsWith(as.character(min),
+                                          as.character("DN"))) , 1, 0)) 
+      
+  # print(df_)
+
+  print("min match")
+  print(sum(df_$min_match)/nrow(df_))
+  print("max match")
+  print(sum(df_$max_match)/nrow(df_))
+
+  # write.csv(df_, paste0(out_dir, "accuracy.csv"))
+
+  df_min_match <- df_ %>%
+    group_by(main_label, data_source) %>%
+    summarise_at(vars(min_match), list(perc_min_match = mean)) %>%
+    arrange(desc(perc_min_match)) 
+
+  df_max_match <- df_ %>%
+    group_by(main_label, data_source) %>%
+    summarise_at(vars(max_match), list(perc_max_match = mean)) %>%
+    arrange(desc(perc_max_match)) 
+
+  #merge 
+  df_matches <- df_min_match %>% 
+    right_join(df_max_match, by=c("main_label","data_source")) %>%
+    as.data.frame() %>%
+    arrange(main_label) %>%
+    mutate(label_source = paste(main_label, data_source, sep = " ")) 
+
+  # print(df_matches)
+
+  df_matches_ <- df_matches %>%
+    select(perc_min_match, perc_max_match,label_source  ) %>%
+    gather("type", "percent", -label_source )
+
+  # print(df_matches_)
+
+  s <- ggplot(df_matches_, aes(y =percent, x= label_source, fill=type) )+
+        geom_bar(stat = "identity", position = "dodge") +
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  ggsave(plot=s, filename=paste0(out_dir, "plot.png"))
+
+}
+
 ssgsea_heatmap <- function(dat.gct, out_path){
 # colors from https://sashamaps.net/docs/resources/20-colors/
 
@@ -227,80 +306,6 @@ metadata <- metadata %>%
 # Make heatmap of ssGSEA res
 ssgsea_heatmap(dat.gct, opt$out_dir)
 
-dat.gct_scale <- t(scale(t(dat.gct))) # scale and center rows
+# Calculate and plot accuracty of ssGSEA res
+ssgsea_acc(dat.gct, opt$out_dir)
 
-# Drop gene sets that arent UP or DN
-dat.gct_UPDN <- dat.gct_scale %>%
-    as.data.frame() %>%
-    tibble::rownames_to_column("Run") %>%
-    dplyr::filter( grepl('UP|DN', Run)) %>%
-    tibble::column_to_rownames("Run") 
-
-# Add row for which set has max and min score in each sample 
-max <- rownames(dat.gct_UPDN)[apply(dat.gct_UPDN,2,which.max)]
-dat.gct_UPDN["max",] <- max
-min <- rownames(dat.gct_UPDN)[apply(dat.gct_UPDN,2,which.min)]
-dat.gct_UPDN["min",] <- min
-
-dat.gct_UPDN["main_label", ] <- df_sample_annotations["main_label",]
-
-tail(dat.gct_UPDN)
-print("-----------------------")
-
-# Transpose to compare label to max and min 
-# check if max value is label + "UP"
-# check if min value is label + "DN"
-df_ <- dat.gct_UPDN %>%
-    t() %>%
-    as.data.frame() %>%
-    select(main_label, min, max) %>%
-    mutate(main_label_str = gsub(" ", "_", main_label)) %>%
-    mutate(max_match= ifelse((startsWith(as.character(max),
-                                        as.character(main_label_str)) & 
-                                endsWith(as.character(max),
-                                        as.character("UP"))) , 1, 0)) %>%
-    mutate( min_match= ifelse((startsWith(as.character(min),
-                                        as.character(main_label_str)) & 
-                                endsWith(as.character(min),
-                                        as.character("DN"))) , 1, 0)) 
-    
-print(df_)
-
-
-print("min")
-print(sum(df_$min_match)/nrow(df_))
-print("max")
-print(sum(df_$max_match)/nrow(df_))
-
-write.csv(df_, paste0(opt$out_dir, "accuracy.csv"))
-
-
-# group by label 
-df_min_match <- df_ %>%
-  group_by(main_label) %>%
-  summarise_at(vars(min_match), list(perc_min_match = mean)) %>%
-  arrange(desc(perc_min_match)) %>%
-  tibble::column_to_rownames("main_label")
-
-print(df_min_match)
-
-df_max_match <- df_ %>%
-  group_by(main_label) %>%
-  summarise_at(vars(max_match), list(perc_max_match = mean)) %>%
-  arrange(desc(perc_max_match)) %>%
-  tibble::column_to_rownames("main_label")
-
-print(df_max_match)
-
-df_matches <- cbind(df_min_match, df_max_match)
-print(df_matches)
-
-df_matches_ <- df_matches %>%
-  tibble::rownames_to_column("label") %>%
-  gather("type", "percent", -label)
-print(df_matches_)
-
-s <- ggplot(df_matches_, aes(y =percent, x= label, fill=type) )+
-      geom_bar(stat = "identity", position = "dodge") +
-     theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-ggsave(plot=s, filename=paste0(opt$out_dir, "plot.png"))
