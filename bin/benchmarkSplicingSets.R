@@ -25,7 +25,7 @@ library(ComplexHeatmap)
 # Functions
 ##########################
 
-ssgsea_acc <- function(dat.gct, out_dir){
+ssgsea_acc <- function(dat.gct, out_dir, name){
 
   dat.gct_scale <- t(scale(t(dat.gct))) # scale and center rows
 
@@ -98,9 +98,10 @@ ssgsea_acc <- function(dat.gct, out_dir){
 
   s <- ggplot(df_matches_, aes(y =percent, x= label_source, fill=type) )+
         geom_bar(stat = "identity", position = "dodge") +
-      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-  ggsave(plot=s, filename=paste0(out_dir, "plot.png"))
-
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+      labs (title = paste0("method: ",name))
+  
+  ggsave(plot=s, filename=paste0(out_dir, "_acc_plot.png"))
 }
 
 ssgsea_heatmap <- function(dat.gct, out_path){
@@ -281,7 +282,7 @@ df_sample_annotations <- metadata %>%
 # all_PS_meta <- rbind(all_PS, df_sample_annotations)
 
 # Make output directories
-ls_out_paths <- list("/gmt" )
+ls_out_paths <- list("/benchmark" )
 for (path in ls_out_paths){
 
   if (!dir.exists(paste0(opt$out_dir,path))){
@@ -304,8 +305,261 @@ metadata <- metadata %>%
 
 
 # Make heatmap of ssGSEA res
-ssgsea_heatmap(dat.gct, opt$out_dir)
+# ssgsea_heatmap(dat.gct, opt$out_dir)
 
 # Calculate and plot accuracty of ssGSEA res
-ssgsea_acc(dat.gct, opt$out_dir)
+# ssgsea_acc(dat.gct, opt$out_dir)
+
+# Named vectors for 
+# ls_gmts <- c("")
+# ls_PS_inputs <-c("") 
+
+
+################
+# Benchmark 
+##################
+
+# ls_PS_inputs <- c(
+#   "merged" = "/mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/merged_mesa_allPS.tsv",
+#   "batchcorr" = "/mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/batch_corr_mesa_allPS.tsv")
+
+
+
+# for (str_method in c("gsva","ssgsea","zscore","plage")){
+# # for (str_method in c("gsva")){
+
+#   # make output path 
+#   outpath <- paste0(opt$out_dir, "benchmark/", str_method,".csv")
+#   print(outpath)
+
+#   cmd <- paste0("docker run -v /mnt:/mnt_  vacation/gsva:1.0.4 ",
+#       "GSVA --gmt /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/splice_set_PS/gmt/main_set.gmt ",   
+#       "--tsv_in /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/batch_corr_mesa_allPS.tsv ",
+#       "--output ",outpath," --method ",str_method, " 2>&1")
+
+#   print(cmd)
+
+# }
+
+# sudo docker run -v /mnt:/mnt_ vacation/gsva:1.0.4 GSVA \
+# --gmt /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/splice_set_PS/gmt/main_set.gmt \
+# --tsv_in /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/batch_corr_mesa_allPS.tsv \
+# --output /mnt_/benchmark/outputs/benchmark/ssgsea.csv  \
+# --method ssgsea
+
+# sudo docker run -v /mnt:/mnt_ vacation/gsva:1.0.4 GSVA \
+# --gmt /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/splice_set_PS/gmt/main_set.gmt \
+# --tsv_in /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/batch_corr_mesa_allPS.tsv \
+# --output /mnt_/benchmark/outputs/benchmark/gsva.csv  \
+# --method gsva
+
+# sudo docker run -v /mnt:/mnt_ vacation/gsva:1.0.4 GSVA \
+# --gmt /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/splice_set_PS/gmt/main_set.gmt \
+# --tsv_in /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/batch_corr_mesa_allPS.tsv \
+# --output /mnt_/benchmark/outputs/benchmark/plage.csv  \
+# --method plage
+
+# sudo docker run -v /mnt:/mnt_ vacation/gsva:1.0.4 GSVA \
+# --gmt /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/splice_set_PS/gmt/main_set.gmt \
+# --tsv_in /mnt_/results_sigil_combine/sigil_results_SongChoiMonaco_20220525/combine_mesa_out/batch_corr_mesa_allPS.tsv \
+# --output /mnt_/benchmark/outputs/benchmark/zscore.csv  \
+# --method zscore
+
+
+gsva_heatmap <- function(df_enr, out_path){
+# colors from https://sashamaps.net/docs/resources/20-colors/
+
+  ls_col = c(
+      "B cells memory" = "#469990", #Teal                           
+      "B cells naive"  = "#000075", #Navy
+
+      "Eosinophils" = "#42d4f4",
+      "Neutrophils" = "#4363d8",
+
+      "Monocytes" = "#800000", #Black
+      "Macrophages M0" = "#9A6324",           
+      "Macrophages M1"  = "#808000", #Maroon
+
+      "Dendritic cells resting" = "#f58231",
+      "Dendritic cells activated" = "#e6194B",
+                          
+      "NK cells resting" = "#ffe119",
+
+      "T cells gamma delta"   = "#fabed4", #pink
+      "T cells follicular helper" = "#ffd8b1", #apricot
+      "T cells regulatory"  = "#fffac8", #beige
+      "T cells CD4 naive"   = "#aaffc3", #mint
+      "T cells CD8"         = "#dcbeff" #lavender
+  )
+
+  ha <- HeatmapAnnotation(
+      df = metadata, 
+      name = "main_label", 
+      col = list("main_label"= ls_col, "data_source" = c("Choi" = "black",
+                                                       "Monaco" = "darkgrey" , 
+                                                       "Song" = "lightgrey")),
+      #  na_col = "grey",
+      # annotation_legend_param = list(),
+      show_legend = TRUE,
+      which = "column",
+      gp = gpar(col = NA)
+      # border = FALSE,
+      # gap = unit(1, "points"),
+
+      # show_annotation_name = TRUE,
+      # annotation_name_gp = gpar(),
+      # annotation_name_offset = NULL,
+      # annotation_name_side = ifelse(which == "column", "right", "bottom"),
+      # annotation_name_rot = NULL,
+
+      # annotation_height = NULL,
+      # annotation_width = NULL,
+      # height = NULL,
+      # width = NULL,
+      # simple_anno_size = ht_opt$simple_anno_size,
+      # simple_anno_size_adjust = FALSE
+      )
+
+  ###############################################################################
+  # clustered unscaled heatmap 
+  png(file=paste0(out_path,"_heatmap_unscaled_clustered.png"),
+      width = 9,
+      height    = 10,
+      units     = "in",
+      res       = 1200)
+
+  ht <- ComplexHeatmap::Heatmap(df_enr,
+                                # name="==",
+                                  show_row_names= TRUE,
+                                  show_column_names = FALSE,
+                                  row_names_gp = grid::gpar(fontsize =5),
+                                  top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  show_row_dend = FALSE,
+                                  heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  legend_gp = gpar(fontsize = 5))
+                )
+
+  draw(ht, merge_legend = TRUE)
+  dev.off()
+
+
+  ##############################################################################
+  # clustered scaled heatmap 
+  df_enr_scale <- t(scale(t(df_enr))) # scale and center rows
+
+  png(file=paste0(out_path,"_heatmap_scaled_clustered.png"),
+      width = 9,
+      height    = 10,
+      units     = "in",
+      res       = 1200)
+
+  ht_scaled_clustered <- ComplexHeatmap::Heatmap(df_enr_scale,
+                                name="Z-Score",
+                                  show_row_names= TRUE,
+                                  show_column_names = FALSE,
+                                  row_names_gp = grid::gpar(fontsize =5),
+                                  top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  show_row_dend = FALSE,
+                                  heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  legend_gp = gpar(fontsize = 5))
+                )
+
+  draw(ht_scaled_clustered, merge_legend = TRUE)
+  dev.off()
+
+  ##############################################################################
+  # ordered scaled heatmap 
+  ls_sample_order <- metadata %>% 
+    rownames_to_column("Run") %>%
+    arrange(main_label) %>%
+    pull(Run)
+
+  png(file=paste0(out_path,"_heatmap_scaled_ordered.png"),
+      width = 9,
+      height    = 10,
+      units     = "in",
+      res       = 1200)
+
+  ht_order <- ComplexHeatmap::Heatmap(df_enr_scale,
+                                name="Z-Score",
+                                  column_order =ls_sample_order,
+                                  row_order = order(rownames(df_enr_scale)), 
+                                  show_row_names= TRUE,
+                                  show_column_names = FALSE,
+                                  row_names_gp = grid::gpar(fontsize =5),
+                                  top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  show_row_dend = FALSE,
+                                  heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  legend_gp = gpar(fontsize = 5))
+                )
+
+  draw(ht_order, merge_legend = TRUE)
+  dev.off()
+
+  ###############################################################################
+  # ordered unscaled heatmap 
+  png(file=paste0(out_path,"_heatmap_unscaled_ordered.png"),
+      width = 9,
+      height    = 10,
+      units     = "in",
+      res       = 1200)
+
+  ht <- ComplexHeatmap::Heatmap(df_enr,
+                                # name="==",
+                                  column_order =ls_sample_order,
+                                  show_row_names= TRUE,
+                                  row_order = order(rownames(df_enr_scale)), 
+                                  show_column_names = FALSE,
+                                  row_names_gp = grid::gpar(fontsize =5),
+                                  top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  show_row_dend = FALSE,
+                                  heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  legend_gp = gpar(fontsize = 5))
+                )
+
+  draw(ht, merge_legend = TRUE)
+  dev.off()
+
+}
+
+##################
+# Benchmark eval
+##################
+enr_outputs <- list(
+ "gsva" = "/mnt_/benchmark/outputs/benchmark/gsva.csv",
+ "zscore" =  "/mnt_/benchmark/outputs/benchmark/zscore.csv",
+ "plage" = "/mnt_/benchmark/outputs/benchmark/plage.csv"
+#  "ssgsea" = "/mnt_/benchmark/outputs/benchmark/ssgsea.csv"
+)
+
+for (name in names(enr_outputs)){
+
+  print(name)
+
+  df_enr <- read.csv(file = enr_outputs[[name]], stringsAsFactors = FALSE) %>%
+    tibble::column_to_rownames("name")
+  
+  # order cols to match metadata
+  df_enr <- df_enr[ , order(names(df_enr))]
+  gsva_heatmap(df_enr, paste0(opt$out_dir,name) )
+
+  # Calculate and plot accuracty of ssGSEA res
+  ssgsea_acc(df_enr, paste0(opt$out_dir, name), name = name)
+
+  # print(head(df_enr))
+
+
+}
 
