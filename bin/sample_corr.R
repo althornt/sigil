@@ -94,10 +94,14 @@ print(head(df_all_PS))
 corr_heatmap <- function(df, tag){
 
   # Find sample correlation; ignoring nans
-  df_corr <- cor(df, method = "spearman", use="complete.obs") %>% as.data.frame
+  df_corr <- cor(df, method = "spearman", use="pairwise.complete.obs") %>% as.data.frame
   df_corr <- df_corr[ ,order(names(df_corr)) ]
   df_corr <- df_corr[order(row.names(df_corr)),]
 
+  metadata <- metadata %>%
+                    tibble::rownames_to_column("Run") %>%
+                    filter(Run %in% names(df_corr)) %>%
+                    tibble::column_to_rownames("Run") 
 
   print(df_corr)
 
@@ -127,15 +131,13 @@ corr_heatmap <- function(df, tag){
     )
 
   ls_group_col = c(
-
     "Monocytes macrophages" = "#808000",
     "Dendritic cells" = "#f58231",
     "T cells" = "#dcbeff",              
     "B cells" = "#469990",
     "NK cells" = "#ffe119",
-     "Eosinophils" = "#42d4f4",
-        "Neutrophils" = "#4363d8"
-
+    "Eosinophils" = "#42d4f4",
+    "Neutrophils" = "#4363d8"
   )
 
   ha <- HeatmapAnnotation(
@@ -190,5 +192,16 @@ corr_heatmap <- function(df, tag){
   dev.off()
 }
 
+# All samples 
 corr_heatmap(df_all_PS, "all_samples")
+
+####################################################################################################
+# Only T-cells 
+ls_tcell_samples <- metadata %>%
+                    tibble::rownames_to_column("Run") %>%
+                    filter(group_label == "T cells") %>%
+                    pull(Run)
+df_all_PS_Tcells <- df_all_PS %>%
+                    select(ls_tcell_samples)
+corr_heatmap(df_all_PS_Tcells, "Tcells")
 
