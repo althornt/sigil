@@ -408,14 +408,11 @@ max <- rownames(df_enr)[apply(df_enr,2,which.max)]
 df_enr["max",] <- max
 min <- rownames(df_enr)[apply(df_enr,2,which.min)]
 df_enr["min",] <- min
-
 df_enr["main_label", ] <- df_sample_annotations["main_label",]
 df_enr["group_label", ] <- df_sample_annotations["group_label",]
 df_enr["data_source", ] <- df_sample_annotations["data_source",]
 
-# Transpose to compare label to max and min 
-# check if max value is label + "UP"
-# check if min value is label + "DN"
+# Check if max value is label + "UP" & check if min value is label + "DN"
 df_ <- df_enr %>%
     t() %>%
     as.data.frame() %>%
@@ -461,5 +458,42 @@ print(sum(df_$min_main_or_group_match)/nrow(df_))
 cat("Max match with main or group UP label: \n")
 print(sum(df_$max_main_or_group_match)/nrow(df_))
 
-
 write.csv(df_, file = paste0(opt$o, "gsva_eval_table.csv"), row.names = FALSE)
+
+
+
+##################
+# plot 
+##################
+
+df_min_match <- df_ %>%
+  group_by(main_label, data_source) %>%
+  summarise_at(vars(min_main_or_group_match), list(perc_min_main_or_group_match = mean)) %>%
+  arrange(desc(perc_min_main_or_group_match)) 
+
+df_max_match <- df_ %>%
+  group_by(main_label, data_source) %>%
+  summarise_at(vars(max_main_or_group_match), list(perc_max_main_or_group_match = mean)) %>%
+  arrange(desc(perc_max_main_or_group_match)) 
+
+#merge 
+df_matches <- df_min_match %>% 
+  right_join(df_max_match, by=c("main_label","data_source")) %>%
+  as.data.frame() %>%
+  arrange(main_label) %>%
+  mutate(label_source = paste(main_label, data_source, sep = " ")) 
+
+# print(df_matches)
+
+df_matches_ <- df_matches %>%
+  select(perc_min_main_or_group_match, perc_max_main_or_group_match,label_source  ) %>%
+  gather("type", "percent", -label_source )
+
+# print(df_matches_)
+
+s <- ggplot(df_matches_, aes(y =percent, x= label_source, fill=type) )+
+      geom_bar(stat = "identity", position = "dodge") +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+    labs (title = paste0(""))
+
+ggsave(plot=s, filename=paste0(opt$o, "gsva_acc_plot.png"))
