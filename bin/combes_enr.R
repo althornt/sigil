@@ -73,12 +73,12 @@ ssgsea_acc <- function(dat.gct, out_dir, name){
 
   df_min_match <- df_ %>%
     group_by(main_label, data_source) %>%
-    summarise_at(vars(min_match), list(perc_min_match = mean)) %>%
+    summarise_at(vars(min_match), list(perc_min_match = median)) %>%
     arrange(desc(perc_min_match)) 
 
   df_max_match <- df_ %>%
     group_by(main_label, data_source) %>%
-    summarise_at(vars(max_match), list(perc_max_match = mean)) %>%
+    summarise_at(vars(max_match), list(perc_max_match = median)) %>%
     arrange(desc(perc_max_match)) 
 
   #merge 
@@ -104,145 +104,7 @@ ssgsea_acc <- function(dat.gct, out_dir, name){
   ggsave(plot=s, filename=paste0(out_dir, "_acc_plot.png"))
 }
 
-ssgsea_heatmap <- function(dat.gct, out_path){
-# colors from https://sashamaps.net/docs/resources/20-colors/
 
-  ls_col = c(
-      "B cells memory" = "#469990", #Teal                           
-      "B cells naive"  = "#000075", #Navy
-
-      "Eosinophils" = "#42d4f4",
-      "Neutrophils" = "#4363d8",
-
-      "Monocytes" = "#800000", #Black
-      "Macrophages M0" = "#9A6324",           
-      "Macrophages M1"  = "#808000", #Maroon
-
-      "Dendritic cells resting" = "#f58231",
-      "Dendritic cells activated" = "#e6194B",
-                          
-      "NK cells resting" = "#ffe119",
-
-      "T cells gamma delta"   = "#fabed4", #pink
-      "T cells follicular helper" = "#ffd8b1", #apricot
-      "T cells regulatory"  = "#fffac8", #beige
-      "T cells CD4 naive"   = "#aaffc3", #mint
-      "T cells CD8"         = "#dcbeff" #lavender
-  )
-
-  ha <- HeatmapAnnotation(
-      df = metadata, 
-      name = "main_label", 
-      col = list("main_label"= ls_col, "data_source" = c("Choi" = "black",
-                                                       "Monaco" = "darkgrey" , 
-                                                       "Song" = "lightgrey")),
-      #  na_col = "grey",
-      # annotation_legend_param = list(),
-      show_legend = TRUE,
-      which = "column",
-      gp = gpar(col = NA)
-      # border = FALSE,
-      # gap = unit(1, "points"),
-
-      # show_annotation_name = TRUE,
-      # annotation_name_gp = gpar(),
-      # annotation_name_offset = NULL,
-      # annotation_name_side = ifelse(which == "column", "right", "bottom"),
-      # annotation_name_rot = NULL,
-
-      # annotation_height = NULL,
-      # annotation_width = NULL,
-      # height = NULL,
-      # width = NULL,
-      # simple_anno_size = ht_opt$simple_anno_size,
-      # simple_anno_size_adjust = FALSE
-      )
-
-  ###############################################################################
-  # clustered unscaled heatmap 
-  png(file=paste0(out_path,"/heatmap_unscaled_clustered.png"),
-      width = 9,
-      height    = 10,
-      units     = "in",
-      res       = 1200)
-
-  ht <- ComplexHeatmap::Heatmap(dat.gct,
-                                name="Z-Score",
-                                  show_row_names= TRUE,
-                                  show_column_names = FALSE,
-                                  row_names_gp = grid::gpar(fontsize =5),
-                                  top_annotation=ha,
-                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                  show_row_dend = FALSE,
-                                  heatmap_legend_param = list(
-                                  # legend_direction = "horizontal", 
-                                  # legend_height = unit(1, "cm"),
-                                  legend_gp = gpar(fontsize = 5))
-                )
-
-  draw(ht, merge_legend = TRUE)
-  dev.off()
-
-  ##############################################################################
-  # clustered scaled heatmap 
-  dat.gct <- t(scale(t(dat.gct))) # scale and center rows
-
-  png(file=paste0(out_path,"/heatmap_scaled_clustered.png"),
-      width = 9,
-      height    = 10,
-      units     = "in",
-      res       = 1200)
-
-  ht_scaled_clustered <- ComplexHeatmap::Heatmap(dat.gct,
-                                name="Z-Score",
-                                  show_row_names= TRUE,
-                                  show_column_names = FALSE,
-                                  row_names_gp = grid::gpar(fontsize =5),
-                                  top_annotation=ha,
-                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                  show_row_dend = FALSE,
-                                  heatmap_legend_param = list(
-                                  # legend_direction = "horizontal", 
-                                  # legend_height = unit(1, "cm"),
-                                  legend_gp = gpar(fontsize = 5))
-                )
-
-  draw(ht_scaled_clustered, merge_legend = TRUE)
-  dev.off()
-
-  ##############################################################################
-  # ordered scaled heatmap 
-  ls_sample_order <- metadata %>% 
-    rownames_to_column("Run") %>%
-    arrange(main_label) %>%
-    pull(Run)
-
-  png(file=paste0(out_path,"/heatmap_scaled_ordered.png"),
-      width = 9,
-      height    = 10,
-      units     = "in",
-      res       = 1200)
-
-  ht_order <- ComplexHeatmap::Heatmap(dat.gct,
-                                name="Z-Score",
-                                  column_order =ls_sample_order,
-                                  row_order = order(rownames(dat.gct)), 
-                                  show_row_names= TRUE,
-                                  show_column_names = FALSE,
-                                  row_names_gp = grid::gpar(fontsize =5),
-                                  top_annotation=ha,
-                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                  show_row_dend = FALSE,
-                                  heatmap_legend_param = list(
-                                  # legend_direction = "horizontal", 
-                                  # legend_height = unit(1, "cm"),
-                                  legend_gp = gpar(fontsize = 5))
-                )
-
-  draw(ht_order, merge_legend = TRUE)
-  dev.off()
-
-}
 
 
 
@@ -464,6 +326,9 @@ df_enr <- df_enr[ , order(names(df_enr))]
 df_enr <- df_enr[ , order(names(df_enr))]
 # gsva_heatmap(df_enr, paste0(opt$out_dir,"gsva") )
 
+print(df_enr)
+print(length(rownames(df_enr)))
+print(metadata)
 
 # Add row for which set has max and min score in each sample 
 max <- rownames(df_enr)[apply(df_enr,2,which.max)]
@@ -473,10 +338,8 @@ df_enr["min",] <- min
 
 df_enr["main_label", ] <- df_sample_annotations["main_label",]
 
-# # Calculate and plot accuracty of ssGSEA res
-# ssgsea_acc(df_enr, paste0(opt$out_dir, name), name = name)
+write.csv(df_enr, paste0(opt$out_dir,"/enr_min_max.csv"))
 
-print(df_enr)
 
 # Calc freq of sets with min score in T cells 
 df_enr_min_tcell <- df_enr %>%
@@ -541,3 +404,232 @@ df_enr_max_treg <- df_enr %>%
 
 cat("\n Treg sets with maximum score: \n")
 print(df_enr_max_treg)
+
+# print(df_enr)
+
+# df_enr_melt <- df_enr %>%
+#     select(perc_min_match, perc_max_match,label_source, -min, -max  ) %>%
+#     gather("key", "val" )
+
+
+# print(df_enr_melt)
+
+print(unique(metadata$main_label))
+
+
+# Calc freq of sets with max score in myeloid
+df_enr_max_myeloid <- df_enr %>%
+  t() %>%
+  as.data.frame() %>%
+  filter(main_label %in% c("myeloid lung")) %>%
+  select(main_label, max) %>%
+  count(max) %>%
+  as.data.frame() %>%
+  mutate(freq = round(n / sum(n), 3)) %>% 
+  arrange(desc(freq)) 
+
+
+cat("\n Myeloid sets with maximum score: \n")
+print(df_enr_max_myeloid)
+
+# Calc freq of sets with min score in myleoid
+df_enr_min_myeloid <- df_enr %>%
+  t() %>%
+  as.data.frame() %>%
+  filter(main_label %in% c("myeloid lung")) %>%
+  select(main_label, min) %>%
+  count(min) %>%
+  as.data.frame() %>%
+  mutate(freq = round(n / sum(n), 3)) %>% 
+  arrange(desc(freq)) 
+
+cat("\n Myeloid sets with min score: \n")
+print(df_enr_min_myeloid)
+
+print(head(df_enr))
+
+##############################################################################
+# Heatmap all 
+
+  # df_enr_heat <- df_enr %>%
+  #   tibble::column_to_rownames("main_label") 
+
+df_enr[] <- sapply(df_enr, as.numeric)
+print(head(df_enr))
+
+png(file=paste0(opt$out_dir,"/gsva_heatmap.png"),
+    width = 9,
+    height    = 10,
+    units     = "in",
+    res       = 1200)
+
+ht_order <- ComplexHeatmap::Heatmap(df_enr,
+                              # name="Z-Score",
+                                # column_order =order(colnames(df_enr)),
+                                # row_order = order(rownames(df_enr_scale)), 
+                                show_row_names= TRUE,
+                                show_column_names = TRUE,
+                                row_names_gp = grid::gpar(fontsize =5),
+                                column_names_gp = grid::gpar(fontsize =5),
+                                # top_annotation=ha,
+                                # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                show_row_dend = TRUE,
+                                heatmap_legend_param = list(
+                                # legend_direction = "horizontal", 
+                                # legend_height = unit(1, "cm"),
+                                legend_gp = gpar(fontsize = 5))
+              )
+
+draw(ht_order, merge_legend = TRUE)
+dev.off()
+
+quit()
+
+#######################################################
+
+# Group input samples by main_label
+# get median of each score in each group 
+# rank groups by median 
+df_enr_median <- df_enr %>%
+  t() %>%
+  as.data.frame()  %>%
+  select(-min,-max ) %>%
+  mutate_at(vars(ends_with("_UP")), funs(as.numeric(as.character(.)))) %>%
+  mutate_at(vars(ends_with("_DN")), funs(as.numeric(as.character(.)))) %>%
+  group_by(main_label) %>%
+  summarise_all(.funs = c(median="median"))%>%
+  # t() %>%
+  as.data.frame()  
+
+
+
+
+print(head(df_enr_median))
+# print(df_enr_median)
+
+
+# df_enr_median_melt <- df_enr_median %>%
+#     # select(-main_label  ) %>%
+#     melt(id = "main_label" )
+
+# print(head(df_enr_median_melt))
+
+# print(dim(df_enr_median_melt))
+# df_enr_median_melt_UP <- df_enr_median_melt %>%
+#   filter(grepl('UP_median', variable)) %>%
+#   filter(variable %in% c("T_cells_group_UP_median","Monocyte_R848-18h_main_UP_median","Macrophage_LPS-18h_main_UP"))
+
+# print(dim(df_enr_median_melt_UP))
+
+# ggplot(data = df_enr_median_melt_UP, aes(x = main_label, y = value)) + 
+#        # `geom_col()` uses `stat_identity()`: it leaves the data as is.
+#        geom_col(position = 'dodge')+
+#       facet_grid(~variable) +
+#       theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+# ggsave(filename=paste0(opt$out_dir,"/medianplot.png"))
+
+##############################################################################
+# Heatmap all 
+
+  df_enr_median_heat <- df_enr_median %>%
+    tibble::column_to_rownames("main_label") 
+
+  df_enr_median_heat[] <- sapply(df_enr_median_heat, as.numeric)
+    
+  png(file=paste0(opt$out_dir,"/median_heatmap.png"),
+      width = 9,
+      height    = 10,
+      units     = "in",
+      res       = 1200)
+
+  ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat,
+                                # name="Z-Score",
+                                  column_order =order(colnames(df_enr_median_heat)),
+                                  # row_order = order(rownames(df_enr_scale)), 
+                                  show_row_names= TRUE,
+                                  show_column_names = TRUE,
+                                  row_names_gp = grid::gpar(fontsize =5),
+                                  column_names_gp = grid::gpar(fontsize =5),
+                                  # top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  show_row_dend = TRUE,
+                                  heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  legend_gp = gpar(fontsize = 5))
+                )
+
+  draw(ht_order, merge_legend = TRUE)
+  dev.off()
+
+##############################################################################
+# Heatmap DN
+
+df_enr_median_heat_DN <- df_enr_median_heat %>%
+    select(matches("DN_median"))
+
+
+print(head(df_enr_median_heat_DN))
+
+  png(file=paste0(opt$out_dir,"/median_heatmap_DN.png"),
+      width = 9,
+      height    = 10,
+      units     = "in",
+      res       = 1200)
+
+  ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat_DN,
+                                # name="Z-Score",
+                                  column_order =order(colnames(df_enr_median_heat_DN)),
+                                  # row_order = order(rownames(df_enr_scale)), 
+                                  show_row_names= TRUE,
+                                  show_column_names = TRUE,
+                                  row_names_gp = grid::gpar(fontsize =5),
+                                  column_names_gp = grid::gpar(fontsize =5),
+                                  # top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  show_row_dend = TRUE,
+                                  heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  legend_gp = gpar(fontsize = 5))
+                )
+
+  draw(ht_order, merge_legend = TRUE)
+  dev.off()
+
+##############################################################################
+# Heatmap DN
+
+df_enr_median_heat_UP <- df_enr_median_heat %>%
+    select(matches("UP_median"))
+
+
+print(head(df_enr_median_heat_UP))
+
+  png(file=paste0(opt$out_dir,"/median_heatmap_UP.png"),
+      width = 9,
+      height    = 10,
+      units     = "in",
+      res       = 1200)
+
+  ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat_UP,
+                                # name="Z-Score",
+                                  column_order =order(colnames(df_enr_median_heat_UP)),
+                                  # row_order = order(rownames(df_enr_scale)), 
+                                  show_row_names= TRUE,
+                                  show_column_names = TRUE,
+                                  row_names_gp = grid::gpar(fontsize =5),
+                                  column_names_gp = grid::gpar(fontsize =5),
+                                  # top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  show_row_dend = TRUE,
+                                  heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  legend_gp = gpar(fontsize = 5))
+                )
+
+  draw(ht_order, merge_legend = TRUE)
+  dev.off()
