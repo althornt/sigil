@@ -377,6 +377,9 @@ print(dim(df_within_label))
 df_all_sets  <- do.call("rbind", list(df_main_label, df_group_label, df_within_label ))
 print(dim(df_all_sets))
 
+write.csv(df_all_sets, paste0(opt$out_dir,"/df_gene_sets.csv"))
+
+
 print(head(df_all_sets))
 print(unique(df_all_sets$set))
 

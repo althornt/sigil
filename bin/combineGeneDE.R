@@ -296,7 +296,10 @@ write.csv(metadata_summary,
 #####################
 # Run deseq2 on each group label vs all others
 ls_group_label_cell_types <-  unique(df_merged_metadata_labelled[["group_label"]])
+ls_main_label_cell_types <-  unique(df_merged_metadata_labelled[["main_label"]])
 ls_group_label_cell_types <- ls_group_label_cell_types[ls_group_label_cell_types != ""]
+# Remove labels that are reused from main to avoid redoing the same comparison
+ls_group_label_cell_types <- ls_group_label_cell_types[!ls_group_label_cell_types %in% ls_main_label_cell_types]
 
 print(ls_group_label_cell_types)
 foreach(i=ls_group_label_cell_types, .packages=  c('magrittr', 'DESeq2','tximport')) %dopar% {
@@ -310,7 +313,6 @@ foreach(i=ls_group_label_cell_types, .packages=  c('magrittr', 'DESeq2','tximpor
 # DESEQ2 main_label
 # ##################
 # Run deseq2 on each main label vs all others
-ls_main_label_cell_types <-  unique(df_merged_metadata_labelled[["main_label"]])
 print(ls_main_label_cell_types)
 foreach(i=ls_main_label_cell_types, .packages=  c('magrittr', 'DESeq2', 'tximport')) %dopar% {
   runDE_1_vs_all(

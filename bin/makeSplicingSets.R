@@ -21,97 +21,6 @@ library(doParallel)
 # Functions
 ##########################
 
-save_pheatmap_pdf <- function(x, filename, width=7, height=7) {
-  #' Function to save pheatmaps to a pdf file
-  stopifnot(!missing(x))
-  stopifnot(!missing(filename))
-  pdf(filename, width=width, height=height)
-  grid::grid.newpage()
-  grid::grid.draw(x$gtable)
-  dev.off()
-}
-
-volcano <- function(df_css, plot_out_dir, cell_type, tag, ls_point_color){
-
-  for (col4label in list("overlapping","event")){
-
-    # For junctions under certain thresholds label with their overlapping gene or the event
-    # df_css$gg_label <- NA
-    df_css <- df_css %>%
-      dplyr::arrange(p.value) %>%
-      dplyr::mutate(gglabel = case_when(((p.value<.00001) | ((p.value < .01  ) & (abs(delta) > .3 )))~ get(col4label)))
-
-    # If given ls_point_color, make those points red
-    df_css$point_color <- NA
-    # print(ls_point_color)
-    if (length(ls_point_color) > 0) {
-      df_css <- df_css %>%
-        dplyr::arrange(p.value) %>%
-        dplyr::mutate(point_color = case_when(event %in% as.vector(ls_point_color)  ~ "Event in the reference matrix",
-                                              TRUE ~ "Event not in the reference matrix"))
-
-    # Plot with point coloring
-    p <- ggplot(data=df_css, aes(x=delta, y=-log10(p.value), color = point_color )) +
-          geom_point(alpha = .7  ) +
-          theme_minimal() + geom_vline(xintercept=c(-0.2, 0.2), col="red") +
-          geom_hline(yintercept=-log10(0.01), col="red") +
-          xlim(-1.0, 1.0) +
-          geom_text(
-            label= df_css$gglabel,
-            vjust="inward",hjust="inward",
-            # nudge_x = 0.05, nudge_y = 0.05,
-            check_overlap =F, col = "darkgreen", size = 2
-          ) +
-          scale_color_manual(name = "",
-            values = c("Event in the reference matrix" = "red",
-                      "Event not in the reference matrix" = "black"),
-            labels = c("Event in the reference matrix",
-                      "Event not in the reference matrix"))+
-           theme(legend.position="bottom")
-
-    } else {
-      # Plot without point coloring
-      p <- ggplot(data=df_css, aes(x=delta, y=-log10(p.value) )) +
-          geom_point(alpha = .7  ) +
-          theme_minimal() + geom_vline(xintercept=c(-0.1, 0.1), col="red") +
-          geom_hline(yintercept=-log10(0.05), col="red") +
-          xlim(-1.0, 1.0) +
-          geom_text(
-            label= df_css$gglabel,
-            # nudge_x = 0.05, nudge_y = 0.05,
-            vjust="inward",hjust="inward",
-            check_overlap =F, col = "darkgreen", size = 2
-          )
-
-    }
-
-    ggsave(plot = p, filename = paste0(plot_out_dir,cell_type,
-                                      tag,"_",col4label,"_volcano.png"))
-
-  }
-
-}
-
-filter_top_junction <-  function(css_df){
-  
-  ls_keep_junctions <- list()
-  for (c in ls_clusters) {
-      # This base R version is much faster than using dplyr
-      # Find junction with lowest p.value in the given cluster
-      css_df_events <- css_df[css_df$event  %in% as.list(c),]
-      css_df_top_junc <- css_df_events[order(css_df_events$p.value),][1,]
-      top_junc <- as.character(css_df_top_junc$event)
-      ls_keep_junctions <- append(ls_keep_junctions, top_junc)
-    }
-
-  # Filter df to top junctions
-  filt_css_df <-css_df %>%
-    dplyr::filter(event %in% unique(unlist(ls_keep_junctions)))
-
-  return(filt_css_df)
-}
-
-
 import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, comparison_label){
   #' Import results from MESA compare sample set script to get the top N
   #' significant events into lists
@@ -517,6 +426,8 @@ print(dim(df_within_label))
 
 df_all_sets  <- do.call("rbind", list(df_main_label, df_group_label, df_within_label ))
 print(dim(df_all_sets))
+write.csv(df_all_sets, paste0(opt$out_dir,"/df_splice_sets.csv"))
+
 
 print(head(df_all_sets))
 print(unique(df_all_sets$set))

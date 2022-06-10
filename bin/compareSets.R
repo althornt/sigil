@@ -118,40 +118,45 @@ cat("\n Number of unique genes in gene set: \n")
 print(length(unique(df_gene_set$X)))
 cat("\n")
 
+###############################
 # Compare on set level 
-df_counts <- data.frame(matrix(ncol = 2, nrow = length(ls_all_sets)))
+###############################
+df_counts <- data.frame(matrix(ncol = 3, nrow = length(ls_all_sets)))
 rownames(df_counts) <- ls_all_sets
-colnames(df_counts) <- list("SpliceCount", "GeneCount")
+colnames(df_counts) <- list("SpliceCount", "GeneCount", "CommonGeneCount")
 
 for (s in ls_all_sets){
   print(s)
 
   # Counting 
-  cnt_splice <- nrow(df_spice_set %>% 
-    filter(set == s) )
-  cnt_gene <- nrow(df_gene_set %>% 
-    filter(set == s) )
-  df_counts[s, "SpliceCount"] <- cnt_splice
-  df_counts[s, "GeneCount"] <- cnt_gene
+  df_splice <- df_spice_set %>% 
+    filter(set == s) 
+  df_gene <- df_gene_set %>% 
+    filter(set == s) 
+  df_counts[s, "SpliceCount"] <- nrow(df_splice)
+  df_counts[s, "GeneCount"] <- nrow(df_gene)
 
   # Comparing 
-
-
-
+  gene_intersection <- intersect(df_splice$overlapping, df_gene$X)
+  print(length(gene_intersection))
+  df_counts[s, "CommonGeneCount"] <- length(gene_intersection)
 }
 
+df_counts %>% 
+  tibble::rownames_to_column("set") %>%
+  arrange(desc(CommonGeneCount))
 
-print(df_counts)
+df_counts %>% 
+  melt() %>%
+  ggplot(aes(x = variable, y = value, color = variable)) +
+  geom_jitter(alpha = 0.5, size = 3) +
+  theme(legend.position = "none")
 
-# Loop through each set 
+ggsave(paste0(opt$out_dir, "countPlot.png"))
 
-    # count set gene 
-
-    # count set splice
-
-    # find intersection of genes  
-
-
+#########################################
+# Compare on comparison level UP or DN
+##############################################
 
 
 # also llop through compare combined UP and DN - drop numbers from X or _UP from set 
