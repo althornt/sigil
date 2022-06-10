@@ -456,7 +456,7 @@ for (i in ls_group_cell_types){
 }
 
 print(group2main)
-print("ppppppppp")
+
 # Run in parallel
 ls_within_res <- foreach(i=group2main,
                         .packages=c('magrittr','dplyr','ggplot2','pheatmap')) %dopar% {
