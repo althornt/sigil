@@ -41,55 +41,53 @@ Bcell_sets <- list(
 )
 
 Tcell_sets <- list(
-    "CD4:+_T_Cell_main_DN",
-    "CD4:+_T_Cell_main_UP",
-    "CD4:+_T_Cell_within_DN",
-    "CD4:+_T_Cell_within_UP",
-    "CD8:+_T_Cell_main_DN",
-    "CD8:+_T_Cell_main_UP",
-    "CD8:+_T_Cell_within_DN",
-    "CD8:+_T_Cell_within_UP",
-    "T_cells_group_DN",
-    "T_cells_group_UP"
+   "T_Cells_CD4:+_main_DN",
+   "T_Cells_CD4:+_main_UP",
+   "T_Cells_CD4:+_within_DN",
+   "T_Cells_CD4:+_within_UP",
+   "T_Cells_CD8:+_main_DN",
+   "T_Cells_CD8:+_main_UP",
+   "T_Cells_CD8:+_within_DN",
+   "T_Cells_CD8:+_within_UP",
+   "T_cells_group_DN",
+   "T_cells_group_UP"
 )
 
 
 DC_sets <- list(
-    "Myeloid_DC_CD123+_main_DN",
-    "Myeloid_DC_CD123+_main_UP",
-    "Myeloid_DC_CD123+_within_DN",
-    "Myeloid_DC_CD123+_within_UP",
-    "Myeloid_DC_main_DN",
-    "Myeloid_DC_main_UP",
-    "Myeloid_DC_within_DN",
-    "Myeloid_DC_within_UP",
-    "Plasmacytoid_DC_main_DN",
-    "Plasmacytoid_DC_main_UP",
-    "Plasmacytoid_DC_within_DN",
-    "Plasmacytoid_DC_within_UP",
-    "Dendritic_LPS-18h_main_DN",
-    "Dendritic_LPS-18h_main_UP",
-    "Dendritic_LPS-18h_within_DN",
-    "Dendritic_LPS-18h_within_UP",
-    "Dendritic_NT_main_DN",
-    "Dendritic_NT_main_UP",
-    "Dendritic_NT_within_DN",
-    "Dendritic_NT_within_UP",
-    "Dendritic_R837-18h_main_DN",
-    "Dendritic_R837-18h_main_UP",
-    "Dendritic_R837-18h_within_DN",
-    "Dendritic_R837-18h_within_UP",
-    "Dendritic_R848-18h_main_DN",
-    "Dendritic_R848-18h_main_UP",
-    "Dendritic_R848-18h_within_DN",
-    "Dendritic_R848-18h_within_UP",
-    "Dendritic_cells_group_DN",
-    "Dendritic_cells_group_UP"
+ "DC_Myeloid_CD123+_main_DN",
+ "DC_Myeloid_CD123+_main_UP",
+ "DC_Myeloid_CD123+_within_DN",
+ "DC_Myeloid_CD123+_within_UP",
+ "DC_Myeloid_main_DN",
+ "DC_Myeloid_main_UP",
+ "DC_Myeloid_within_DN",
+ "DC_Myeloid_within_UP",
+ "DC_Plasmacytoid_main_DN",
+ "DC_Plasmacytoid_main_UP",
+ "DC_Plasmacytoid_within_DN",
+ "DC_Plasmacytoid_within_UP",
+ "Dendritic_LPS-18h_main_DN",
+ "Dendritic_LPS-18h_main_UP",
+ "Dendritic_LPS-18h_within_DN",
+ "Dendritic_LPS-18h_within_UP",
+ "Dendritic_NT_main_DN",
+ "Dendritic_NT_main_UP",
+ "Dendritic_NT_within_DN",
+ "Dendritic_NT_within_UP",
+ "Dendritic_R837-18h_main_DN",
+ "Dendritic_R837-18h_main_UP",
+ "Dendritic_R837-18h_within_DN",
+ "Dendritic_R837-18h_within_UP",
+ "Dendritic_R848-18h_main_DN",
+ "Dendritic_R848-18h_main_UP",
+ "Dendritic_R848-18h_within_DN",
+ "Dendritic_R848-18h_within_UP",
+ "Dendritic_cells_group_DN",
+ "Dendritic_cells_group_UP"
 )
 
 Eos_sets <- list(
-    "Eosinophils_group_DN",
-    "Eosinophils_group_UP",
     "Eosinophils_main_DN",
     "Eosinophils_main_UP"
 )
@@ -118,7 +116,7 @@ Macrophage_sets <- list(
     "Macrophages_group_DN",
     "Macrophages_group_UP"
 )
-monocyte_sets <- list(
+Monocyte_sets <- list(
     "Monocyte_LPS-18h_main_DN",
     "Monocyte_LPS-18h_main_UP",
     "Monocyte_LPS-18h_within_DN",
@@ -160,9 +158,7 @@ NK_sets <- list(
 
 Neutrophil_sets <- list(
     "Neutrophils_main_DN",
-    "Neutrophils_main_UP",
-    "Neutrophils_group_DN",
-    "Neutrophils_group_UP"
+    "Neutrophils_main_UP"
 )
 
 ###############################
@@ -218,7 +214,7 @@ monaco_neutrophil <-list(
 Monaco2set <- list(
   "Tcells" = list(monaco_tcells, Tcell_sets),
   "Bcells" = list(monaco_bcells, Bcell_sets),
-  "Monocytes" = list(monaco_monocytes, monocyte_sets),
+  "Monocytes" = list(monaco_monocytes, Monocyte_sets),
   "NKcells" = list(monaco_NKcells, NK_sets),
   "DC" = list(monaco_DC, DC_sets),
   "neutrophils"    =  list(monaco_neutrophil, Neutrophil_sets)
@@ -291,6 +287,14 @@ df_enr <- df_enr[ , order(names(df_enr))]
 # write.csv(df_enr, file = paste0(opt$o, "gsva_maxmin.csv"), row.names = TRUE)
 
 # print(unique(metadata$group_label))
+
+
+# for (i in rownames(df_enr)){
+#   cat("\n")
+#   print(i)
+#   cat("\n")
+
+# }
 
 ls_groups_keep <- list("T cells", "Th cells", "B cells", 
                         "Monocytes", "NK cells", "Dendritic cells",
@@ -409,6 +413,11 @@ df_enr_main_acc_group <- df_enr_main_acc %>%
 print(df_enr_main_acc_main)
 print(df_enr_main_acc_group)
 
+write.csv(df_enr_main_acc_main, file = paste0(opt$o, "eval_by_main_label.csv"), row.names = TRUE)
+write.csv(df_enr_main_acc_group, file = paste0(opt$o, "eval_by_group_label.csv"), row.names = TRUE)
+
+
+# quit()
 
 #######################
 # median heatmap by group
