@@ -66,7 +66,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
   # Get top negative delta events
   top_sig_by_pval_negdelta <- df_css %>%
       dplyr::filter(p.value <= .05 ) %>%
-      dplyr::filter(delta <= -.15 ) %>%
+      dplyr::filter(delta <= -.10 ) %>%
       dplyr::arrange(p.value)  %>%
       head(topN) %>%
       select(event,overlapping, delta, p.value)
@@ -85,7 +85,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
   # Get top positive delta events
   top_sig_by_pval_posdelta <- df_css %>%
     dplyr::filter(p.value <= .05) %>%
-    dplyr::filter(delta >= .15 ) %>%
+    dplyr::filter(delta >= .10 ) %>%
     dplyr::arrange(p.value)  %>%
     head(topN) %>%
     select(event,overlapping, delta, p.value)

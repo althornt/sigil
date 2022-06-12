@@ -32,7 +32,7 @@ import_deseq2 <- function(filename, topN, plot_out_dir, deseq2_dir, meta_col, co
   # Get top negative delta events
   df_topN_DEG_down_reg <- df_res %>%
       dplyr::filter(padj <= .05 ) %>%
-      dplyr::filter(log2FoldChange < 0 ) %>%
+      dplyr::filter(log2FoldChange < 1 ) %>%
       dplyr::arrange(padj) %>%
       head(topN) 
     #   %>%
@@ -41,7 +41,7 @@ import_deseq2 <- function(filename, topN, plot_out_dir, deseq2_dir, meta_col, co
   # Get top negative delta events
   df_topN_DEG_up_reg <- df_res %>%
       dplyr::filter(padj <= .05 ) %>%
-      dplyr::filter(log2FoldChange > 0 ) %>%
+      dplyr::filter(log2FoldChange > 1 ) %>%
       dplyr::arrange(padj) %>%
       head(topN) 
     #   %>%
