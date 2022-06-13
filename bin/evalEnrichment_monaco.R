@@ -394,6 +394,11 @@ df_enr_main_acc <- df_enr %>%
 # Overall accuracy from all samples
 mean(df_enr_main_acc$max_up_set_or_min_down_set_match)
 
+sink(paste0(opt$o, "mean.csv"))
+cat(mean(df_enr_main_acc$max_up_set_or_min_down_set_match))
+sink()
+
+
 # Accuracy by main label 
 df_enr_main_acc_main <- df_enr_main_acc %>%
   select(max_up_set_or_min_down_set_match, main_label) %>%
@@ -417,7 +422,7 @@ write.csv(df_enr_main_acc_main, file = paste0(opt$o, "eval_by_main_label.csv"), 
 write.csv(df_enr_main_acc_group, file = paste0(opt$o, "eval_by_group_label.csv"), row.names = TRUE)
 
 
-# quit()
+quit()
 
 #######################
 # median heatmap by group

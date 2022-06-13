@@ -62,10 +62,26 @@ metadata <- metadata %>%
     select(main_label, group_label)
     # select(main_label, group_label, data_source)
 
+ls_dir<- list.dirs(path = opt$i, full.names = FALSE, recursive = TRUE)
+
+
+#################
+# Overall mean
+##################
+# ls_main_dfs <- list()
+for (d in ls_dir){
+  filename <- paste0(opt$i,d,"/mean.csv")
+
+  if (file.exists(filename)){
+    cat(d , ": ")
+    file.show(filename)
+  }
+}
+
 #############
 # main label
 ############
-ls_dir<- list.dirs(path = opt$i, full.names = FALSE, recursive = TRUE)
+# ls_dir<- list.dirs(path = opt$i, full.names = FALSE, recursive = TRUE)
 
 ls_main_dfs <- list()
 for (d in ls_dir){
@@ -100,8 +116,8 @@ ht_order <- ComplexHeatmap::Heatmap(df_main_eval,
                                 # row_order = order(rownames(df_main_eval)), 
                                 show_row_names= TRUE,
                                 show_column_names = TRUE,
-                                row_names_gp = grid::gpar(fontsize =5),
-                                column_names_gp = grid::gpar(fontsize =5),
+                                row_names_gp = grid::gpar(fontsize =10),
+                                column_names_gp = grid::gpar(fontsize = 7.5),
                                 # top_annotation=ha,
                                 # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
                                 show_row_dend = TRUE,
@@ -167,3 +183,5 @@ ht_order <- ComplexHeatmap::Heatmap(df_group_eval,
 
 draw(ht_order, merge_legend = TRUE)
 dev.off()
+
+
