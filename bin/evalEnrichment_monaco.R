@@ -220,17 +220,48 @@ Monaco2set <- list(
   "neutrophils"    =  list(monaco_neutrophil, Neutrophil_sets)
 )
 
-# print(Monaco2set)
-# print("--------")
-# print(Monaco2set[[1]][1])
 
+checktop <-function(str_main_label, ls_correct_sets, df_enr){
+
+   # Get list of samples of this type
+    ls_samples <- metadata %>%
+      tibble::rownames_to_column("Run")  %>%
+      filter(main_label == str_main_label) %>%
+      pull(Run)
+    
+    # Add 1 if either max or min is a match ; 0 if neither are a match 
+    for (sample in ls_samples){
+
+      if ((df_enr["max_up_set",sample] %in% ls_correct_sets) ||
+          (df_enr["min_down_set",sample] %in% ls_correct_sets)){
+
+          df_enr["max_up_set_or_min_down_set_match", sample] <- 1
+
+      } else {
+         df_enr["max_up_set_or_min_down_set_match", sample] <- 0
+      }      
+    }
+  return(df_enr)
+}
 # Arguments
 option_list <- list(
   optparse::make_option(
-    c("-i", "--input"),
+    c("-s", "--splice_set"),
     type = "character",
     default = NULL,
-    help = "GSVA"),
+    help = ""),
+
+  optparse::make_option(
+    c("-g", "--gene_set"),
+    type = "character",
+    default = NULL,
+    help = ""),
+
+  optparse::make_option(
+    c("-i", "--immuneSigDB"),
+    type = "character",
+    default = NULL,
+    help = ""),
 
   optparse::make_option(
     c("-o", "--out_dir"),
@@ -271,30 +302,22 @@ metadata <- metadata %>%
     select(main_label, group_label)
     # select(main_label, group_label, data_source)
 
-# Read in and sort enrichment output 
-df_enr <- read.csv(file = opt$i, stringsAsFactors = FALSE) %>%
+
+# Read in and sort enrichment outputs 
+df_gene_enr <- read.csv(file = opt$gene_set, stringsAsFactors = FALSE) %>%
   tibble::column_to_rownames("name")
-df_enr <- df_enr[ , order(names(df_enr))]
+df_gene_enr <- df_gene_enr[ , order(names(df_gene_enr))]
 
-# # Add row for which set has max and min score in each sample 
-# max <- rownames(df_enr)[apply(df_enr,2,which.max)]
-# df_enr["max",] <- max
-# min <- rownames(df_enr)[apply(df_enr,2,which.min)]
-# df_enr["min",] <- min
-# df_enr["main_label", ] <- df_sample_annotations["main_label",]
-# df_enr["group_label", ] <- df_sample_annotations["group_label",]
-# # df_enr["data_source", ] <- df_sample_annotations["data_source",]
-# write.csv(df_enr, file = paste0(opt$o, "gsva_maxmin.csv"), row.names = TRUE)
+df_splice_enr <- read.csv(file = opt$splice_set, stringsAsFactors = FALSE) %>%
+  tibble::column_to_rownames("name")
+df_splice_enr <- df_splice_enr[ , order(names(df_splice_enr))]
 
-# print(unique(metadata$group_label))
+df_imsig_enr <- read.csv(file = opt$immuneSigDB, stringsAsFactors = FALSE) %>%
+  tibble::column_to_rownames("name")
+df_imsig_enr <- df_imsig_enr[ , order(names(df_imsig_enr))]
 
-
-# for (i in rownames(df_enr)){
-#   cat("\n")
-#   print(i)
-#   cat("\n")
-
-# }
+print(dim(df_gene_enr))
+print(dim(df_splice_enr))
 
 ls_groups_keep <- list("T cells", "Th cells", "B cells", 
                         "Monocytes", "NK cells", "Dendritic cells",
@@ -302,210 +325,124 @@ ls_groups_keep <- list("T cells", "Th cells", "B cells",
 ls_main_drop <- list("Low-density basophils","PBMCs",
                       "Plasmablasts","Progenitor cells")
 
+calc <- function(df_enr, name){
 
-df_enr_UP <- df_enr %>%
-    tibble::rownames_to_column("Sets") %>%
-    dplyr::filter(grepl("_UP", Sets)) %>%
-    tibble::column_to_rownames("Sets") 
+  df_enr_UP <- df_enr %>%
+      tibble::rownames_to_column("Sets") %>%
+      dplyr::filter(grepl("_UP", Sets)) %>%
+      tibble::column_to_rownames("Sets") 
 
-df_enr_DN <- df_enr %>%
-    tibble::rownames_to_column("Sets") %>%
-    dplyr::filter(grepl("_DN", Sets)) %>%
-    tibble::column_to_rownames("Sets") 
+  df_enr_DN <- df_enr %>%
+      tibble::rownames_to_column("Sets") %>%
+      dplyr::filter(grepl("_DN", Sets)) %>%
+      tibble::column_to_rownames("Sets") 
 
-max <- rownames(df_enr_UP)[apply(df_enr_UP,2,which.max)]
-df_enr["max_up_set",] <- max
-min <- rownames(df_enr_DN)[apply(df_enr_DN,2,which.min)]
-df_enr["min_down_set",] <- min
+  max <- rownames(df_enr_UP)[apply(df_enr_UP,2,which.max)]
+  df_enr["max_up_set",] <- max
+  min <- rownames(df_enr_DN)[apply(df_enr_DN,2,which.min)]
+  df_enr["min_down_set",] <- min
 
+  df_enr["group_label", ] <- df_sample_annotations["group_label",]
 
-checktop <-function(str_main_label, ls_correct_sets, df_enr){
-
-   # Get list of samples of this type
-    ls_samples <- metadata %>%
-      tibble::rownames_to_column("Run")  %>%
-      filter(main_label == str_main_label) %>%
-      pull(Run)
-    
-    # Add 1 if either max or min is a match ; 0 if neither are a match 
-    for (sample in ls_samples){
-
-      if ((df_enr["max_up_set",sample] %in% ls_correct_sets) ||
-          (df_enr["min_down_set",sample] %in% ls_correct_sets)){
-
-          df_enr["max_up_set_or_min_down_set_match", sample] <- 1
-
-      } else {
-         df_enr["max_up_set_or_min_down_set_match", sample] <- 0
-      }      
+  # For each cell type use list to check if the max UP or min DN
+  # is in the correct splice set
+  for ( i in unique(metadata$main_label)){
+    # Tcells 
+    if (i %in% unlist(Monaco2set[[1]][1])){
+      df_enr <- checktop(i, unlist(Monaco2set[[1]][2]), df_enr)
+    } 
+    # Bcells
+    else if (i %in% unlist(Monaco2set[[2]][1])){
+      df_enr <- checktop(i, unlist(Monaco2set[[2]][2]), df_enr)
+    } 
+    # Monocytes
+    else if (i %in% unlist(Monaco2set[[3]][1])){
+      df_enr <- checktop(i, unlist(Monaco2set[[3]][2]), df_enr)
     }
-  return(df_enr)
-}
+    # NKcells
+    else if (i %in% unlist(Monaco2set[[4]][1])){
+      df_enr <- checktop(i, unlist(Monaco2set[[4]][2]), df_enr)
+    }
+    # DC 
+    else if (i %in% unlist(Monaco2set[[5]][1])){
+      df_enr <- checktop(i, unlist(Monaco2set[[5]][2]), df_enr)
+    }
+    # Neutrophils
+    else if (i %in% unlist(Monaco2set[[6]][1])){
+      df_enr <- checktop(i, unlist(Monaco2set[[6]][2]), df_enr)
+    }
 
-# For each cell type use Monaco2set list to check if the max UP or min DN
-# is in the correct splice set
-for ( i in unique(metadata$main_label)){
-  # Tcells 
-  if (i %in% unlist(Monaco2set[[1]][1])){
-    df_enr <- checktop(i, unlist(Monaco2set[[1]][2]), df_enr)
-  } 
-  # Bcells
-  else if (i %in% unlist(Monaco2set[[2]][1])){
-    df_enr <- checktop(i, unlist(Monaco2set[[2]][2]), df_enr)
-  } 
-  # Monocytes
-  else if (i %in% unlist(Monaco2set[[3]][1])){
-    df_enr <- checktop(i, unlist(Monaco2set[[3]][2]), df_enr)
-  }
-  # NKcells
-  else if (i %in% unlist(Monaco2set[[4]][1])){
-    df_enr <- checktop(i, unlist(Monaco2set[[4]][2]), df_enr)
-  }
-  # DC 
-  else if (i %in% unlist(Monaco2set[[5]][1])){
-    df_enr <- checktop(i, unlist(Monaco2set[[5]][2]), df_enr)
-  }
-  # Neutrophils
-  else if (i %in% unlist(Monaco2set[[6]][1])){
-    df_enr <- checktop(i, unlist(Monaco2set[[6]][2]), df_enr)
-  }
+    } 
 
-  } 
+    df_enr_main_acc <- df_enr %>%
+      t() %>%
+      as.data.frame()  %>%
+      filter(group_label %in% ls_groups_keep) %>%
+      mutate_at(c('max_up_set_or_min_down_set_match'), as.character) %>%
+      mutate_at(c('max_up_set_or_min_down_set_match'), as.numeric) 
 
+    # Overall accuracy from all samples
+    overall_mean <- mean(df_enr_main_acc$max_up_set_or_min_down_set_match)
 
+    # Accuracy by group label 
+    df_enr_main_acc_group <- df_enr_main_acc %>%
+      select(max_up_set_or_min_down_set_match, group_label) %>%
+      group_by(group_label ) %>%
+      dplyr::summarize(Mean = mean(max_up_set_or_min_down_set_match, na.rm=FALSE)) %>%
+      as.data.frame()  %>%
+      arrange(desc(Mean)) 
 
-df_enr["main_label", ] <- df_sample_annotations["main_label",]
-df_enr["group_label", ] <- df_sample_annotations["group_label",]
+  # print(df_enr_main_acc_group)
 
-write.csv(df_enr, file = paste0(opt$o, "gsva_maxmin_main.csv"), row.names = TRUE)
+  #################
+  # heatmap all samples 
 
+  df_enr_heat <-  df_enr %>%
+      t() %>%
+      as.data.frame()  %>%
+      select(-max_up_set_or_min_down_set_match,-max_up_set,-min_down_set ) %>%
+      arrange(rownames(.)) %>%
+      filter(group_label %in% ls_groups_keep)  %>%
+      select(-group_label) %>%
+      mutate_at(vars(ends_with("_UP")), funs(as.numeric(as.character(.)))) %>%
+      mutate_at(vars(ends_with("_DN")), funs(as.numeric(as.character(.)))) 
 
-# Drop the samples that didnt have matching sets 
-# df_enr<- df_enr %>%
-#   select_if(~ !any(is.na(.)))
+  print(df_enr_heat)
 
-df_enr_main_acc <- df_enr %>%
-  t() %>%
-  as.data.frame()  %>%
-  filter(!main_label %in% ls_main_drop) %>%
-  mutate_at(c('max_up_set_or_min_down_set_match'), as.character) %>%
-  mutate_at(c('max_up_set_or_min_down_set_match'), as.numeric) 
-
-# Overall accuracy from all samples
-mean(df_enr_main_acc$max_up_set_or_min_down_set_match)
-
-sink(paste0(opt$o, "mean.csv"))
-cat(mean(df_enr_main_acc$max_up_set_or_min_down_set_match))
-sink()
-
-
-# Accuracy by main label 
-df_enr_main_acc_main <- df_enr_main_acc %>%
-  select(max_up_set_or_min_down_set_match, main_label) %>%
-  group_by(main_label ) %>%
-  dplyr::summarize(Mean = mean(max_up_set_or_min_down_set_match, na.rm=FALSE)) %>%
-  as.data.frame()  %>%
-  arrange(desc(Mean)) 
-
-# Accuracy by group label 
-df_enr_main_acc_group <- df_enr_main_acc %>%
-  select(max_up_set_or_min_down_set_match, group_label) %>%
-  group_by(group_label ) %>%
-  dplyr::summarize(Mean = mean(max_up_set_or_min_down_set_match, na.rm=FALSE)) %>%
-  as.data.frame()  %>%
-  arrange(desc(Mean)) 
-
-print(df_enr_main_acc_main)
-print(df_enr_main_acc_group)
-
-write.csv(df_enr_main_acc_main, file = paste0(opt$o, "eval_by_main_label.csv"), row.names = TRUE)
-write.csv(df_enr_main_acc_group, file = paste0(opt$o, "eval_by_group_label.csv"), row.names = TRUE)
-
-
-quit()
-
-#######################
-# median heatmap by group
-#########################
-
-# group enr by the group label 
-df_enr_median <- df_enr %>%
-  t() %>%
-  as.data.frame()  %>%
-  select(-max_up_set_or_min_down_set_match,-max_up_set,-min_down_set, -main_label ) %>%
-  filter(group_label %in% ls_groups_keep) %>%
-  mutate_at(vars(ends_with("_UP")), funs(as.numeric(as.character(.)))) %>%
-  mutate_at(vars(ends_with("_DN")), funs(as.numeric(as.character(.)))) %>%
-  group_by(group_label) %>%
-  summarise_all(.funs = c(median="median"))%>%
-  # t() %>%
-  as.data.frame()  
-
-print(head(df_enr_median))
-
-
-
-##############################################################################
-# Heatmap all 
-
-df_enr_median_heat <- df_enr_median %>%
-  tibble::column_to_rownames("group_label") 
-
-df_enr_median_heat[] <- sapply(df_enr_median_heat, as.numeric)
-  
-png(file=paste0(opt$out_dir,"/median_heatmap_group.png"),
-    width = 9,
-    height    = 10,
-    units     = "in",
-    res       = 1200)
-
-ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat,
-                              # name="Z-Score",
-                                column_order =order(colnames(df_enr_median_heat)),
-                                # row_order = order(rownames(df_enr_scale)), 
-                                show_row_names= TRUE,
-                                show_column_names = TRUE,
-                                row_names_gp = grid::gpar(fontsize =5),
-                                column_names_gp = grid::gpar(fontsize =5),
-                                # top_annotation=ha,
-                                # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                show_row_dend = TRUE,
-                                heatmap_legend_param = list(
-                                # legend_direction = "horizontal", 
-                                # legend_height = unit(1, "cm"),
-                                legend_gp = gpar(fontsize = 5))
-              )
-
-draw(ht_order, merge_legend = TRUE)
-dev.off()
-
-
-##############################################################################
-# Heatmap DN
-
-df_enr_median_heat_DN <- df_enr_median_heat %>%
-    select(matches("DN_median"))
-
-
-print(head(df_enr_median_heat_DN))
-
-  png(file=paste0(opt$out_dir,"/median_heatmap_DN_group.png"),
+  png(file=paste0(opt$out_dir,"/", name, "_heatmap_group.png"),
       width = 9,
-      height    = 7,
+      height    = 10,
       units     = "in",
       res       = 1200)
 
-  ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat_DN,
+  metadata_harow <- metadata %>% 
+        select(group_label) %>%
+        filter(group_label %in% ls_groups_keep)
+
+  ha_row <- rowAnnotation(
+      df = metadata_harow, 
+      name = "label", 
+      # col = list( "group_label" = c("myeloid" = "black",
+      #                             "Tcell" = "skyblue" , 
+      #                             "Treg" = "lightgrey")
+      #                             # "live" = "pink", 
+      #                             # "epcam" = "green",
+      #                             # "tumor" = "purple")
+      #                             ),
+      show_legend = TRUE,
+      gp = gpar(col = NA)
+      )
+  ht_order <- ComplexHeatmap::Heatmap(df_enr_heat,
                                 # name="Z-Score",
-                                  column_order =order(colnames(df_enr_median_heat_DN)),
-                                  row_order = order(rownames(df_enr_median_heat_DN)), 
+                                  column_order =order(colnames(df_enr_heat)),
+                                  # row_order = order(rownames(df_enr_heat)), 
                                   show_row_names= TRUE,
                                   show_column_names = TRUE,
-                                  row_names_gp = grid::gpar(fontsize =8),
-                                  column_names_gp = grid::gpar(fontsize =7),
-                                  # top_annotation=ha,
+                                  row_names_gp = grid::gpar(fontsize =5),
+                                  column_names_gp = grid::gpar(fontsize =5),
+                                  right_annotation=ha_row,
                                   # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                  show_row_dend = TRUE,
+                                  # show_row_dend = TRUE,
                                   heatmap_legend_param = list(
                                   # legend_direction = "horizontal", 
                                   # legend_height = unit(1, "cm"),
@@ -515,163 +452,176 @@ print(head(df_enr_median_heat_DN))
   draw(ht_order, merge_legend = TRUE)
   dev.off()
 
-##############################################################################
-# Heatmap DN
+  ###############
+  # median
+  #################
 
-df_enr_median_heat_UP <- df_enr_median_heat %>%
-    select(matches("UP_median"))
+  # group enr by the group label 
+  df_enr_median <- df_enr %>%
+    t() %>%
+    as.data.frame()  %>%
+    select(-max_up_set_or_min_down_set_match,-max_up_set,-min_down_set ) %>%
+    filter(group_label %in% ls_groups_keep)  %>%
+    mutate_at(vars(ends_with("_UP")), funs(as.numeric(as.character(.)))) %>%
+    mutate_at(vars(ends_with("_DN")), funs(as.numeric(as.character(.)))) %>%
+    group_by(group_label) %>%
+    summarise_all(.funs = c(median="median"))%>%
+    # t() %>%
+    as.data.frame()  
+
+  df_enr_median_heat <- df_enr_median %>%
+    tibble::column_to_rownames("group_label") 
+
+  df_enr_median_heat[] <- sapply(df_enr_median_heat, as.numeric)
+
+  # Make DN df
+  df_enr_median_heat_DN <- df_enr_median_heat %>%
+      select(matches("DN_median"))
+  names(df_enr_median_heat_DN) = gsub(pattern = "_DN_median", replacement = "",
+                                      x = names(df_enr_median_heat_DN))
+  # Make UP df
+  df_enr_median_heat_UP <- df_enr_median_heat %>%
+      select(matches("UP_median"))
+  names(df_enr_median_heat_UP) = gsub(pattern = "_UP_median", replacement = "",
+                                      x = names(df_enr_median_heat_UP))
+
+  # Find sets in UP not in DN and add to DN
+  DN_missing <- names(df_enr_median_heat_UP)[!(names(df_enr_median_heat_UP) %in% names(df_enr_median_heat_DN))]
+  df_enr_median_heat_DN[,DN_missing] <- NA
+
+  # Find sets in DN not in UP and add to UP
+  UP_missing <- names(df_enr_median_heat_DN)[!(names(df_enr_median_heat_DN) %in% names(df_enr_median_heat_UP))]
+  df_enr_median_heat_UP[,UP_missing] <- NA
+
+  # Add missing columns with NAs
+  df_enr_median_heat_UP <-df_enr_median_heat_UP[ , order(names(df_enr_median_heat_UP))]
+  df_enr_median_heat_DN <- df_enr_median_heat_DN[ , order(names(df_enr_median_heat_DN))]
 
 
-print(head(df_enr_median_heat_UP))
+  ht_med_dn <- ComplexHeatmap::Heatmap(df_enr_median_heat_DN,
+                                  name = "",
+                                  row_title = "DN",
+                                  column_order =order(colnames(df_enr_median_heat_DN)),
+                                  row_order = order(rownames(df_enr_median_heat_DN)), 
+                                  show_row_names= TRUE,
+                                  show_column_names = TRUE,
+                                  row_names_gp = grid::gpar(fontsize =8),
+                                  column_names_gp = grid::gpar(fontsize =7)
+                                  # top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  # show_row_dend = TRUE,
+                                  # heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  # legend_gp = gpar(fontsize = 5))
+                )
 
-  png(file=paste0(opt$out_dir,"/median_heatmap_UP_group.png"),
-      width = 9,
-      height    = 7,
-      units     = "in",
-      res       = 1200)
-
-  ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat_UP,
-                                # name="Z-Score",
+  ht_med_up <- ComplexHeatmap::Heatmap(df_enr_median_heat_UP,
+                                  row_title = "UP",
                                   column_order =order(colnames(df_enr_median_heat_UP)),
                                   row_order = order(rownames(df_enr_median_heat_UP)), 
                                   show_row_names= TRUE,
                                   show_column_names = TRUE,
                                   row_names_gp = grid::gpar(fontsize =8),
                                   column_names_gp = grid::gpar(fontsize =7),
+                                  show_heatmap_legend = FALSE
+
                                   # top_annotation=ha,
-                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                  show_row_dend = TRUE,
-                                  heatmap_legend_param = list(
+                                  # show_row_dend = TRUE,
+                                  # heatmap_legend_param = list(
                                   # legend_direction = "horizontal", 
                                   # legend_height = unit(1, "cm"),
-                                  legend_gp = gpar(fontsize = 5))
-                )
+                                  # legend_gp = gpar(fontsize = 5)
+                                  )
 
-  draw(ht_order, merge_legend = TRUE)
-  dev.off()
-
-#######################
-# median heatmap by main
-#########################
-
-# group enr by the group label 
-df_enr_median <- df_enr %>%
-  t() %>%
-  as.data.frame()  %>%
-  select(-max_up_set_or_min_down_set_match,-max_up_set,-min_down_set, -group_label ) %>%
-  # filter(main_label %in% ls_groups_keep) %>%
-  mutate_at(vars(ends_with("_UP")), funs(as.numeric(as.character(.)))) %>%
-  mutate_at(vars(ends_with("_DN")), funs(as.numeric(as.character(.)))) %>%
-  group_by(main_label) %>%
-  summarise_all(.funs = c(median="median"))%>%
-  # t() %>%
-  as.data.frame()  
-
-print(head(df_enr_median))
-
-
-
-##############################################################################
-# Heatmap all 
-
-df_enr_median_heat <- df_enr_median %>%
-  tibble::column_to_rownames("main_label") 
-
-df_enr_median_heat[] <- sapply(df_enr_median_heat, as.numeric)
-  
-png(file=paste0(opt$out_dir,"/median_heatmap_main.png"),
-    width = 9,
-    height    = 10,
-    units     = "in",
-    res       = 1200)
-
-ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat,
-                              # name="Z-Score",
-                                # column_order =order(colnames(df_enr_median_heat)),
-                                # row_order = order(rownames(df_enr_scale)), 
-                                show_row_names= TRUE,
-                                show_column_names = TRUE,
-                                row_names_gp = grid::gpar(fontsize =5),
-                                column_names_gp = grid::gpar(fontsize =5),
-                                # top_annotation=ha,
-                                # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                show_row_dend = TRUE,
-                                heatmap_legend_param = list(
-                                # legend_direction = "horizontal", 
-                                # legend_height = unit(1, "cm"),
-                                legend_gp = gpar(fontsize = 5))
-              )
-
-draw(ht_order, merge_legend = TRUE)
-dev.off()
-
-
-##############################################################################
-# Heatmap DN
-
-df_enr_median_heat_DN <- df_enr_median_heat %>%
-    select(matches("DN_median"))
-
-
-print(head(df_enr_median_heat_DN))
-
-  png(file=paste0(opt$out_dir,"/median_heatmap_DN_main.png"),
-      width = 9,
-      height    = 7,
+  # combined gene and splice heatmaps
+  png(file=paste0(opt$out_dir,name,"_median_heatmap_UP_DN_group.png"),
+      width = 10,
+      height    = 4,
       units     = "in",
       res       = 1200)
 
-  ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat_DN,
-                                # name="Z-Score",
-                                  # column_order =order(colnames(df_enr_median_heat_DN)),
-                                  # row_order = order(rownames(df_enr_median_heat_DN)), 
-                                  show_row_names= TRUE,
-                                  show_column_names = TRUE,
-                                  row_names_gp = grid::gpar(fontsize =8),
-                                  column_names_gp = grid::gpar(fontsize =7),
-                                  # top_annotation=ha,
-                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                  show_row_dend = TRUE,
-                                  heatmap_legend_param = list(
-                                  # legend_direction = "horizontal", 
-                                  # legend_height = unit(1, "cm"),
-                                  legend_gp = gpar(fontsize = 5))
-                )
-
-  draw(ht_order, merge_legend = TRUE)
+  ht_list = ht_med_up %v% ht_med_dn
+  draw(ht_list, 
+      merge_legend = TRUE,
+      column_title = name, column_title_gp = gpar(fontsize = 16))
   dev.off()
 
-##############################################################################
-# Heatmap DN
+  return(list(overall_mean,df_enr_main_acc, df_enr_main_acc_group ))
 
-df_enr_median_heat_UP <- df_enr_median_heat %>%
-    select(matches("UP_median"))
+}
 
+# Run gene
+ls_gene_res <- calc(df_gene_enr, "gene")
+cat("\n")
+cat("\n Average gene set sensitivity:")
+cat("\n", paste0(ls_gene_res[1]), "\n")
+cat("\n")
 
-print(head(df_enr_median_heat_UP))
+# write.csv(ls_gene_res[2], file = paste0(opt$o, "gene_set_eval_by_group_label.csv"), row.names = TRUE)
+# # write.csv(ls_gene_res[3], file = paste0(opt$o, "gene_set_eval_by_group_label_mean.csv"), row.names = TRUE)
 
-  png(file=paste0(opt$out_dir,"/median_heatmap_UP_main.png"),
-      width = 9,
-      height    = 7,
-      units     = "in",
-      res       = 1200)
+# Run splice
+ls_splice_res <- calc(df_splice_enr, "splice")
+cat("\n")
+cat("\n Average splice set sensitivity:")
+cat("\n", paste0(ls_splice_res[1]), "\n")
+cat("\n")
 
-  ht_order <- ComplexHeatmap::Heatmap(df_enr_median_heat_UP,
-                                # name="Z-Score",
-                                  # column_order =order(colnames(df_enr_median_heat_UP)),
-                                  # row_order = order(rownames(df_enr_median_heat_UP)), 
-                                  show_row_names= TRUE,
-                                  show_column_names = TRUE,
-                                  row_names_gp = grid::gpar(fontsize =8),
-                                  column_names_gp = grid::gpar(fontsize =7),
-                                  # top_annotation=ha,
-                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
-                                  show_row_dend = TRUE,
-                                  heatmap_legend_param = list(
-                                  # legend_direction = "horizontal", 
-                                  # legend_height = unit(1, "cm"),
-                                  legend_gp = gpar(fontsize = 5))
-                )
+write.csv(ls_splice_res[2], file = paste0(opt$o, "splice_set_eval_by_group_label.csv"), row.names = TRUE)
 
-  draw(ht_order, merge_legend = TRUE)
-  dev.off()
+# write.csv(df_enr_main_acc_main, file = paste0(opt$o, "eval_by_main_label.csv"), row.names = TRUE)
+# write.csv(df_enr_main_acc_group, file = paste0(opt$o, "eval_by_group_label.csv"), row.names = TRUE)
+
+# Merge gene and splice table
+cat("\n")
+df_merge <- ls_splice_res[3][[1]] %>%
+    rename(Splice = Mean) %>%
+    left_join(ls_gene_res[3][[1]], by = "group_label") %>%
+    rename(Gene = Mean)
+df_merge
+cat("\n")
+
+########################
+# ImmuneSigD
+########################
+df_imsig_enr["group_label", ] <- df_sample_annotations["group_label",]
+max <- rownames(df_imsig_enr)[apply(df_imsig_enr,2,which.max)]
+df_imsig_enr["max",] <- max
+min <- rownames(df_imsig_enr)[apply(df_imsig_enr,2,which.min)]
+df_imsig_enr["min",] <- min
+
+for (i in unique(df_sample_annotations["group_label",])){
+  print(i)
+
+  # Calc freq of sets with min score 
+  df_enr_min_ <- df_imsig_enr %>%
+    t() %>%
+    as.data.frame() %>%
+    filter(group_label == i) %>%
+    select(group_label, min) %>%
+    count(min) %>%
+    as.data.frame() %>%
+    mutate(freq = round(n / sum(n), 3)) %>% 
+    arrange(desc(freq)) 
+
+  cat("i")
+  cat("\n sets with minimum score: \n")
+  print(df_enr_min_)
+
+  # Calc freq of sets with min score 
+  df_enr_max_ <- df_imsig_enr %>%
+    t() %>%
+    as.data.frame() %>%
+    filter(group_label == i) %>%
+    select(group_label, max) %>%
+    count(max) %>%
+    as.data.frame() %>%
+    mutate(freq = round(n / sum(n), 3)) %>% 
+    arrange(desc(freq)) 
+
+  cat("\n i \n")
+  cat("\n sets with max score: \n")
+  print(df_enr_max_)
+
+}
