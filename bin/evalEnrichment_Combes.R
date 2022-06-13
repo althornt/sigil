@@ -517,5 +517,106 @@ cat("\n")
 
 
 
+########################
+# ImmuneSigD
+########################
+df_imsig_enr["group_label", ] <- df_sample_annotations["group_label",]
+max <- rownames(df_imsig_enr)[apply(df_imsig_enr,2,which.max)]
+df_imsig_enr["max",] <- max
+min <- rownames(df_imsig_enr)[apply(df_imsig_enr,2,which.min)]
+df_imsig_enr["min",] <- min
+
+# Calc freq of sets with min score in T cells 
+df_enr_min_tcell <- df_imsig_enr %>%
+  t() %>%
+  as.data.frame() %>%
+  filter(group_label %in% c("Tcell")) %>%
+  select(group_label, min) %>%
+  # count(main_label, min) %>%
+  count(min) %>%
+  as.data.frame() %>%
+  mutate(freq = round(n / sum(n), 3)) %>% 
+  arrange(desc(freq)) 
+  # %>%
+  # filter(grepl("DN",min))
+
+cat("\n Tcell sets with minimum score: \n")
+print(df_enr_min_tcell)
 
 
+# Calc freq of sets with max score in T cells 
+df_enr_max_tcell <- df_imsig_enr %>%
+  t() %>%
+  as.data.frame() %>%
+  filter(group_label %in% c("Tcell")) %>%
+  select(group_label, max) %>%
+  count(max) %>%
+  as.data.frame() %>%
+  mutate(freq = round(n / sum(n), 3)) %>% 
+  arrange(desc(freq)) 
+
+
+cat("\n Tcell sets with maximum score: \n")
+print(df_enr_max_tcell)
+
+
+# Calc freq of sets with min score in T regs 
+
+df_enr_min_treg <- df_imsig_enr %>%
+  t() %>%
+  as.data.frame() %>%
+  filter(group_label %in% c("Treg")) %>%
+  select(group_label, min) %>%
+  # count(main_label, min) %>%
+  count(min) %>%
+  as.data.frame() %>%
+  mutate(freq = round(n / sum(n), 3)) %>% 
+  arrange(desc(freq)) 
+  # %>%
+  # filter(grepl("DN",min))
+cat("\n Treg sets with minimum score: \n")
+print(df_enr_min_treg)
+
+
+# Calc freq of sets with max score in T regs 
+df_enr_max_treg <- df_imsig_enr %>%
+  t() %>%
+  as.data.frame() %>%
+  filter(group_label %in% c("Treg")) %>%
+  select(group_label, max) %>%
+  count(max) %>%
+  as.data.frame() %>%
+  mutate(freq = round(n / sum(n), 3)) %>% 
+  arrange(desc(freq)) 
+
+cat("\n Treg sets with maximum score: \n")
+print(df_enr_max_treg)
+
+# Calc freq of sets with max score in myeloid
+df_enr_max_myeloid <- df_imsig_enr %>%
+  t() %>%
+  as.data.frame() %>%
+  filter(group_label %in% c("myeloid")) %>%
+  select(group_label, max) %>%
+  count(max) %>%
+  as.data.frame() %>%
+  mutate(freq = round(n / sum(n), 3)) %>% 
+  arrange(desc(freq)) 
+
+
+cat("\n Myeloid sets with maximum score: \n")
+print(df_enr_max_myeloid)
+
+# Calc freq of sets with min score in myleoid
+df_enr_min_myeloid <- df_imsig_enr %>%
+  t() %>%
+  as.data.frame() %>%
+  filter(group_label %in% c("myeloid")) %>%
+  select(group_label, min) %>%
+  count(min) %>%
+  as.data.frame() %>%
+  mutate(freq = round(n / sum(n), 3)) %>% 
+  arrange(desc(freq)) 
+
+cat("\n Myeloid sets with min score: \n")
+print(df_enr_min_myeloid)
