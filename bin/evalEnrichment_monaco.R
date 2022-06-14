@@ -21,12 +21,9 @@ library(tidyr)
 library(reshape2)
 library(ComplexHeatmap)
 
-##########################
-# Functions
-##########################
-
-
-
+#################################
+# Mapping sets and cell types
+#################################
 Bcell_sets <- list(
     "B_cells_group_DN",
     "B_cells_group_UP",
@@ -52,7 +49,6 @@ Tcell_sets <- list(
    "T_cells_group_DN",
    "T_cells_group_UP"
 )
-
 
 DC_sets <- list(
  "DC_Myeloid_CD123+_main_DN",
@@ -161,9 +157,7 @@ Neutrophil_sets <- list(
     "Neutrophils_main_UP"
 )
 
-###############################
 # Monoco cell types
-
 monaco_tcells <- list(
     "Naive CD4 T cells", 
     "Naive CD8 T cells",
@@ -219,9 +213,11 @@ Monaco2set <- list(
   "DC" = list(monaco_DC, DC_sets),
   "neutrophils"    =  list(monaco_neutrophil, Neutrophil_sets)
 )
+##########################
+# Functions
+##########################
 
-
-checktop <-function(str_main_label, ls_correct_sets, df_enr){
+checktop <-function(str_main_label, ls_correct_sets, df_enr, df_maxmin){
 
    # Get list of samples of this type
     ls_samples <- metadata %>%
@@ -229,119 +225,46 @@ checktop <-function(str_main_label, ls_correct_sets, df_enr){
       filter(main_label == str_main_label) %>%
       pull(Run)
     
-    # Add 1 if either max or min is a match ; 0 if neither are a match 
+    # Determine if each sample is correct or not
     for (sample in ls_samples){
+        # cat("\n", sample, "\n")
+        # Find which UP set is max by intersection max set list with correct sets
+        intx_up <- intersect(unlist(df_maxmin["df_enr_UP_max_ls",sample]) , ls_correct_sets)
 
-      if ((df_enr["max_up_set",sample] %in% ls_correct_sets) ||
-          (df_enr["min_down_set",sample] %in% ls_correct_sets)){
+        # Find which DN set is min by intersection min set list with correct sets
+        intx_dn <- intersect(unlist(df_maxmin["df_enr_DN_min_ls",sample]) , ls_correct_sets)
 
-          df_enr["max_up_set_or_min_down_set_match", sample] <- 1
-
-      } else {
-         df_enr["max_up_set_or_min_down_set_match", sample] <- 0
-      }      
+        # Add 1 if either max or min is a match ; 0 if neither are a match 
+        if ((length(intx_dn) > 0) || (length(intx_up) > 0)){
+            df_enr["max_up_set_or_min_down_set_match", sample] <- 1
+        } else {
+          df_enr["max_up_set_or_min_down_set_match", sample] <- 0
+        }
     }
   return(df_enr)
 }
-# Arguments
-option_list <- list(
-  optparse::make_option(
-    c("-s", "--splice_set"),
-    type = "character",
-    default = NULL,
-    help = ""),
-
-  optparse::make_option(
-    c("-g", "--gene_set"),
-    type = "character",
-    default = NULL,
-    help = ""),
-
-  optparse::make_option(
-    c("-i", "--immuneSigDB"),
-    type = "character",
-    default = NULL,
-    help = ""),
-
-  optparse::make_option(
-    c("-o", "--out_dir"),
-    type = "character",
-    default = NULL,
-    help = "full path to put outputs"),
-
-  optparse::make_option(
-    c("-m", "--metadata"),
-    type = "character",
-    default = NULL,
-    help = "full path to put outputs"))
-
-# Read the arguments passed
-opt_parser <- optparse::OptionParser(option_list = option_list)
-opt <- optparse::parse_args(opt_parser)
-
-# Make output directories
-if (!dir.exists(paste0(opt$out_dir))){
-  dir.create(paste0(opt$out_dir),
-  recursive = TRUE, showWarnings = TRUE)
-}
-
-
-# Open files
-metadata <- read.csv(file = opt$metadata)
-df_sample_annotations <- metadata %>%
-  arrange(Run) %>%
-  dplyr::select(Run,main_label,group_label, sigil_general) %>%
-  # dplyr::select(Run,main_label,group_label, sigil_general, data_source) %>%
-  tibble::column_to_rownames("Run") %>%
-  t()
-
-# Read in and sort metadata 
-metadata <- metadata %>% 
-    arrange(Run) %>%
-    tibble::column_to_rownames("Run") %>%
-    select(main_label, group_label)
-    # select(main_label, group_label, data_source)
-
-
-# Read in and sort enrichment outputs 
-df_gene_enr <- read.csv(file = opt$gene_set, stringsAsFactors = FALSE) %>%
-  tibble::column_to_rownames("name")
-df_gene_enr <- df_gene_enr[ , order(names(df_gene_enr))]
-
-df_splice_enr <- read.csv(file = opt$splice_set, stringsAsFactors = FALSE) %>%
-  tibble::column_to_rownames("name")
-df_splice_enr <- df_splice_enr[ , order(names(df_splice_enr))]
-
-df_imsig_enr <- read.csv(file = opt$immuneSigDB, stringsAsFactors = FALSE) %>%
-  tibble::column_to_rownames("name")
-df_imsig_enr <- df_imsig_enr[ , order(names(df_imsig_enr))]
-
-print(dim(df_gene_enr))
-print(dim(df_splice_enr))
-
-ls_groups_keep <- list("T cells", "Th cells", "B cells", 
-                        "Monocytes", "NK cells", "Dendritic cells",
-                        "Neutrophils")     
-ls_main_drop <- list("Low-density basophils","PBMCs",
-                      "Plasmablasts","Progenitor cells")
 
 calc <- function(df_enr, name){
 
+  # Split into df for UP and DN sets
   df_enr_UP <- df_enr %>%
       tibble::rownames_to_column("Sets") %>%
       dplyr::filter(grepl("_UP", Sets)) %>%
       tibble::column_to_rownames("Sets") 
-
   df_enr_DN <- df_enr %>%
       tibble::rownames_to_column("Sets") %>%
       dplyr::filter(grepl("_DN", Sets)) %>%
       tibble::column_to_rownames("Sets") 
 
-  max <- rownames(df_enr_UP)[apply(df_enr_UP,2,which.max)]
-  df_enr["max_up_set",] <- max
-  min <- rownames(df_enr_DN)[apply(df_enr_DN,2,which.min)]
-  df_enr["min_down_set",] <- min
+  # Find which UP sets have the max score (includes ties)
+  df_enr_UP_max_ls <- apply(df_enr_UP,2,function(x) as.list(which(x==max(x))))
+  df_enr_UP_max_ls <- lapply(df_enr_UP_max_ls, function(x) names(x))
+  
+  # Find which DN sets have the min score (includes ties)
+  df_enr_DN_min_ls <- apply(df_enr_DN,2,function(x)  as.list(which(x==min(x))))
+  df_enr_DN_min_ls <- lapply(df_enr_DN_min_ls, function(x) names(x))
 
+  df_maxmin <- rbind(df_enr_DN_min_ls, df_enr_UP_max_ls)
   df_enr["group_label", ] <- df_sample_annotations["group_label",]
 
   # For each cell type use list to check if the max UP or min DN
@@ -349,50 +272,50 @@ calc <- function(df_enr, name){
   for ( i in unique(metadata$main_label)){
     # Tcells 
     if (i %in% unlist(Monaco2set[[1]][1])){
-      df_enr <- checktop(i, unlist(Monaco2set[[1]][2]), df_enr)
+      df_enr <- checktop(i, unlist(Monaco2set[[1]][2]), df_enr, df_maxmin)
     } 
     # Bcells
     else if (i %in% unlist(Monaco2set[[2]][1])){
-      df_enr <- checktop(i, unlist(Monaco2set[[2]][2]), df_enr)
+      df_enr <- checktop(i, unlist(Monaco2set[[2]][2]), df_enr, df_maxmin)
     } 
     # Monocytes
     else if (i %in% unlist(Monaco2set[[3]][1])){
-      df_enr <- checktop(i, unlist(Monaco2set[[3]][2]), df_enr)
+      df_enr <- checktop(i, unlist(Monaco2set[[3]][2]), df_enr, df_maxmin)
     }
     # NKcells
     else if (i %in% unlist(Monaco2set[[4]][1])){
-      df_enr <- checktop(i, unlist(Monaco2set[[4]][2]), df_enr)
+      df_enr <- checktop(i, unlist(Monaco2set[[4]][2]), df_enr, df_maxmin)
     }
     # DC 
     else if (i %in% unlist(Monaco2set[[5]][1])){
-      df_enr <- checktop(i, unlist(Monaco2set[[5]][2]), df_enr)
+      df_enr <- checktop(i, unlist(Monaco2set[[5]][2]), df_enr, df_maxmin)
     }
     # Neutrophils
     else if (i %in% unlist(Monaco2set[[6]][1])){
-      df_enr <- checktop(i, unlist(Monaco2set[[6]][2]), df_enr)
+      df_enr <- checktop(i, unlist(Monaco2set[[6]][2]), df_enr, df_maxmin)
     }
 
     } 
 
-    df_enr_main_acc <- df_enr %>%
-      t() %>%
-      as.data.frame()  %>%
-      filter(group_label %in% ls_groups_keep) %>%
-      mutate_at(c('max_up_set_or_min_down_set_match'), as.character) %>%
-      mutate_at(c('max_up_set_or_min_down_set_match'), as.numeric) 
+  df_enr_main_acc <- df_enr %>%
+    t() %>%
+    as.data.frame()  %>%
+    filter(group_label %in% ls_groups_keep) %>%
+    mutate_at(c('max_up_set_or_min_down_set_match'), as.character) %>%
+    mutate_at(c('max_up_set_or_min_down_set_match'), as.numeric) 
 
-    # Overall accuracy from all samples
-    overall_mean <- mean(df_enr_main_acc$max_up_set_or_min_down_set_match)
+  # Overall accuracy from all samples
+  overall_mean <- mean(df_enr_main_acc$max_up_set_or_min_down_set_match)
 
-    # Accuracy by group label 
-    df_enr_main_acc_group <- df_enr_main_acc %>%
-      select(max_up_set_or_min_down_set_match, group_label) %>%
-      group_by(group_label ) %>%
-      dplyr::summarize(Mean = mean(max_up_set_or_min_down_set_match, na.rm=FALSE)) %>%
-      as.data.frame()  %>%
-      arrange(desc(Mean)) 
+  # Accuracy by group label 
+  df_enr_main_acc_group <- df_enr_main_acc %>%
+    select(max_up_set_or_min_down_set_match, group_label) %>%
+    group_by(group_label ) %>%
+    dplyr::summarize(Mean = mean(max_up_set_or_min_down_set_match, na.rm=FALSE)) %>%
+    as.data.frame()  %>%
+    arrange(desc(Mean)) 
 
-  # print(df_enr_main_acc_group)
+  print(df_enr_main_acc_group)
 
   #################
   # heatmap all samples 
@@ -400,14 +323,12 @@ calc <- function(df_enr, name){
   df_enr_heat <-  df_enr %>%
       t() %>%
       as.data.frame()  %>%
-      select(-max_up_set_or_min_down_set_match,-max_up_set,-min_down_set ) %>%
+      select(-max_up_set_or_min_down_set_match ) %>%
       arrange(rownames(.)) %>%
       filter(group_label %in% ls_groups_keep)  %>%
       select(-group_label) %>%
       mutate_at(vars(ends_with("_UP")), funs(as.numeric(as.character(.)))) %>%
       mutate_at(vars(ends_with("_DN")), funs(as.numeric(as.character(.)))) 
-
-  print(df_enr_heat)
 
   png(file=paste0(opt$out_dir,"/", name, "_heatmap_group.png"),
       width = 9,
@@ -460,7 +381,7 @@ calc <- function(df_enr, name){
   df_enr_median <- df_enr %>%
     t() %>%
     as.data.frame()  %>%
-    select(-max_up_set_or_min_down_set_match,-max_up_set,-min_down_set ) %>%
+    select(-max_up_set_or_min_down_set_match ) %>%
     filter(group_label %in% ls_groups_keep)  %>%
     mutate_at(vars(ends_with("_UP")), funs(as.numeric(as.character(.)))) %>%
     mutate_at(vars(ends_with("_DN")), funs(as.numeric(as.character(.)))) %>%
@@ -551,6 +472,91 @@ calc <- function(df_enr, name){
 
 }
 
+
+##########################
+# Main
+##########################
+
+# Arguments
+option_list <- list(
+  optparse::make_option(
+    c("-s", "--splice_set"),
+    type = "character",
+    default = NULL,
+    help = ""),
+
+  optparse::make_option(
+    c("-g", "--gene_set"),
+    type = "character",
+    default = NULL,
+    help = ""),
+
+  optparse::make_option(
+    c("-i", "--immuneSigDB"),
+    type = "character",
+    default = NULL,
+    help = ""),
+
+  optparse::make_option(
+    c("-o", "--out_dir"),
+    type = "character",
+    default = NULL,
+    help = "full path to put outputs"),
+
+  optparse::make_option(
+    c("-m", "--metadata"),
+    type = "character",
+    default = NULL,
+    help = "full path to put outputs"))
+
+# Read the arguments passed
+opt_parser <- optparse::OptionParser(option_list = option_list)
+opt <- optparse::parse_args(opt_parser)
+
+# Make output directories
+if (!dir.exists(paste0(opt$out_dir))){
+  dir.create(paste0(opt$out_dir),
+  recursive = TRUE, showWarnings = TRUE)
+}
+
+# Open files
+metadata <- read.csv(file = opt$metadata)
+df_sample_annotations <- metadata %>%
+  arrange(Run) %>%
+  dplyr::select(Run,main_label,group_label, sigil_general) %>%
+  # dplyr::select(Run,main_label,group_label, sigil_general, data_source) %>%
+  tibble::column_to_rownames("Run") %>%
+  t()
+
+# Read in and sort metadata 
+metadata <- metadata %>% 
+    arrange(Run) %>%
+    tibble::column_to_rownames("Run") %>%
+    select(main_label, group_label)
+    # select(main_label, group_label, data_source)
+
+# Read in and sort enrichment outputs 
+df_gene_enr <- read.csv(file = opt$gene_set, stringsAsFactors = FALSE) %>%
+  tibble::column_to_rownames("name")
+df_gene_enr <- df_gene_enr[ , order(names(df_gene_enr))]
+
+df_splice_enr <- read.csv(file = opt$splice_set, stringsAsFactors = FALSE) %>%
+  tibble::column_to_rownames("name")
+df_splice_enr <- df_splice_enr[ , order(names(df_splice_enr))]
+
+df_imsig_enr <- read.csv(file = opt$immuneSigDB, stringsAsFactors = FALSE) %>%
+  tibble::column_to_rownames("name")
+df_imsig_enr <- df_imsig_enr[ , order(names(df_imsig_enr))]
+
+print(dim(df_gene_enr))
+print(dim(df_splice_enr))
+
+ls_groups_keep <- list("T cells", "Th cells", "B cells", 
+                        "Monocytes", "NK cells", "Dendritic cells",
+                        "Neutrophils")     
+ls_main_drop <- list("Low-density basophils","PBMCs",
+                      "Plasmablasts","Progenitor cells")
+
 # Run gene
 ls_gene_res <- calc(df_gene_enr, "gene")
 cat("\n")
@@ -582,46 +588,46 @@ df_merge <- ls_splice_res[3][[1]] %>%
 df_merge
 cat("\n")
 
-########################
-# ImmuneSigD
-########################
-df_imsig_enr["group_label", ] <- df_sample_annotations["group_label",]
-max <- rownames(df_imsig_enr)[apply(df_imsig_enr,2,which.max)]
-df_imsig_enr["max",] <- max
-min <- rownames(df_imsig_enr)[apply(df_imsig_enr,2,which.min)]
-df_imsig_enr["min",] <- min
+# ########################
+# # ImmuneSigD
+# ########################
+# df_imsig_enr["group_label", ] <- df_sample_annotations["group_label",]
+# max <- rownames(df_imsig_enr)[apply(df_imsig_enr,2,which.max)]
+# df_imsig_enr["max",] <- max
+# min <- rownames(df_imsig_enr)[apply(df_imsig_enr,2,which.min)]
+# df_imsig_enr["min",] <- min
 
-for (i in unique(df_sample_annotations["group_label",])){
-  print(i)
+# for (i in unique(df_sample_annotations["group_label",])){
+#   print(i)
 
-  # Calc freq of sets with min score 
-  df_enr_min_ <- df_imsig_enr %>%
-    t() %>%
-    as.data.frame() %>%
-    filter(group_label == i) %>%
-    select(group_label, min) %>%
-    count(min) %>%
-    as.data.frame() %>%
-    mutate(freq = round(n / sum(n), 3)) %>% 
-    arrange(desc(freq)) 
+#   # Calc freq of sets with min score 
+#   df_enr_min_ <- df_imsig_enr %>%
+#     t() %>%
+#     as.data.frame() %>%
+#     filter(group_label == i) %>%
+#     select(group_label, min) %>%
+#     count(min) %>%
+#     as.data.frame() %>%
+#     mutate(freq = round(n / sum(n), 3)) %>% 
+#     arrange(desc(freq)) 
 
-  cat("i")
-  cat("\n sets with minimum score: \n")
-  print(df_enr_min_)
+#   cat("i")
+#   cat("\n sets with minimum score: \n")
+#   print(df_enr_min_)
 
-  # Calc freq of sets with min score 
-  df_enr_max_ <- df_imsig_enr %>%
-    t() %>%
-    as.data.frame() %>%
-    filter(group_label == i) %>%
-    select(group_label, max) %>%
-    count(max) %>%
-    as.data.frame() %>%
-    mutate(freq = round(n / sum(n), 3)) %>% 
-    arrange(desc(freq)) 
+#   # Calc freq of sets with min score 
+#   df_enr_max_ <- df_imsig_enr %>%
+#     t() %>%
+#     as.data.frame() %>%
+#     filter(group_label == i) %>%
+#     select(group_label, max) %>%
+#     count(max) %>%
+#     as.data.frame() %>%
+#     mutate(freq = round(n / sum(n), 3)) %>% 
+#     arrange(desc(freq)) 
 
-  cat("\n i \n")
-  cat("\n sets with max score: \n")
-  print(df_enr_max_)
+#   cat("\n i \n")
+#   cat("\n sets with max score: \n")
+#   print(df_enr_max_)
 
-}
+# }
