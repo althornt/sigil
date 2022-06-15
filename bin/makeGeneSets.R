@@ -62,7 +62,7 @@ import_deseq2_within<- function(ls_cell_types, topN,  label, deseq2_dir, meta_co
   #'
   #' @param ls_cell_types - list of  cell-types that were compared in
   #' compareWithinType.R script
-  #' @param topN - integer; how many of the top splicing events to use
+  #' @param topN - integer; how many of the top gene events to use
   #' @param label - string to use to represent cell type in output files
   #' @return ls_top_events - list containing 3 list - top positive events, top
   #' negative events, and top negative and positive
@@ -153,14 +153,10 @@ option_list <- list(
 opt_parser <- optparse::OptionParser(option_list = option_list)
 opt <- optparse::parse_args(opt_parser)
 
-# Make output directories
-ls_out_paths <- list("/gmt" )
-for (path in ls_out_paths){
-
-  if (!dir.exists(paste0(opt$out_dir,path))){
-    dir.create(paste0(opt$out_dir,path),
+# Make output directory
+if (!dir.exists(paste0(opt$out_dir))){
+    dir.create(paste0(opt$out_dir),
     recursive = TRUE, showWarnings = TRUE)
-}
 }
 
 # Open files
@@ -205,12 +201,18 @@ ls_main_label_res <- foreach(i=ls_de_file_names_cell_type,
 print(length(ls_main_label_res))
 
 #Check its existence
-if (file.exists(paste0(opt$out_dir,"/gene_set.gmt"))) {
+if (file.exists(paste0(opt$out_dir,"/gene_sets.gmt"))) {
   #Delete file if it exists
-  file.remove(paste0(opt$out_dir,"/gene_set.gmt"))
+  file.remove(paste0(opt$out_dir,"/gene_sets.gmt"))
 }
 
-outfile = file(paste0(opt$out_dir,"/gene_set.gmt"), open = 'a') # open in “a”ppend mode
+if (file.exists(paste0(opt$out_dir,"/gene_sets_group.gmt"))) {
+  #Delete file if it exists
+  file.remove(paste0(opt$out_dir,"/gene_sets_group.gmt"))
+}
+
+outfile_all = file(paste0(opt$out_dir,"/gene_sets.gmt"), open = 'a') # open in “a”ppend mode
+outfile_group = file(paste0(opt$out_dir,"/gene_sets_group.gmt"), open = 'a') # open in “a”ppend mode
 
 for (i in ls_main_label_res){
   name = i[1][1]
@@ -218,10 +220,10 @@ for (i in ls_main_label_res){
   # print(name, "\t", "desc" )
 
   ls_UP <- i[[2]]
-  cat(paste0(name,"_main_UP"),"\t", "desc" ,"\t", paste0(ls_UP, sep = "\t"), '\n', file = outfile, sep = '', append = TRUE)
+  cat(paste0(name,"_main_UP"),"\t", "desc" ,"\t", paste0(ls_UP, sep = "\t"), '\n', file = outfile_all, sep = '', append = TRUE)
 
   ls_DN <- i[[3]]
-  cat(paste0(name,"_main_DN"),"\t","desc","\t" ,paste0(ls_DN, sep = "\t"), '\n', file = outfile, sep = '', append = TRUE)
+  cat(paste0(name,"_main_DN"),"\t","desc","\t" ,paste0(ls_DN, sep = "\t"), '\n', file = outfile_all, sep = '', append = TRUE)
 
 }
 
@@ -279,10 +281,16 @@ for (i in ls_group_label_res){
   # print(name, "\t", "desc" )
 
   ls_UP <- i[[2]]
-  cat(paste0(name,"_group_UP"),"\t", "desc","\t" ,paste0(ls_UP, sep = "\t"), '\n', file = outfile, sep = '', append = TRUE)
+  cat(paste0(name,"_group_UP"),"\t", "desc","\t" ,paste0(ls_UP, sep = "\t"), '\n', file = outfile_all, sep = '', append = TRUE)
 
   ls_DN <- i[[3]]
-  cat(paste0(name,"_group_DN"),"\t","desc","\t" ,paste0(ls_DN, sep = "\t"), '\n', file = outfile, sep = '', append = TRUE)
+  cat(paste0(name,"_group_DN"),"\t","desc","\t" ,paste0(ls_DN, sep = "\t"), '\n', file = outfile_all, sep = '', append = TRUE)
+
+  ls_UP <- i[[2]]
+  cat(paste0(name,"_group_UP"),"\t", "desc","\t" ,paste0(ls_UP, sep = "\t"), '\n', file = outfile_group, sep = '', append = TRUE)
+
+  ls_DN <- i[[3]]
+  cat(paste0(name,"_group_DN"),"\t","desc","\t" ,paste0(ls_DN, sep = "\t"), '\n', file = outfile_group, sep = '', append = TRUE)
 
 }
 
@@ -340,10 +348,10 @@ for (ls in ls_within_res){
     print(name)
 
     ls_UP <- i[[2]]
-    cat(paste0(name,"_within_UP"),"\t","desc","\t" ,paste0(ls_UP, sep = "\t"), '\n', file = outfile, sep = '', append = TRUE)
+    cat(paste0(name,"_within_UP"),"\t","desc","\t" ,paste0(ls_UP, sep = "\t"), '\n', file = outfile_all, sep = '', append = TRUE)
 
     ls_DN <- i[[3]]
-    cat(paste0(name,"_within_DN"),"\t","desc","\t" ,paste0(ls_DN, sep = "\t"), '\n', file = outfile, sep = '', append = TRUE)
+    cat(paste0(name,"_within_DN"),"\t","desc","\t" ,paste0(ls_DN, sep = "\t"), '\n', file = outfile_all, sep = '', append = TRUE)
 
   }
 }
