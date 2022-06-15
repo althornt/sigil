@@ -377,6 +377,15 @@ calc <- function(df_enr, name){
   # median
   #################
 
+  # shouldnt need this list after switching group label to be prioritized if the same as main label 
+  ls_sets_keep <- c( "B_cells_group",         
+  "Dendritic_cells_group" ,
+  "Macrophages_group"     ,
+  "Monocytes_group"       ,
+  "Neutrophils_main",
+  "NK_cells_group"   ,     
+  "T_cells_group")
+
   # group enr by the group label 
   df_enr_median <- df_enr %>%
     t() %>%
@@ -390,6 +399,7 @@ calc <- function(df_enr, name){
     # t() %>%
     as.data.frame()  
 
+
   df_enr_median_heat <- df_enr_median %>%
     tibble::column_to_rownames("group_label") 
 
@@ -397,12 +407,12 @@ calc <- function(df_enr, name){
 
   # Make DN df
   df_enr_median_heat_DN <- df_enr_median_heat %>%
-      select(matches("DN_median"))
+      select(matches("_DN_median"))
   names(df_enr_median_heat_DN) = gsub(pattern = "_DN_median", replacement = "",
                                       x = names(df_enr_median_heat_DN))
   # Make UP df
   df_enr_median_heat_UP <- df_enr_median_heat %>%
-      select(matches("UP_median"))
+      select( matches("_UP_median"))
   names(df_enr_median_heat_UP) = gsub(pattern = "_UP_median", replacement = "",
                                       x = names(df_enr_median_heat_UP))
 
@@ -415,9 +425,114 @@ calc <- function(df_enr, name){
   df_enr_median_heat_UP[,UP_missing] <- NA
 
   # Add missing columns with NAs
-  df_enr_median_heat_UP <-df_enr_median_heat_UP[ , order(names(df_enr_median_heat_UP))]
-  df_enr_median_heat_DN <- df_enr_median_heat_DN[ , order(names(df_enr_median_heat_DN))]
+  df_enr_median_heat_UP <-df_enr_median_heat_UP[ , order(names(df_enr_median_heat_UP))] 
+  df_enr_median_heat_UP <-df_enr_median_heat_UP[ls_sets_keep]
 
+  df_enr_median_heat_DN <- df_enr_median_heat_DN[ , order(names(df_enr_median_heat_DN))]
+  df_enr_median_heat_DN <-df_enr_median_heat_DN[ls_sets_keep]
+
+  ##############################################
+  # Scores added
+
+  df_enr_median_heat_DN_switch <- df_enr_median_heat_DN %>% 
+    mutate_if(is.numeric, funs(. * -1))
+  df_enr_median_heat_comb <- df_enr_median_heat_DN_switch + df_enr_median_heat_UP
+
+  ht_med_dn <- ComplexHeatmap::Heatmap(df_enr_median_heat_DN,
+                                  name = "",
+                                  row_title = "DN", row_title_rot = 0,
+                                  column_order =order(colnames(df_enr_median_heat_DN)),
+                                  row_order = order(rownames(df_enr_median_heat_DN)), 
+                                  show_row_names= TRUE,
+                                  show_column_names = TRUE,
+                                  row_names_gp = grid::gpar(fontsize =8),
+                                  column_names_gp = grid::gpar(fontsize =7)
+                                  # top_annotation=ha,
+                                  # heatmap_legend_param = list(legend_gp = gpar(fontsize = 3)),
+                                  # show_row_dend = TRUE,
+                                  # heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  # legend_gp = gpar(fontsize = 5))
+                )
+
+  ht_med_up <- ComplexHeatmap::Heatmap(df_enr_median_heat_UP,
+                                  row_title = "UP", row_title_rot = 0,
+                                  column_order =order(colnames(df_enr_median_heat_UP)),
+                                  row_order = order(rownames(df_enr_median_heat_UP)), 
+                                  show_row_names= TRUE,
+                                  show_column_names = TRUE,
+                                  row_names_gp = grid::gpar(fontsize =8),
+                                  column_names_gp = grid::gpar(fontsize =7),
+                                  show_heatmap_legend = FALSE
+
+                                  # top_annotation=ha,
+                                  # show_row_dend = TRUE,
+                                  # heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  # legend_gp = gpar(fontsize = 5)
+                                  )
+  ht_med_comb <- ComplexHeatmap::Heatmap(df_enr_median_heat_comb,
+                                  row_title = "UP+abs(DN)",row_title_rot = 0,
+                                  column_order =order(colnames(df_enr_median_heat_comb)),
+                                  row_order = order(rownames(df_enr_median_heat_comb)), 
+                                  show_row_names= TRUE,
+                                  show_column_names = TRUE,
+                                  row_names_gp = grid::gpar(fontsize =8),
+                                  column_names_gp = grid::gpar(fontsize =7),
+                                  show_heatmap_legend = FALSE
+
+                                  # top_annotation=ha,
+                                  # show_row_dend = TRUE,
+                                  # heatmap_legend_param = list(
+                                  # legend_direction = "horizontal", 
+                                  # legend_height = unit(1, "cm"),
+                                  # legend_gp = gpar(fontsize = 5)
+                                  )
+  # combined gene and splice heatmaps
+  png(file=paste0(opt$out_dir,name,"_median_heatmap_UP_DN_group.png"),
+      width = 4,
+      height    = 4,
+      units     = "in",
+      res       = 1200)
+
+  ht_list = ht_med_up %v% ht_med_dn %v% ht_med_comb
+  draw(ht_list, 
+      merge_legend = TRUE,
+      column_title = name, column_title_gp = gpar(fontsize = 12))
+  dev.off()
+
+
+
+  ########################################################
+  #scaled heatmap
+  df_enr_median_heat_scaled = t(scale(t(df_enr_median_heat))) %>% as.data.frame
+  # Make DN df
+  df_enr_median_heat_DN <- df_enr_median_heat_scaled %>%
+      select(matches("_DN_median"))
+  names(df_enr_median_heat_DN) = gsub(pattern = "_DN_median", replacement = "",
+                                      x = names(df_enr_median_heat_DN))
+  # Make UP df
+  df_enr_median_heat_UP <- df_enr_median_heat_scaled %>%
+      select( matches("_UP_median"))
+  names(df_enr_median_heat_UP) = gsub(pattern = "_UP_median", replacement = "",
+                                      x = names(df_enr_median_heat_UP))
+
+  # Find sets in UP not in DN and add to DN
+  DN_missing <- names(df_enr_median_heat_UP)[!(names(df_enr_median_heat_UP) %in% names(df_enr_median_heat_DN))]
+  df_enr_median_heat_DN[,DN_missing] <- NA
+
+  # Find sets in DN not in UP and add to UP
+  UP_missing <- names(df_enr_median_heat_DN)[!(names(df_enr_median_heat_DN) %in% names(df_enr_median_heat_UP))]
+  df_enr_median_heat_UP[,UP_missing] <- NA
+
+  # Add missing columns with NAs
+  df_enr_median_heat_UP <-df_enr_median_heat_UP[ , order(names(df_enr_median_heat_UP))] 
+  df_enr_median_heat_UP <-df_enr_median_heat_UP[ls_sets_keep]
+
+  df_enr_median_heat_DN <- df_enr_median_heat_DN[ , order(names(df_enr_median_heat_DN))]
+  df_enr_median_heat_DN <-df_enr_median_heat_DN[ls_sets_keep]
 
   ht_med_dn <- ComplexHeatmap::Heatmap(df_enr_median_heat_DN,
                                   name = "",
@@ -455,18 +570,23 @@ calc <- function(df_enr, name){
                                   # legend_gp = gpar(fontsize = 5)
                                   )
 
+
+
   # combined gene and splice heatmaps
-  png(file=paste0(opt$out_dir,name,"_median_heatmap_UP_DN_group.png"),
-      width = 10,
-      height    = 4,
+  png(file=paste0(opt$out_dir,name,"_median_heatmap_UP_DN_group_scaled.png"),
+      width = 4,
+      height    = 8,
       units     = "in",
       res       = 1200)
 
-  ht_list = ht_med_up %v% ht_med_dn
+  ht_list = ht_med_up %v% ht_med_dn 
   draw(ht_list, 
       merge_legend = TRUE,
       column_title = name, column_title_gp = gpar(fontsize = 16))
   dev.off()
+
+  
+
 
   return(list(overall_mean,df_enr_main_acc, df_enr_main_acc_group ))
 
