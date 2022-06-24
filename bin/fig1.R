@@ -160,21 +160,78 @@ print(length(ls_IR_ref_genes))
 # print(plotObject)
 # dev.off()
 
-##############################
-# fig 2
 #########################
-if (!dir.exists(paste0(fig_output_path,"PS/"))){
-dir.create(paste0(fig_output_path,"PS/"),
+# fig 2 splice vs gene
+#########################
+if (!dir.exists(paste0(fig_output_path,"PS/within/"))){
+dir.create(paste0(fig_output_path,"PS/within/"),
+recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(paste0(fig_output_path,"PS/group/"))){
+dir.create(paste0(fig_output_path,"PS/group/"),
+recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(paste0(fig_output_path,"PS/main/"))){
+dir.create(paste0(fig_output_path,"PS/main/"),
 recursive = TRUE, showWarnings = TRUE)}
 
 print(head(df_metadata))
 
+# df_splice_ref_z %>%
+#     arrange(desc(ratio)) %>%
+#     head(10)
 
-plot_PS <- function(junc,gene, comp_type, cell_type ){
+# df_splice_ref_z$high_ratio_2 <- NA
+
+df_splice_ref_z_plot <- df_splice_ref_z %>%
+    mutate(ratio = abs(splice_z/gene_z)) %>%
+    mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
+    arrange(desc(ratio)) %>%
+    filter(ratio != "NA")
+
+
+
+######################
+# zscore scatter plot
+######################
+# Splice vs Gene________________________________________________________________
+p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
+    scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+    geom_point(size=.85, alpha = .6) +
+    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
+    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+    # geom_text(
+    #           label= df_splice_ref_z[["high_ratio_2"]],
+    #           nudge_x = 0.01, nudge_y = 0.01,
+    #           check_overlap =F, col = "black", size = 3
+    #         ) +
+    theme_classic() +
+    theme(legend.position="right", 
+            # legend.title=element_blank(),
+        #   legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 8),
+          axis.title.x=element_text(size=12),
+          axis.title.y=element_text(size=12))  
+        #   +
+    # guides(color = guide_legend(nrow = 3)) 
+    # +
+    # ylim(-1, 1) 
+
+ggsave(plot = p_vs_gene, dpi = 400,
+    filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
+
+
+quit()
+
+
+#######################
+# splice vs gene dist
+######################
+
+plot_PS_gene <- function(junc,gene, comp_type, cell_type ){
     samples_main <- samples_other <- NA
     print("____________________________________________")
     print(cell_type)
-    # replace, not sure why needed twice
+    # replace underscores, not sure why needed twice
     cell_type_ <- sub("_", " ", cell_type)
     cell_type_ <- sub("_", " ", cell_type_)
 
@@ -204,15 +261,10 @@ plot_PS <- function(junc,gene, comp_type, cell_type ){
         group <- df_metadata %>%
                 filter(main_label == cell_type_) %>%
                 pull(group_label)
-    
         group <- unique(group)
-        print(group)
-        print("_")
-        
         samples_main <- df_metadata %>%
                      filter(main_label == cell_type_) %>%
                      pull(Run)
-
         samples_other <- df_metadata %>%
                     filter(main_label != cell_type_) %>%
                     filter(group_label == eval(group)) %>%
@@ -288,18 +340,18 @@ plot_PS <- function(junc,gene, comp_type, cell_type ){
 }
 
 # for (row in 1:nrow(df_splice_ref_z)) {
-for (row in 1:30) {
+for (row in 1:50) {
     junc <- as.character(df_splice_ref_z[row, "event"])
     gene <- as.character(df_splice_ref_z[row, "overlapping"])
     comp_type <- as.character(df_splice_ref_z[row, "group"])
     cell_type <- as.character(df_splice_ref_z[row, "cell_type"])
 
-    plot_PS(junc,gene, comp_type, cell_type )
+    plot_PS_gene(junc,gene, comp_type, cell_type )
 
 }
 
 
 
-# df_splice_ref_z %>%
-#     arrange(desc(ratio)) %>%
-#     head(100)
+df_splice_ref_z %>%
+    arrange(desc(ratio)) %>%
+    head(10)
