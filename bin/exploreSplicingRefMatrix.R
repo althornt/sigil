@@ -94,15 +94,19 @@ calcGroupMed <- function(df_PS, label_type){
     rownames_to_column("rowname") %>%   #transpose
     gather(var, value, -rowname) %>% 
     spread(rowname, value) %>%
-    filter(get(label_type) != "") %>%     #remove samples without a label grouping
+    # filter(get(label_type) != "") %>%     #remove samples without a label grouping
     select(c(paste0(str_label),"var",df_spliceRefMatrix$event )) %>% #keep label col and junctions
     mutate_at(df_spliceRefMatrix$event, as.numeric) %>% # convert to numeric
     group_by_at(label_type) %>%
     summarise_at(vars(df_spliceRefMatrix$event), funs(median(., na.rm=TRUE))) %>%
     column_to_rownames(paste(str_label)) %>%
-    as.data.frame(.) %>%
-    select_if(~ !any(is.na(.))) #remove NA
+    as.data.frame(.)  
+    # %>%
+    # select_if(~ !any(is.na(.))) #remove NA
 
+  # print(df_t_med)
+  print(dim(df_t_med))
+  print(rowSums(is.na(df_t_med)))
   df_med <-  df_t_med  %>%
     rownames_to_column("rowname") %>% 
     gather(var, value, -rowname)  %>% 
@@ -110,22 +114,27 @@ calcGroupMed <- function(df_PS, label_type){
     as.data.frame(.) %>%
     column_to_rownames("var")
     
+  print(sum(is.na(df_med)))
+  print(colSums(is.na(df_med)))
+  print(dim(df_med))
+
   #Remove junctions with 0 variance which break scaling
   df_med_var<- df_med[apply(df_med, 1, var) != 0, ]
+  print(nrow(df_med) - nrow(df_med_var))
 
-  heatmap_res <- pheatmap(
-          main = paste0(" "),
-          df_med_var,
-          scale = "row",
-          show_rownames=F,
-          show_colnames=T,
-          na_col = "grey"
-          )
+  # heatmap_res <- pheatmap(
+  #         main = paste0(" "),
+  #         df_med_var,
+  #         scale = "row",
+  #         show_rownames=F,
+  #         show_colnames=T,
+  #         na_col = "grey"
+  #         )
 
-  save_pheatmap_pdf(
-          heatmap_res,
-          paste0(opt$out_dir,"/",paste(label_type),"_med_heatmap.pdf")
-          )
+  # save_pheatmap_pdf(
+  #         heatmap_res,
+  #         paste0(opt$out_dir,"/",paste(label_type),"_med_heatmap.pdf")
+  #         )
 
   return(df_med)
 }
@@ -175,9 +184,9 @@ print(dim(df_spliceRefMatrix))
 df_all_PS <- read.table(file = opt$mesa_PS, sep="\t", header = TRUE, row.names=1) 
 # df_all_PS <- df_all_PS %>% mutate_if(is.character,as.numeric)
 
-print(head(df_all_PS))
+
+# print(head(df_all_PS))
 # print(str(df_all_PS))
-# quit()
 
 metadata <- read.csv(file = opt$metadata)
 df_sample_annotations <- metadata %>%
@@ -212,6 +221,8 @@ df_group_label_med_z <- t(scale(t(df_group_label_med)))
 
 df_main_label_med <- calcGroupMed(df_all_PS_ref_events, "main_label")
 df_main_label_med_z <- t(scale(t(df_main_label_med)))
+
+print(setdiff(unique(df_spliceRefMatrix$event),rownames(df_main_label_med)))
 
 print(dim(df_group_label_med))
 print(dim(df_group_label_med_z))

@@ -292,6 +292,10 @@ calcGroupMed <- function(df_exp, ls_gene, LM_type){
     as.data.frame(.) %>%
     column_to_rownames("var")
     
+  print(sum(is.na(df_med)))
+  print(colSums(is.na(df_med)))
+  print(dim(df_med))
+
   # #Remove genes with 0 variance which break scaling
   # df_med_var<- df_med[apply(df_med, 1, var) != 0, ]
 
@@ -340,16 +344,24 @@ add_z_to_ref <- function(ref_df){
         ref_df <- ref_df %>%
           mutate(gene_z = ifelse(((overlapping==gene) & (cell_type_group==gene_cell)), z, gene_z))
       }
-    } 
+    } else {
+      print("missing gene:")
+      print(gene)
+      print(df_)
+
+    }
   }
 
   # Adding splice z_scores and IR z scores to splice ref df
   for (this_event in ref_df$event){
+    print(this_event)
     df_  <- ref_df %>% filter(event == this_event)
     # Iterate over cell types and look up Z scores 
     for (splice_cell in as.vector(unlist(unique(df_$cell_type_group)))){
       splice_z_val <- df_splice_group_label_main_label_med_z[this_event, splice_cell] 
       IR_z_val <- df_IR_group_label_main_label_med_z[this_event, splice_cell] 
+
+      print(IR_z_val)
 
       # Add zscores to ref df
       ref_df <- ref_df %>%
@@ -542,9 +554,14 @@ df_to_UMAP(df_gene_ref_PS_ref_IR_ref,paste0(opt$out_dir, "/dim_red"), "gene_and_
 # Formating Gene Exp Z-score df
 #################################
 # Gene exp : get medians and z-score across group
-df_exp_main_label_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "main_label")
+
+ls_genes_from_splice_or_IR <- unlist(list(unlist(unique(df_splice_ref$overlapping)), unlist(unique(df_IR_ref$overlapping))))
+print(head(ls_genes_from_splice_or_IR))
+print(length(ls_genes_from_splice_or_IR))
+
+df_exp_main_label_med <- calcGroupMed(df_exp, unlist(ls_genes_from_splice_or_IR), "main_label")
 df_exp_main_label_med_z <- t(scale(t(df_exp_main_label_med)))
-df_exp_group_label_med <- calcGroupMed(df_exp, unlist(unique(df_splice_ref$overlapping)), "group_label")
+df_exp_group_label_med <- calcGroupMed(df_exp, unlist(ls_genes_from_splice_or_IR), "group_label")
 df_exp_group_label_med_z <- t(scale(t(df_exp_group_label_med)))
 
 # Add group_label / main_label tags to column names because same cell name can be in both
@@ -556,6 +573,7 @@ df_exp_group_label_main_label_med_z <- cbind(df_exp_group_label_med_z, df_exp_ma
 print("Combined......")
 print(head(df_exp_group_label_main_label_med_z))
 print(dim(df_exp_group_label_main_label_med_z))
+
 
 # Replace spaces in names with _ to match other df
 str_conv_space <- function(in_str){
@@ -666,8 +684,17 @@ df_splice_ref <- add_z_to_ref(ref_df = df_splice_ref )
 df_IR_ref <- add_z_to_ref(ref_df = df_IR_ref )
 
 print(head(df_splice_ref))
-print(head(df_IR_ref))
+print(dim(df_splice_ref))
+print(colSums(is.na(df_splice_ref)))
+print(length(unique(df_splice_ref$event)))
+
 print("------------------------------------")
+
+print(head(df_IR_ref))
+print(dim(df_IR_ref))
+print(colSums(is.na(df_IR_ref)))
+print(length(unique(df_IR_ref$event)))
+
 
 # ################################################################################
 # # Quantify number of splice change with little gene change
@@ -707,6 +734,19 @@ for (i in unique(lowratio$overlapping)){
   cat("\n")
 }
 
+print(head(df_splice_ref))
+write.csv(df_splice_ref,paste0(opt$out_dir, "/splice_ref_zscores.csv"), row.names = FALSE)
+
+
+df_IR_ref$high_ratio <- NA
+df_IR_ref <- df_IR_ref %>%
+    mutate(ratio = abs(IR_z/gene_z)) %>%
+    mutate(high_ratio = ifelse(ratio > 4,
+                                paste(overlapping),
+                                high_ratio)) %>%
+    arrange(desc(ratio))
+write.csv(df_IR_ref,paste0(opt$out_dir, "/IR_ref_zscores.csv"), row.names = FALSE)
+
 
 ####################################################
 # Scatter plot all splice events vs gene or IR
@@ -738,7 +778,7 @@ for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref"
   # Splice vs Gene Zoomed ______________________________________________________
   p_vs_gene_zoom <- ggplot(aes(x=splice_z, y=gene_z, color = cell_type), data=df_splice_ref)+ 
     geom_point(size=2) +
-    labs(title= "") + 
+    labs(title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
     geom_text(
@@ -748,11 +788,11 @@ for (label_type in c("cell_type", "event", "overlapping", "group", "in_gene_ref"
             ) +
     theme_minimal() +
     theme(legend.position="bottom", 
-          legend.title = element_text(size = 5), 
-          legend.text = element_text(size = 5),
-          axis.title.x=element_text(size=7),
-          axis.title.y=element_text(size=7))  +
-    guides(color = guide_legend(nrow = 2)) +
+          legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 6),
+          axis.title.x=element_text(size=8),
+          axis.title.y=element_text(size=8))  +
+    guides(color = guide_legend(nrow = 3)) +
     ylim(-1, 1) 
 
   ggsave(plot = p_vs_gene_zoom, width = 12, height = 7, dpi = 400,
@@ -873,41 +913,43 @@ for (label_type in c("cell_type", "event", "overlapping", "group")){
 
 }
 
-# #################
-# # UpSet Plots
-# ################
-# T_cell_within_cell_types <-  c(
-#     "T_cells_CD8",
-#     "T_cells_CD4_naive",
-#     #   "T cells CD4 memory resting",
-#     #   "T cells CD4 memory  activated",
-#     "T_cells_follicular_helper",
-#     "T_cells_regulatory_(Tregs)",
-#     "T_cells_gamma_delta")
 
-# T_cell_within_cell_types <- c("T_cells_CD4_naive","T_cells_CD8", 
-#     "T_cells_follicular_helper", "T_cells_gamma_delta"  )
+
+# # #################
+# # # UpSet Plots
+# # ################
+# # T_cell_within_cell_types <-  c(
+# #     "T_cells_CD8",
+# #     "T_cells_CD4_naive",
+# #     #   "T cells CD4 memory resting",
+# #     #   "T cells CD4 memory  activated",
+# #     "T_cells_follicular_helper",
+# #     "T_cells_regulatory_(Tregs)",
+# #     "T_cells_gamma_delta")
+
+# # T_cell_within_cell_types <- c("T_cells_CD4_naive","T_cells_CD8", 
+# #     "T_cells_follicular_helper", "T_cells_gamma_delta"  )
      
 
-# ls_upsets <- list(
-#   # list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plots/upsetplot_event2cell.pdf"), "NA"),
-#   # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plots/upsetplot_eventgene2cell.pdf"), "NA"),
-#   # list(df_gene_ref, "gene", paste0(opt$out_dir, "upset_plots/upsetplot_DEG2cell.pdf"), "NA"),
-#   list(df_IR_ref, "overlapping", paste0(opt$out_dir, "upset_plots/upsetplot_IRgene2cell.pdf"), "NA")
+# # ls_upsets <- list(
+# #   # list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plots/upsetplot_event2cell.pdf"), "NA"),
+# #   # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plots/upsetplot_eventgene2cell.pdf"), "NA"),
+# #   # list(df_gene_ref, "gene", paste0(opt$out_dir, "upset_plots/upsetplot_DEG2cell.pdf"), "NA"),
+# #   list(df_IR_ref, "overlapping", paste0(opt$out_dir, "upset_plots/upsetplot_IRgene2cell.pdf"), "NA")
 
-#   # list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plots/upsetplot_event2cell_Tcell.pdf"), T_cell_within_cell_types),
-#   # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plots/upsetplot_eventgene2cell_Tcell.pdf"), T_cell_within_cell_types),
-#   # list(df_gene_ref, "gene", paste0(opt$out_dir, "upset_plots/upsetplot_DEG2cell_Tcell.pdf"), T_cell_within_cell_types)
-# )
+# #   # list(df_splice_ref, "event", paste0(opt$out_dir, "upset_plots/upsetplot_event2cell_Tcell.pdf"), T_cell_within_cell_types),
+# #   # list(df_splice_ref, "overlapping", paste0(opt$out_dir, "upset_plots/upsetplot_eventgene2cell_Tcell.pdf"), T_cell_within_cell_types),
+# #   # list(df_gene_ref, "gene", paste0(opt$out_dir, "upset_plots/upsetplot_DEG2cell_Tcell.pdf"), T_cell_within_cell_types)
+# # )
 
-# foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
-#   upset_plot(
-#       df_ref = i[1],
-#       val= i[2],
-#       output_name = i[3], 
-#       ls_sets = i[4]
-#       )
-#   }
+# # foreach(i=ls_upsets, .packages=  c('magrittr', 'UpSetR')) %dopar% {
+# #   upset_plot(
+# #       df_ref = i[1],
+# #       val= i[2],
+# #       output_name = i[3], 
+# #       ls_sets = i[4]
+# #       )
+# #   }
 
 
 # Upset plot by gene 
@@ -923,18 +965,18 @@ print(length(ls_splice_ref_genes))
 print("Number of IR ref genes:")
 print(length(ls_IR_ref_genes))
 
-listInput <- list(gene = ls_gene_ref_genes,
-                 splice = ls_splice_ref_genes, 
-                 IR = ls_IR_ref_genes)
+# listInput <- list(gene = ls_gene_ref_genes,
+#                  splice = ls_splice_ref_genes, 
+#                  IR = ls_IR_ref_genes)
 
-plotObject <- upset(fromList(listInput), order.by = "freq")
-pdf(file= paste0(opt$out_dir, "/upset_plots/upsetplot_ref_genes_vs_splice_vs_IR.pdf"))
-print(plotObject)
-dev.off()
+# plotObject <- upset(fromList(listInput), order.by = "freq")
+# pdf(file= paste0(opt$out_dir, "/upset_plots/upsetplot_ref_genes_vs_splice_vs_IR.pdf"))
+# print(plotObject)
+# dev.off()
 
-# ##################################
-# # Compare gene lists
-# #################################
+# # ##################################
+# # # Compare gene lists
+# # #################################
 
 # Find genes in all 3
 ls_ref_genes_splice_IR <- Reduce(intersect, 

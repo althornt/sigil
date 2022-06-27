@@ -179,6 +179,11 @@ print(nrow(df_all_PS)- nrow(all_PS_nan_filt))
 # Main Label Comparisons
 ##########################
 ls_main_cell_types <- unlist(unique(metadata[["main_label"]]))
+ls_group_cell_types <- unlist(unique(metadata[["group_label"]]))
+
+# Remove labels that are reused from main to avoid redoing the same comparison
+ls_main_cell_types <- ls_main_cell_types[!ls_main_cell_types %in% ls_group_cell_types]
+
 # Run MESA compare_sample_sets for each main type 
 foreach(i=ls_main_cell_types, .packages='magrittr') %dopar% {
   runCompareSampleSets_1_vs_all(
@@ -190,9 +195,6 @@ print(typeof(ls_main_cell_types))
 ###########################
 # Group Label Comparisons
 ###########################
-ls_group_cell_types <- unlist(unique(metadata[["group_label"]]))
-# Remove labels that are reused from main to avoid redoing the same comparison
-ls_group_cell_types <- ls_group_cell_types[!ls_group_cell_types %in% ls_main_cell_types]
 
 # Run MESA compare_sample_sets for each group type 
 foreach(i=ls_group_cell_types, .packages='magrittr') %dopar% {

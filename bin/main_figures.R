@@ -34,6 +34,7 @@ df_metadata <- read.csv(file = paste0(sigil_out_path, "combine_mesa_out/merged_m
 print(df_metadata)
 
 df_splice_ref_z <- read.csv(file = paste0(sigil_out_path, "gene_and_splicing_out/splice_ref_zscores.csv"))
+df_IR_ref_z <- read.csv(file = paste0(sigil_out_path, "gene_and_splicing_out/IR_ref_zscores.csv"))
 
 # Read in all MESA PS 
 df_all_PS <- read.table(file = paste0(sigil_out_path,"combine_mesa_out/batch_corr_mesa_allPS.tsv"),
@@ -45,6 +46,11 @@ df_exp <- read.table(file= paste0(sigil_out_path,
                     sep=",", header = TRUE, row.names=1)
 df_exp <- df_exp %>% mutate_if(is.character,as.numeric)
 
+# Read in MESA intron retention 
+df_IR_table <- read.table(file =paste0(sigil_out_path,
+                          "/combine_mesa_out/batch_corr_mesa_ir_table_intron_retention.tsv"),
+                          sep="\t", header = TRUE, row.names=1) 
+df_IR_table <- df_IR_table %>% mutate_if(is.character,as.numeric)
 
 
 # #####################################
@@ -160,17 +166,17 @@ print(length(ls_IR_ref_genes))
 # print(plotObject)
 # dev.off()
 
-#########################
+###########################
 # fig 2 splice vs gene
-#########################
-if (!dir.exists(paste0(fig_output_path,"PS/within/"))){
-dir.create(paste0(fig_output_path,"PS/within/"),
+###########################
+if (!dir.exists(paste0(fig_output_path,"PS/withinType/"))){
+dir.create(paste0(fig_output_path,"PS/withinType/"),
 recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(paste0(fig_output_path,"PS/group/"))){
-dir.create(paste0(fig_output_path,"PS/group/"),
+if (!dir.exists(paste0(fig_output_path,"PS/group_label/"))){
+dir.create(paste0(fig_output_path,"PS/group_label/"),
 recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(paste0(fig_output_path,"PS/main/"))){
-dir.create(paste0(fig_output_path,"PS/main/"),
+if (!dir.exists(paste0(fig_output_path,"PS/main_label/"))){
+dir.create(paste0(fig_output_path,"PS/main_label/"),
 recursive = TRUE, showWarnings = TRUE)}
 
 print(head(df_metadata))
@@ -189,9 +195,9 @@ df_splice_ref_z_plot <- df_splice_ref_z %>%
 
 
 
-######################
-# zscore scatter plot
-######################
+############################
+# fig 2 zscore scatter plot
+###############################
 # Splice vs Gene________________________________________________________________
 p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
     scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
@@ -220,14 +226,11 @@ ggsave(plot = p_vs_gene, dpi = 400,
     filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
 
 
-quit()
+############################
+# fig 2 splice vs gene dist
+################################
 
-
-#######################
-# splice vs gene dist
-######################
-
-plot_PS_gene <- function(junc,gene, comp_type, cell_type ){
+plot_PS_gene <- function(junc,gene, comp_type, cell_type, df_PSorIR, tag ){
     samples_main <- samples_other <- NA
     print("____________________________________________")
     print(cell_type)
@@ -256,8 +259,7 @@ plot_PS_gene <- function(junc,gene, comp_type, cell_type ){
                     pull(Run)
     } else {
         # Within group comparison 
-
-        #get group label for the given label  
+        # get group label for the given label  
         group <- df_metadata %>%
                 filter(main_label == cell_type_) %>%
                 pull(group_label)
@@ -279,7 +281,7 @@ plot_PS_gene <- function(junc,gene, comp_type, cell_type ){
     # PS Plot
     #############
 
-    df_PS_junc <- df_all_PS %>% 
+    df_PS_junc <- df_PSorIR %>% 
         filter(row.names(.) %in% c(junc)) %>%
         t() %>%
         as.data.frame() 
@@ -300,11 +302,11 @@ plot_PS_gene <- function(junc,gene, comp_type, cell_type ){
         geom_point(alpha = .5,position = position_jitter(seed = 1, width = 0.2)) +
         # theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +  
         theme(axis.title.x = element_blank()) + 
-        labs(y= "PS", title = junc) 
+        labs(y= tag, title = junc) 
 
-    ##############
+    ###################
     # Expression Plot
-    #############
+    ##################
     df_gene <- df_exp %>% 
         filter(row.names(.) %in% c(gene)) %>%
         t() %>%
@@ -325,7 +327,7 @@ plot_PS_gene <- function(junc,gene, comp_type, cell_type ){
         geom_point(alpha = .5, position = position_jitter(seed = 1, width = 0.2)) +
         # theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
         theme(axis.title.x = element_blank()) + 
-        labs(y= "log2(TPM)", title =gene) +
+        labs(y= "log2(TPM+1)", title =gene) +
         scale_y_continuous(
             expand = c(0,0),
             limits = c(0,  max(df_gene_p$junc) )) +
@@ -333,25 +335,86 @@ plot_PS_gene <- function(junc,gene, comp_type, cell_type ){
 
 
     plot_grid(p1, p2)
-    ggsave(paste0(fig_output_path,"PS/",junc,"_",gene,"_",cell_type,"_",comp_type,"_genePS.png"), width=15, height=8, unit="cm")
-
-
+    ggsave(paste0(fig_output_path,tag,"/",comp_type,"/",junc,"_",gene,"_",cell_type,"_",comp_type,"_genePS.png"), width=15, height=8, unit="cm")
 
 }
 
-# for (row in 1:nrow(df_splice_ref_z)) {
-for (row in 1:50) {
-    junc <- as.character(df_splice_ref_z[row, "event"])
-    gene <- as.character(df_splice_ref_z[row, "overlapping"])
-    comp_type <- as.character(df_splice_ref_z[row, "group"])
-    cell_type <- as.character(df_splice_ref_z[row, "cell_type"])
+# # for (row in 1:nrow(df_splice_ref_z)) {
+# for (row in 1:100) {
+#     junc <- as.character(df_splice_ref_z[row, "event"])
+#     gene <- as.character(df_splice_ref_z[row, "overlapping"])
+#     comp_type <- as.character(df_splice_ref_z[row, "group"])
+#     cell_type <- as.character(df_splice_ref_z[row, "cell_type"])
 
-    plot_PS_gene(junc,gene, comp_type, cell_type )
+#     plot_PS_gene(junc,gene, comp_type, cell_type , df_all_PS)
 
-}
+# }
 
 
+#########################
+# fig 3 IR vs gene
+#########################
+if (!dir.exists(paste0(fig_output_path,"IR/withinType/"))){
+dir.create(paste0(fig_output_path,"IR/withinType/"),
+recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(paste0(fig_output_path,"IR/group_label/"))){
+dir.create(paste0(fig_output_path,"IR/group_label/"),
+recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(paste0(fig_output_path,"IR/main_label/"))){
+dir.create(paste0(fig_output_path,"IR/main_label/"),
+recursive = TRUE, showWarnings = TRUE)}
 
-df_splice_ref_z %>%
+print(head(df_metadata))
+print("----------")
+df_IR_ref_z  %>%
     arrange(desc(ratio)) %>%
-    head(10)
+    head(100)
+
+print(nrow(df_IR_ref_z))
+print(sum(is.na(df_IR_ref_z$gene_z)))
+print(sum(is.na(df_IR_ref_z$IR_z)))
+
+print(nrow(df_splice_ref_z))
+print(sum(is.na(df_splice_ref_z$gene_z)))
+print(sum(is.na(df_splice_ref_z$splice_z)))
+
+df_IR_ref_z_plot <- df_IR_ref_z %>%
+    mutate(ratio = abs(IR_z/gene_z)) %>%
+    mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
+    arrange(desc(ratio)) %>%
+    filter(ratio != "NA")
+
+# ############################
+# # fig 3 IR zscore scatter plot
+# ###############################
+# IR vs Gene________________________________________________________________
+IR_vs_gene <-  ggplot(aes(x=IR_z, y=gene_z, color = Color), data=df_IR_ref_z_plot) + 
+    scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+    geom_point(size=.85, alpha = .6) +
+    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Intron Retention Z-score") +
+    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+    theme_classic() +
+    theme(legend.position="right", 
+            # legend.title=element_blank(),
+        #   legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 8),
+          axis.title.x=element_text(size=12),
+          axis.title.y=element_text(size=12))  
+        #   +
+    # guides(color = guide_legend(nrow = 3)) 
+    # +
+    # ylim(-1, 1) 
+
+ggsave(plot = IR_vs_gene, dpi = 400,
+    filename = paste0(fig_output_path, "/zscore_IR_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
+
+for (row in 1:100) {
+    junc <- as.character(df_IR_ref_z[row, "event"])
+    gene <- as.character(df_IR_ref_z[row, "overlapping"])
+    comp_type <- as.character(df_IR_ref_z[row, "group"])
+    cell_type <- as.character(df_IR_ref_z[row, "cell_type"])
+
+    plot_PS_gene(junc,gene, comp_type, cell_type , df_IR_table, "IR")
+
+}
