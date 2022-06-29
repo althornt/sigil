@@ -1,4 +1,7 @@
 #!/usr/bin/env Rscript
+
+
+suppressMessages({
 library(optparse)
 library(magrittr)
 library(ggplot2)
@@ -8,6 +11,7 @@ library(dplyr)
 library(foreach)
 library(doParallel)
 library(cowplot)
+})
 
 cl <- makeCluster(detectCores() - 1, outfile = "")
 registerDoParallel(cl)
@@ -30,85 +34,67 @@ df_gene_set <- read.csv(file = paste0(sigil_out_path,
                           "combine_gene_out/gene_sets/df_gene_sets.csv"))
 print(head(df_gene_set))
 
-df_metadata <- read.csv(file = paste0(sigil_out_path, "combine_mesa_out/merged_metadata.csv"), stringsAsFactors=FALSE)
-ls_group_cell_types <- unlist(unique(df_metadata[["group_label"]]))
-ls_main_cell_types <- unlist(unique(df_metadata[["main_label"]]))
-
-
-# print(head(comb))
-
-
-# for (i in comb){
-#     print(i)
-# }
-
+# df_metadata <- read.csv(file = paste0(sigil_out_path, "combine_mesa_out/merged_metadata.csv"), stringsAsFactors=FALSE)
+# ls_group_cell_types <- unlist(unique(df_metadata[["group_label"]]))
+# ls_main_cell_types <- unlist(unique(df_metadata[["main_label"]]))
 
 compare_sets <-  function(df_sets, tag,total,col){
     ls_phyper <- list()
-    ls_sets <- unique(df_sets$set)
 
-    for (setA in ls_sets) {
-        for (setB in ls_sets) {
-            #skip if the same set
-            if (setA==setB) break
+    df_comb <- combn(unique(df_sets$set), 2) %>%
+        t() %>%
+        as.data.frame()
 
-            if (setA %in% c("T_Cells_CD8:+_within_UP","T_Cells_CD4:+_within_DN" ) &
-                    setB %in% c("T_Cells_CD8:+_within_UP","T_Cells_CD4:+_within_DN" )
-            ) break
+    df_out <- foreach(i = 1:nrow(df_comb),.combine='rbind', .packages=c('magrittr','dplyr','ggplot2'))  %dopar% {
 
-            if (setA %in% c("B_cells_naive_within_UP","B_cells_memory_within_DN" ) &
-                    setB %in% c("B_cells_naive_within_UP","B_cells_memory_within_DN" )
-            ) break
+        setA <- df_comb[i,"V1"]
+        setB <- df_comb[i,"V2"]
 
-        #        [1] "T_Cells_CD8:+_within_UP : T_Cells_CD4:+_within_DN"
-        # [1] "T_Cells_CD8:+_within_DN : T_Cells_CD4:+_within_UP"
-        # [1] "B_cells_naive_within_UP : B_cells_memory_within_DN"
-        # [1] "B_cells_naive_within_DN : B_cells_memory_within_UP
+        # print(paste(setA,setB,sep=" : "))
+        ls_events_A <- df_sets %>% 
+            filter(set==setA) %>%
+            pull(col)
 
-            ls_events_A <- df_sets %>% 
-                filter(set==setA) %>%
-                pull(col)
-            
-            #    print(length(ls_events_A))
-            ls_events_B <- df_sets %>% 
-                filter(set==setB) %>%
-                pull(col)
-            #    print(length(ls_events_B))
+        #    print(length(ls_events_A))
+        ls_events_B <- df_sets %>% 
+            filter(set==setB) %>%
+            pull(col)
+        #    print(length(ls_events_B))
 
-            overlap <- length(intersect(ls_events_A,ls_events_B))
-                # print(overlap)
+        overlap <- length(intersect(ls_events_A,ls_events_B))
+        # print(overlap)
 
-            #Run hypergeometric test to find enrichment
-            pval <- phyper(
-                            overlap-1, 
-                            length(ls_events_B),
-                            total-length(ls_events_B), 
-                            length(ls_events_A),
-                            lower.tail= FALSE
-                            )
-                # print(pval)
-            
-                ls_phyper[[paste(setA,setB,sep=" : ")]] <- pval
+        #Run hypergeometric test to find enrichment
+        pval <- phyper(
+                        overlap-1, 
+                        length(ls_events_B),
+                        total-length(ls_events_B), 
+                        length(ls_events_A),
+                        lower.tail= FALSE
+                        )
+        # print(pval)
 
-                # print(paste(setA,setB,sep=" : "))
-            
-                if (overlap ==200){print(paste(setA,setB,sep=" : "))}
-            }
+        ls_phyper[[paste(setA,setB,sep=" : ")]] <- pval
+
+        # print(paste(setA,setB,sep=" : "))
+
+        if (overlap ==200){print(paste(setA,setB,sep=" : "))}
+        g <- c(setA,setB,pval)
         }
 
-        # Make df of pvalues
-        df_phyper <- do.call("rbind",ls_phyper) %>% as.data.frame()
-        colnames(df_phyper) <- c("pval")
+    colnames(df_out) <- c("setA","setB","pval")
+    df_out <- df_out %>% as.data.frame()
+    df_out$pval = as.numeric(as.character(df_out$pval))
 
-        # Make histogram of pvalues
-        hist <- ggplot(df_phyper, aes(x=pval)) + 
-            geom_histogram() +
-            ggtitle(tag) +
-            ylim(0, 4000) +
-            theme_classic() 
-        ggsave(paste0(fig_output_path,"phyper_hist_",tag,".png"), width=10, height=5, unit="cm")
+    # Make histogram of pvalues
+    hist <- ggplot(df_out, aes(x=pval)) + 
+        geom_histogram() +
+        ggtitle(tag) +
+        ylim(0, 4000) +
+        theme_classic() 
+    ggsave(paste0(fig_output_path,"phyper_hist_",tag,".png"), width=10, height=5, unit="cm")
 
-        return(list("res" = df_phyper, "hist"=hist))
+    return(list("res" = df_out, "hist"=hist))
 }
 
 # Run function to get overlap among sigil sets 
@@ -131,13 +117,6 @@ plot_grid(phyper_gene$hist, phyper_splice$hist, phyper_IR$hist,
 
 ggsave(paste0(fig_output_path,"gene_splice_IR_phyper_hist.png"), width=8, height=20, unit="cm")
 
-
-comb <- combn(unique(unique(df_splice_set$set)), 2) %>%
-    t() %>%
-    as.data.frame()
-
-print(ncol(comb))
-print(nrow(comb))
-
-
 stopCluster(cl)
+
+
