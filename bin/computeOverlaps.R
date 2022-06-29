@@ -79,22 +79,33 @@ compare_sets <-  function(df_sets, tag,total,col){
         # print(paste(setA,setB,sep=" : "))
 
         if (overlap ==200){print(paste(setA,setB,sep=" : "))}
-        g <- c(setA,setB,pval)
+        g <- c(setA,setB,pval,overlap)
         }
 
-    colnames(df_out) <- c("setA","setB","pval")
+    colnames(df_out) <- c("setA","setB","pval","overlap")
     df_out <- df_out %>% as.data.frame()
     df_out$pval = as.numeric(as.character(df_out$pval))
+    df_out$overlap = as.numeric(as.character(df_out$overlap))
 
+    df_out<- df_out %>%
+        mutate(sig = ifelse(pval < .05, "significant overlap", "no significant overlap"))
+    
     # Make histogram of pvalues
-    hist <- ggplot(df_out, aes(x=pval)) + 
+    hist_pval <- ggplot(df_out, aes(x=pval)) + 
         geom_histogram() +
         ggtitle(tag) +
         ylim(0, 4000) +
         theme_classic() 
-    ggsave(paste0(fig_output_path,"phyper_hist_",tag,".png"), width=10, height=5, unit="cm")
+    # ggsave(paste0(fig_output_path,"phyper_hist_",tag,".png"), width=10, height=5, unit="cm")
 
-    return(list("res" = df_out, "hist"=hist))
+    # Make histogram of overlap
+    hist_overlap <- ggplot(df_out, aes(x=overlap)) + 
+        geom_histogram() +
+        ggtitle(tag) +
+        ylim(0, 4000) +
+        theme_classic() 
+
+    return(list("res" = df_out, "hist_pval"=hist_pval,"hist_overlap"=hist_overlap ))
 }
 
 # Run function to get overlap among sigil sets 
@@ -110,12 +121,38 @@ phyper_gene <- compare_sets(df_gene_set, "gene",length(unique(df_gene_set$X)), "
 print(head(phyper_gene$res))
 print(dim(phyper_gene$res))
 
-# Make combined cowplot with all 3 types of sets
-plot_grid(phyper_gene$hist, phyper_splice$hist, phyper_IR$hist, 
+# Make combined pval cowplot with all 3 types of sets
+plot_grid(phyper_gene$hist_pval, phyper_splice$hist_pval, phyper_IR$hist_pval, 
         # labels = c('gene','splice', 'IR'),
         ncol = 1)
 
 ggsave(paste0(fig_output_path,"gene_splice_IR_phyper_hist.png"), width=8, height=20, unit="cm")
+
+# Make combined overlap cowplot with all 3 types of sets
+plot_grid(phyper_gene$hist_overlap, phyper_splice$hist_overlap, phyper_IR$hist_overlap, 
+        # labels = c('gene','splice', 'IR'),
+        ncol = 1)
+
+ggsave(paste0(fig_output_path,"gene_splice_IR_phyper_overlap.png"), width=8, height=20, unit="cm")
+
+
+# Combine 3 dfs
+phyper_gene$res$type <- "gene"
+phyper_splice$res$type <- "splice"
+phyper_IR$res$type <- "IR"
+df_combined_phyper <- do.call("rbind", list(phyper_gene$res, phyper_splice$res, phyper_IR$res)) %>%
+    as.data.frame()
+
+print(head(df_combined_phyper))
+ggplot(df_combined_phyper, aes(sig, ..count.., fill = type)) + 
+        geom_bar( position = "dodge") +
+        theme_classic() +
+        theme(axis.title.x = element_blank()) +
+        scale_color_manual("legend",values=c("gene"="orange","splice"="skyblue","IR"="darkgreen"))
+  
+
+ggsave(paste0(fig_output_path,"gene_splice_IR_sig.png"), width=15, height=6, unit="cm")
+
 
 stopCluster(cl)
 
