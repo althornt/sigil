@@ -6,29 +6,24 @@ library(ggplot2)
 library(tidyverse)
 library(tidyr)
 library(dplyr)
-# library(uwot)
 library(RColorBrewer)
-# library(foreach)
-library(doParallel)
-# cl <- makeCluster(detectCores() - 1, outfile = "")
-# registerDoParallel(cl)
 library(uwot)
-library(RColorBrewer)
 library(magrittr)
-library(pheatmap)
+# library(pheatmap)
 library(purrr)
 library(tidyr)
 # library(reshape2)
 library(ComplexHeatmap)
 library(UpSetR)
 library(cowplot)
+library(enrichR)
 
 
 sigil_out_path = "/mnt/results_sigil_combine/sigil_results_SongChoi_newlabels_20220614/"
 fig_output_path = "/mnt/figures/"
 if (!dir.exists(fig_output_path)){
-dir.create(fig_output_path,
-recursive = TRUE, showWarnings = TRUE)}
+    dir.create(fig_output_path,
+    recursive = TRUE, showWarnings = TRUE)}
 
 df_metadata <- read.csv(file = paste0(sigil_out_path, "combine_mesa_out/merged_metadata.csv"), stringsAsFactors=FALSE)
 # print(df_metadata)
@@ -179,178 +174,254 @@ print(length(ls_IR_ref_genes))
 # print(plotObject)
 # dev.off()
 
-###########################
-# fig 2 splice vs gene
-###########################
-if (!dir.exists(paste0(fig_output_path,"PS/withinType/"))){
-dir.create(paste0(fig_output_path,"PS/withinType/"),
-recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(paste0(fig_output_path,"PS/group_label/"))){
-dir.create(paste0(fig_output_path,"PS/group_label/"),
-recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(paste0(fig_output_path,"PS/main_label/"))){
-dir.create(paste0(fig_output_path,"PS/main_label/"),
+##########################################################
+# Fig 2 Enrichr on all genes from each set type
+############################################################
+if (!dir.exists(paste0(fig_output_path,"enrichr"))){
+dir.create(paste0(fig_output_path,"enrichr"),
 recursive = TRUE, showWarnings = TRUE)}
 
-print(head(df_metadata))
 
-# df_splice_ref_z %>%
+dbs <- c("GO_Biological_Process_2021",
+        "GO_Cellular_Component_2021", 
+        "GO_Molecular_Function_2021")
+
+ls_sigil_types <- list("gene"=ls_gene_ref_genes,
+                    "splice"=ls_splice_ref_genes,
+                    "IR"=ls_IR_ref_genes)
+ls_BP <-ls_CC <- ls_MF <- list()
+for (i in names(ls_sigil_types)){
+    cat("-------------------------------------------------------")
+    cat("\n",i,"\n")
+
+    enriched <- enrichr(ls_sigil_types[[i]], dbs)
+
+    write.csv(enriched[[1]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
+    write.csv(enriched[[2]], paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_", i, ".csv"))
+    write.csv(enriched[[3]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
+
+    BP <- enriched[[1]] %>%
+        arrange(Adjusted.P.value) %>%
+        head(10) %>%
+        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
+            geom_bar(stat = 'identity') +
+            theme_classic() +
+            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+            labs(title = paste0(i," GO_Biological_Process_2021"))
+
+    CC <- enriched[[2]] %>%
+        arrange(Adjusted.P.value) %>%
+        head(10) %>%
+        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
+            geom_bar(stat = 'identity') +
+            theme_classic() +
+            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+            labs(title = paste0(i," GO_Cellular_Component_2021"))
+
+    MF <- enriched[[3]] %>%
+        arrange(Adjusted.P.value) %>%
+        head(10) %>%
+        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
+            geom_bar(stat = 'identity') +
+            theme_classic() +
+            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+            labs(title = paste0(i," GO_Molecular_Function_2021"))
+
+    # ggsave(MF, dpi = 400,
+    #     filename = paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_",i,".png"),
+    #     width=20, height= 8, unit="cm")
+    
+    ls_BP[[i]] <- BP
+    ls_CC[[i]] <- CC    
+    ls_MF[[i]] <- MF
+}
+
+
+plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]], nrow=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","GO_Biological_Process_2021_all.png"), width=30, height=30, unit="cm")
+
+plot_grid(ls_CC[[1]],ls_CC[[2]],ls_CC[[3]], nrow=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_all.png"), width=30, height=30, unit="cm")
+
+plot_grid(ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], nrow=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_all.png"), width=30, height=30, unit="cm")
+
+plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]],ls_CC[[1]],ls_CC[[2]],ls_CC[[3]],ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], 
+        nrow=3,ncol=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","all.png"), width=120, height=40, unit="cm", dpi =400)
+
+# ###########################
+# # fig 3 splice vs gene
+# ###########################
+# if (!dir.exists(paste0(fig_output_path,"PS/withinType/"))){
+# dir.create(paste0(fig_output_path,"PS/withinType/"),
+# recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(paste0(fig_output_path,"PS/group_label/"))){
+# dir.create(paste0(fig_output_path,"PS/group_label/"),
+# recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(paste0(fig_output_path,"PS/main_label/"))){
+# dir.create(paste0(fig_output_path,"PS/main_label/"),
+# recursive = TRUE, showWarnings = TRUE)}
+
+# print(head(df_metadata))
+
+# # df_splice_ref_z %>%
+# #     arrange(desc(ratio)) %>%
+# #     head(10)
+
+# # df_splice_ref_z$high_ratio_2 <- NA
+
+# df_splice_ref_z_plot <- df_splice_ref_z %>%
+#     mutate(ratio = abs(splice_z/gene_z)) %>%
+#     mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
 #     arrange(desc(ratio)) %>%
-#     head(10)
-
-# df_splice_ref_z$high_ratio_2 <- NA
-
-df_splice_ref_z_plot <- df_splice_ref_z %>%
-    mutate(ratio = abs(splice_z/gene_z)) %>%
-    mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
-    arrange(desc(ratio)) %>%
-    filter(ratio != "NA")
+#     filter(ratio != "NA")
 
 
 
-############################
-# fig 2 zscore scatter plot
-###############################
-# Splice vs Gene________________________________________________________________
-p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
-    scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
-    geom_point(size=.85, alpha = .6) +
-    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
-    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    # geom_text(
-    #           label= df_splice_ref_z[["high_ratio_2"]],
-    #           nudge_x = 0.01, nudge_y = 0.01,
-    #           check_overlap =F, col = "black", size = 3
-    #         ) +
-    theme_classic() +
-    theme(legend.position="right", 
-            # legend.title=element_blank(),
-        #   legend.title = element_text(size = 6), 
-          legend.text = element_text(size = 8),
-          axis.title.x=element_text(size=12),
-          axis.title.y=element_text(size=12))  
-        #   +
-    # guides(color = guide_legend(nrow = 3)) 
-    # +
-    # ylim(-1, 1) 
+# ############################
+# # fig 3 zscore scatter plot
+# ###############################
+# # Splice vs Gene________________________________________________________________
+# p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
+#     scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+#     geom_point(size=.85, alpha = .6) +
+#     labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
+#     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     # geom_text(
+#     #           label= df_splice_ref_z[["high_ratio_2"]],
+#     #           nudge_x = 0.01, nudge_y = 0.01,
+#     #           check_overlap =F, col = "black", size = 3
+#     #         ) +
+#     theme_classic() +
+#     theme(legend.position="right", 
+#             # legend.title=element_blank(),
+#         #   legend.title = element_text(size = 6), 
+#           legend.text = element_text(size = 8),
+#           axis.title.x=element_text(size=12),
+#           axis.title.y=element_text(size=12))  
+#         #   +
+#     # guides(color = guide_legend(nrow = 3)) 
+#     # +
+#     # ylim(-1, 1) 
 
-ggsave(plot = p_vs_gene, dpi = 400,
-    filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
+# ggsave(plot = p_vs_gene, dpi = 400,
+#     filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
 
 
-############################
-# fig 2 splice vs gene dist
-################################
+# ############################
+# # fig 3 splice vs gene dist
+# ################################
 
-plot_PS_gene <- function(junc,gene, comp_type, cell_type, df_PSorIR, tag ){
-    samples_main <- samples_other <- NA
-    print("____________________________________________")
-    print(cell_type)
-    # replace underscores, not sure why needed twice
-    cell_type_ <- sub("_", " ", cell_type)
-    cell_type_ <- sub("_", " ", cell_type_)
+# plot_PS_gene <- function(junc,gene, comp_type, cell_type, df_PSorIR, tag ){
+#     samples_main <- samples_other <- NA
+#     print("____________________________________________")
+#     print(cell_type)
+#     # replace underscores, not sure why needed twice
+#     cell_type_ <- sub("_", " ", cell_type)
+#     cell_type_ <- sub("_", " ", cell_type_)
 
-    print(cell_type_)
-    print(comp_type)
-    print(junc)
+#     print(cell_type_)
+#     print(comp_type)
+#     print(junc)
 
-    if (comp_type == "main_label"){
-        samples_main <- df_metadata %>%
-                    filter(main_label == cell_type_) %>%
-                    pull(Run)
-        samples_other <- df_metadata %>%
-                    filter(main_label != cell_type_) %>%
-                    pull(Run)
+#     if (comp_type == "main_label"){
+#         samples_main <- df_metadata %>%
+#                     filter(main_label == cell_type_) %>%
+#                     pull(Run)
+#         samples_other <- df_metadata %>%
+#                     filter(main_label != cell_type_) %>%
+#                     pull(Run)
 
-    } else if (comp_type == "group_label"){
-        samples_main <- df_metadata %>%
-                    filter(group_label == cell_type_) %>%
-                    pull(Run)
-        samples_other <- df_metadata %>%
-                    filter(group_label != cell_type_) %>%
-                    pull(Run)
-    } else {
-        # Within group comparison 
-        # get group label for the given label  
-        group <- df_metadata %>%
-                filter(main_label == cell_type_) %>%
-                pull(group_label)
-        group <- unique(group)
-        samples_main <- df_metadata %>%
-                     filter(main_label == cell_type_) %>%
-                     pull(Run)
-        samples_other <- df_metadata %>%
-                    filter(main_label != cell_type_) %>%
-                    filter(group_label == eval(group)) %>%
-                    pull(Run)
-    }
+#     } else if (comp_type == "group_label"){
+#         samples_main <- df_metadata %>%
+#                     filter(group_label == cell_type_) %>%
+#                     pull(Run)
+#         samples_other <- df_metadata %>%
+#                     filter(group_label != cell_type_) %>%
+#                     pull(Run)
+#     } else {
+#         # Within group comparison 
+#         # get group label for the given label  
+#         group <- df_metadata %>%
+#                 filter(main_label == cell_type_) %>%
+#                 pull(group_label)
+#         group <- unique(group)
+#         samples_main <- df_metadata %>%
+#                      filter(main_label == cell_type_) %>%
+#                      pull(Run)
+#         samples_other <- df_metadata %>%
+#                     filter(main_label != cell_type_) %>%
+#                     filter(group_label == eval(group)) %>%
+#                     pull(Run)
+#     }
 
     
-    print(length(samples_main))
-    print(length(samples_other))
+#     print(length(samples_main))
+#     print(length(samples_other))
 
-    ##############
-    # PS Plot
-    #############
+#     ##############
+#     # PS Plot
+#     #############
 
-    df_PS_junc <- df_PSorIR %>% 
-        filter(row.names(.) %in% c(junc)) %>%
-        t() %>%
-        as.data.frame() 
+#     df_PS_junc <- df_PSorIR %>% 
+#         filter(row.names(.) %in% c(junc)) %>%
+#         t() %>%
+#         as.data.frame() 
 
-    df_PS_junc_main <- df_PS_junc %>%
-        filter(row.names(.) %in% samples_main) %>%
-        mutate(type = cell_type)
-    df_PS_junc_other <- df_PS_junc %>%
-        filter(row.names(.) %in% samples_other) %>%
-        mutate(type = "other")
+#     df_PS_junc_main <- df_PS_junc %>%
+#         filter(row.names(.) %in% samples_main) %>%
+#         mutate(type = cell_type)
+#     df_PS_junc_other <- df_PS_junc %>%
+#         filter(row.names(.) %in% samples_other) %>%
+#         mutate(type = "other")
 
-    df_PS_junc_p <- rbind(df_PS_junc_main,df_PS_junc_other)
-    names(df_PS_junc_p) <- c("junc","type")
+#     df_PS_junc_p <- rbind(df_PS_junc_main,df_PS_junc_other)
+#     names(df_PS_junc_p) <- c("junc","type")
 
-    p1 <- ggplot(df_PS_junc_p, aes(x=type, y=junc)) +
-        geom_boxplot(outlier.shape = NA) +
-        theme_classic() +
-        geom_point(alpha = .5,position = position_jitter(seed = 1, width = 0.2)) +
-        # theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +  
-        theme(axis.title.x = element_blank()) + 
-        labs(y= tag, title = junc) 
+#     p1 <- ggplot(df_PS_junc_p, aes(x=type, y=junc)) +
+#         geom_boxplot(outlier.shape = NA) +
+#         theme_classic() +
+#         geom_point(alpha = .5,position = position_jitter(seed = 1, width = 0.2)) +
+#         # theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +  
+#         theme(axis.title.x = element_blank()) + 
+#         labs(y= tag, title = junc) 
 
-    ###################
-    # Expression Plot
-    ##################
-    df_gene <- df_exp %>% 
-        filter(row.names(.) %in% c(gene)) %>%
-        t() %>%
-        as.data.frame() 
+#     ###################
+#     # Expression Plot
+#     ##################
+#     df_gene <- df_exp %>% 
+#         filter(row.names(.) %in% c(gene)) %>%
+#         t() %>%
+#         as.data.frame() 
 
-    df_gene_main <- df_gene %>%
-        filter(row.names(.) %in% samples_main) %>%
-        mutate(type = cell_type)
-    df_gene_other <- df_gene %>%
-        filter(row.names(.) %in% samples_other) %>%
-        mutate(type = "other")
+#     df_gene_main <- df_gene %>%
+#         filter(row.names(.) %in% samples_main) %>%
+#         mutate(type = cell_type)
+#     df_gene_other <- df_gene %>%
+#         filter(row.names(.) %in% samples_other) %>%
+#         mutate(type = "other")
 
-    df_gene_p <- rbind(df_gene_main,df_gene_other)
-    names(df_gene_p) <- c("junc","type")
-    p2 <- ggplot(df_gene_p,aes(x=type, y=junc)) +
-        geom_boxplot(outlier.shape = NA) +
-        theme_classic() +
-        geom_point(alpha = .5, position = position_jitter(seed = 1, width = 0.2)) +
-        # theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
-        theme(axis.title.x = element_blank()) + 
-        labs(y= "log2(TPM+1)", title =gene) +
-        scale_y_continuous(
-            expand = c(0,0),
-            limits = c(0,  max(df_gene_p$junc) )) +
-        coord_cartesian(clip = "off") 
+#     df_gene_p <- rbind(df_gene_main,df_gene_other)
+#     names(df_gene_p) <- c("junc","type")
+#     p2 <- ggplot(df_gene_p,aes(x=type, y=junc)) +
+#         geom_boxplot(outlier.shape = NA) +
+#         theme_classic() +
+#         geom_point(alpha = .5, position = position_jitter(seed = 1, width = 0.2)) +
+#         # theme(axis.title.x = element_blank(), axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+#         theme(axis.title.x = element_blank()) + 
+#         labs(y= "log2(TPM+1)", title =gene) +
+#         scale_y_continuous(
+#             expand = c(0,0),
+#             limits = c(0,  max(df_gene_p$junc) )) +
+#         coord_cartesian(clip = "off") 
 
 
-    plot_grid(p1, p2)
-    ggsave(paste0(fig_output_path,tag,"/",comp_type,"/",junc,"_",gene,"_",cell_type,"_",comp_type,"_genePS.png"), width=15, height=8, unit="cm")
+#     plot_grid(p1, p2)
+#     ggsave(paste0(fig_output_path,tag,"/",comp_type,"/",junc,"_",gene,"_",cell_type,"_",comp_type,"_genePS.png"), width=15, height=8, unit="cm")
 
-}
+# }
 
 # # for (row in 1:nrow(df_splice_ref_z)) {
 # for (row in 1:100) {
@@ -365,7 +436,7 @@ plot_PS_gene <- function(junc,gene, comp_type, cell_type, df_PSorIR, tag ){
 
 
 #########################
-# fig 3 IR vs gene
+# fig 4 IR vs gene
 #########################
 # if (!dir.exists(paste0(fig_output_path,"IR/withinType/"))){
 # dir.create(paste0(fig_output_path,"IR/withinType/"),
@@ -398,7 +469,7 @@ plot_PS_gene <- function(junc,gene, comp_type, cell_type, df_PSorIR, tag ){
 #     filter(ratio != "NA")
 
 # ############################
-# # fig 3 IR zscore scatter plot
+# # fig 4 IR zscore scatter plot
 # ###############################
 # # IR vs Gene________________________________________________________________
 # IR_vs_gene <-  ggplot(aes(x=IR_z, y=gene_z, color = Color), data=df_IR_ref_z_plot) + 
@@ -432,78 +503,81 @@ plot_PS_gene <- function(junc,gene, comp_type, cell_type, df_PSorIR, tag ){
 
 # }
 
-#############################
-# comparing sets 
-################################
+# #############################
+# # comparing sets 
+# ################################
 
-# Get union of sets in both to iterate through 
-ls_all_sets <- union(df_spice_set$set, df_gene_set$set)
-# print(length(ls_all_sets))
+# # Get union of sets in both to iterate through 
+# ls_all_sets <- union(df_spice_set$set, df_gene_set$set)
+# # print(length(ls_all_sets))
 
-# Get intersection of spliced genes and genes
-gene_intersection <- intersect(unique(df_spice_set$overlapping), unique(df_gene_set$X))
-# print(gene_intersection)
+# # Get intersection of spliced genes and genes
+# gene_intersection <- intersect(unique(df_spice_set$overlapping), unique(df_gene_set$X))
+# # print(gene_intersection)
 
-cat("\n Number of common genes in gene and splice sets: \n")
-print(length(gene_intersection))
+# cat("\n Number of common genes in gene and splice sets: \n")
+# print(length(gene_intersection))
 
-cat("\n Number of unique genes in splice set: \n")
-print(length(unique(df_spice_set$overlapping)))
+# cat("\n Number of unique genes in splice set: \n")
+# print(length(unique(df_spice_set$overlapping)))
 
-cat("\n Number of unique junctions in splice set: \n")
-print(length(unique(df_spice_set$event)))
+# cat("\n Number of unique junctions in splice set: \n")
+# print(length(unique(df_spice_set$event)))
 
-cat("\n Number of unique genes in gene set: \n")
-print(length(unique(df_gene_set$X)))
-cat("\n")
+# cat("\n Number of unique genes in gene set: \n")
+# print(length(unique(df_gene_set$X)))
+# cat("\n")
+
+# ###############################
+# # Compare on set level 
+# ###############################
+# df_counts <- data.frame(matrix(ncol = 3, nrow = length(ls_all_sets)))
+# rownames(df_counts) <- ls_all_sets
+# colnames(df_counts) <- list("gene", "splice","IR")
+
+# for (s in ls_all_sets){
+#   print(s)
+
+#   # Counting 
+#   df_splice <- df_spice_set %>% 
+#     filter(set == s) 
+#   df_IR <- df_IR_set %>% 
+#     filter(set == s) 
+#   df_gene <- df_gene_set %>% 
+#     filter(set == s) 
+#   df_counts[s, "splice"] <- nrow(df_splice)
+#   df_counts[s, "gene"] <- nrow(df_gene)
+#   df_counts[s, "IR"] <- nrow(df_IR)
+
+#   # Comparing 
+# #   gene_intersection <- intersect(df_splice$overlapping, df_gene$X)
+# #   print(length(gene_intersection))
+# #   df_counts[s, "gene and splice"] <- length(gene_intersection)
+# }
+
+# print(head(df_counts))
+
+# df_counts %>% 
+#   pivot_longer(names_to = "variable", values_to = "value", cols = everything()) %>%
+#   ggplot(aes(x = fct_inorder(variable), y = value, color = variable)) +
+#     geom_jitter(alpha = 0.5, size = 2) +
+#     theme_classic() +
+#     theme(legend.position = "none") +
+#     labs(x = "", y = "marker count per set") +
+#     scale_color_manual(values=c("gene"="orange","splice"="skyblue","IR"="darkgreen"))
+
+# ggsave(paste0(fig_output_path, "count_per_set_plot.png"), width=6, height=10, dpi=300, units=c("cm"))
+
+# # df_counts %>% 
+# #   tibble::rownames_to_column("set") %>%
+# #   arrange(desc(splice))
+
+# df_counts %>% 
+#   tibble::rownames_to_column("set") %>%
+#   filter(gene < 100) %>%
+#   arrange(desc(gene))
+
 
 ###############################
 # Compare on set level 
 ###############################
-df_counts <- data.frame(matrix(ncol = 3, nrow = length(ls_all_sets)))
-rownames(df_counts) <- ls_all_sets
-colnames(df_counts) <- list("gene", "splice","IR")
-
-for (s in ls_all_sets){
-  print(s)
-
-  # Counting 
-  df_splice <- df_spice_set %>% 
-    filter(set == s) 
-  df_IR <- df_IR_set %>% 
-    filter(set == s) 
-  df_gene <- df_gene_set %>% 
-    filter(set == s) 
-  df_counts[s, "splice"] <- nrow(df_splice)
-  df_counts[s, "gene"] <- nrow(df_gene)
-  df_counts[s, "IR"] <- nrow(df_IR)
-
-  # Comparing 
-#   gene_intersection <- intersect(df_splice$overlapping, df_gene$X)
-#   print(length(gene_intersection))
-#   df_counts[s, "gene and splice"] <- length(gene_intersection)
-}
-
-print(head(df_counts))
-
-df_counts %>% 
-  pivot_longer(names_to = "variable", values_to = "value", cols = everything()) %>%
-  ggplot(aes(x = fct_inorder(variable), y = value, color = variable)) +
-    geom_jitter(alpha = 0.5, size = 2) +
-    theme_classic() +
-    theme(legend.position = "none") +
-    labs(x = "", y = "marker count per set") +
-    scale_color_manual(values=c("gene"="orange","splice"="skyblue","IR"="darkgreen"))
-
-ggsave(paste0(fig_output_path, "count_per_set_plot.png"), width=6, height=10, dpi=300, units=c("cm"))
-
-# df_counts %>% 
-#   tibble::rownames_to_column("set") %>%
-#   arrange(desc(splice))
-
-df_counts %>% 
-  tibble::rownames_to_column("set") %>%
-  filter(gene < 100) %>%
-  arrange(desc(gene))
-
-
