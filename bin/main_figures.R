@@ -9,15 +9,14 @@ library(dplyr)
 library(RColorBrewer)
 library(uwot)
 library(magrittr)
-# library(pheatmap)
 library(purrr)
 library(tidyr)
-# library(reshape2)
 library(ComplexHeatmap)
 library(UpSetR)
 library(cowplot)
-library(enrichR)
-
+# library(enrichR)
+library(GenomicRanges)
+library(valr)
 
 sigil_out_path = "/mnt/results_sigil_combine/sigil_results_SongChoi_newlabels_20220614/"
 fig_output_path = "/mnt/figures/"
@@ -48,10 +47,9 @@ df_IR_table <- read.table(file =paste0(sigil_out_path,
 df_IR_table <- df_IR_table %>% mutate_if(is.character,as.numeric)
 
 # Read in sigil sets
-df_spice_set <- read.csv(file = paste0(sigil_out_path,
+df_splice_set <- read.csv(file = paste0(sigil_out_path,
                           "combine_mesa_out/splice_set_PS/df_splice_sets.csv"))
-print(head(df_spice_set))
-
+print(head(df_splice_set))
 df_IR_set <- read.csv(file = paste0(sigil_out_path,
                           "combine_mesa_out/splice_set_IR/df_splice_sets.csv"))
 print(head(df_IR_set))
@@ -60,6 +58,23 @@ df_gene_set <- read.csv(file = paste0(sigil_out_path,
                           "combine_gene_out/gene_sets/df_gene_sets.csv"))
 print(head(df_gene_set))
 
+
+# df_bed_PS <- distinct(read.table(file = paste0(sigil_out_path,
+#                         "combine_mesa_out/explore_ref_matrix_PS/RefMatrix.bed"), 
+#                         header = FALSE)) 
+# df_bed_IR <- distinct(read.table(file = paste0(sigil_out_path,
+#                         "combine_mesa_out/explore_ref_matrix_IR/RefMatrix.bed"),
+#                          header = FALSE))
+# names(df_bed_PS) <-  names(df_bed_IR) <- list("CHROM", "START","STOP")                        
+
+# UCSC alt event track table
+df_alt_events <- read.table(file = "/mnt/files/UCSC_alt_events_track.tsv", header = TRUE)  %>%
+    dplyr::rename(start = chromStart, end = chromEnd ) %>%
+    mutate_at('start', as.integer) %>%
+    mutate_at('end', as.integer)
+
+print(head(df_alt_events))
+print("----")
 
 # #####################################
 # # Fig1B + C cell type summary plot
@@ -104,8 +119,10 @@ print(head(df_gene_set))
 
 # Read in gene reference matrix 
 df_gene_ref <- read.csv(file= paste0(sigil_out_path,"/combine_gene_out/ref_matrix/combined_main_group_withingroup_combinedRefMat.tsv"),
-                         sep = "\t",header=TRUE) %>%
-              rename(gene = X)
+                         sep = "\t",header=TRUE) 
+                         
+                        #  %>%
+            #   rename(gene = X)
 
 # Read in splice reference matrix 
 df_splice_ref <- read.csv(file= paste0(
@@ -125,7 +142,7 @@ print(head(df_IR_ref))
 print(dim(df_IR_ref))
 
 # Genes affected by splice, IR, and gene
-ls_gene_ref_genes <- unique(df_gene_ref$gene)
+ls_gene_ref_genes <- unique(df_gene_ref$X)
 ls_splice_ref_genes <- unique(df_splice_ref$overlapping)
 ls_IR_ref_genes <- unique(df_IR_ref$overlapping)
 
@@ -161,6 +178,7 @@ print(length(ls_splice_ref_genes))
 print("Number of IR ref genes:")
 print(length(ls_IR_ref_genes))
 
+
 # listInput <- list("Gene" = ls_gene_ref_genes,
 #                  "Splice" = ls_splice_ref_genes, 
 #                  "Intron Retention" = ls_IR_ref_genes)
@@ -174,81 +192,189 @@ print(length(ls_IR_ref_genes))
 # print(plotObject)
 # dev.off()
 
+
+##########################################################
+# Fig 2 compare events to UCSC Alt track alt promoter
+############################################################
+# Add bed cols to splice ref 
+df_splice_set <- df_splice_set %>%
+  rowwise() %>%
+    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
+    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+    as.data.frame() 
+    # %>%
+    # head(10)
+print(head(df_splice_set))
+print(dim(df_splice_set))
+print("~~~~~~~~~~~")
+
+# df_IR_ref <- df_IR_ref %>%
+#   rowwise() %>%
+#     mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
+#     mutate(start = strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] ) %>%
+#     mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+#     mutate(sign = strsplit(event, ":")[[1]][3]) 
+
+df_alt_events_promoter <- df_alt_events %>%
+    filter(name=="altPromoter") %>%
+    select("chrom","start","end","name","strand")
+
+print(head(df_alt_events_promoter))
+# print(dim(df_alt_events_promoter))
+
+
+
+print("~~~~~~~~~~~")
+# intersection of splice ref junctions with alt promoters; 
+# if they intersect/overlap it suggests the alt promoter its intersected with 
+# is being skipped
+df_alt_promoter_splice_ref <- bed_intersect(df_splice_set, df_alt_events_promoter, 
+         suffix = c(".splice_ref", ".alt_pro"))  %>%
+        as.data.frame() 
+head(df_alt_promoter_splice_ref)
+
+# count promoter per junction 
+df_alt_promoter_splice_ref %>%
+    group_by(event.splice_ref, set.splice_ref) %>%
+    count() %>%
+    arrange(desc(n)) %>%
+    as.data.frame()  %>%
+    head(10)
+
+df_splice_set %>%
+    group_by(event, set) %>%
+        count() %>%
+        arrange(desc(n)) %>%
+        as.data.frame()  %>%
+        head(100)
+
+unique_splice_juncs <- unique(df_splice_set$event)
+print(length(unique_splice_juncs))
+unique_splice_juncs_alt_pro <- unique(df_alt_promoter_splice_ref$event.splice_ref)
+print(length(unique_splice_juncs_alt_pro))
+
+cat("\n Percent of splice ref junctions that contain an alt promoter: \n")
+cat((length(unique_splice_juncs_alt_pro)/length(unique_splice_juncs))*100 )
+cat("\n")
+
+# Add alt promoter info splice set df 
+df_splice_set <- df_splice_set %>%
+    mutate(contains_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro), 1, 0)) 
+
+
+
+print(head(df_splice_set))
+
+# Bar plot of mean jucntions intersect alt promoter 
+df_splice_set %>%
+    select(set, contains_alt_pro) %>%
+    group_by(set) %>%
+    summarise_at(vars(contains_alt_pro), list(alt_mean = mean)) %>%
+    ggplot(aes(x = set, y = alt_mean))  + 
+        geom_bar(stat = 'identity') +
+        theme_classic() +
+        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+
+ggsave(paste0(fig_output_path,"alt_promoter_count.png"), width=40, height=10, unit="cm", dpi = 300)
+
+
+df_alt_promoter_splice_ref_closest <- bed_intersect(df_splice_set, df_alt_events_promoter, 
+         suffix = c(".splice_ref", ".alt_pro"))  %>%
+        as.data.frame() 
+head(df_alt_promoter_splice_ref_closest)
+quit()
+
 ##########################################################
 # Fig 2 Enrichr on all genes from each set type
 ############################################################
-if (!dir.exists(paste0(fig_output_path,"enrichr"))){
-dir.create(paste0(fig_output_path,"enrichr"),
-recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(paste0(fig_output_path,"enrichr"))){
+# dir.create(paste0(fig_output_path,"enrichr"),
+# recursive = TRUE, showWarnings = TRUE)}
 
 
-dbs <- c("GO_Biological_Process_2021",
-        "GO_Cellular_Component_2021", 
-        "GO_Molecular_Function_2021")
+# dbs <- c("GO_Biological_Process_2021",
+#         "GO_Cellular_Component_2021", 
+#         "GO_Molecular_Function_2021",
+#         "KEGG_2021_Human")
 
-ls_sigil_types <- list("gene"=ls_gene_ref_genes,
-                    "splice"=ls_splice_ref_genes,
-                    "IR"=ls_IR_ref_genes)
-ls_BP <-ls_CC <- ls_MF <- list()
-for (i in names(ls_sigil_types)){
-    cat("-------------------------------------------------------")
-    cat("\n",i,"\n")
+# ls_sigil_types <- list("gene"=ls_gene_ref_genes,
+#                     "splice"=ls_splice_ref_genes,
+#                     "IR"=ls_IR_ref_genes)
+# ls_BP <-ls_CC <- ls_MF <- ls_kegg <- list()
+# for (i in names(ls_sigil_types)){
+#     cat("-------------------------------------------------------")
+#     cat("\n",i,"\n")
 
-    enriched <- enrichr(ls_sigil_types[[i]], dbs)
+#     # Run enrichr
+#     enriched <- enrichr(ls_sigil_types[[i]], dbs)
 
-    write.csv(enriched[[1]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
-    write.csv(enriched[[2]], paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_", i, ".csv"))
-    write.csv(enriched[[3]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
+#     # Save results to files
+#     write.csv(enriched[[1]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
+#     write.csv(enriched[[2]], paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_", i, ".csv"))
+#     write.csv(enriched[[3]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
 
-    BP <- enriched[[1]] %>%
-        arrange(Adjusted.P.value) %>%
-        head(10) %>%
-        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
-            geom_bar(stat = 'identity') +
-            theme_classic() +
-            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
-            labs(title = paste0(i," GO_Biological_Process_2021"))
+#     # Make barplot of adjusted pvalues
+#     BP <- enriched[[1]] %>%
+#         arrange(Adjusted.P.value) %>%
+#         head(10) %>%
+#         ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
+#             geom_bar(stat = 'identity') +
+#             theme_classic() +
+#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+#             labs(title = paste0(i," GO_Biological_Process_2021"))
 
-    CC <- enriched[[2]] %>%
-        arrange(Adjusted.P.value) %>%
-        head(10) %>%
-        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
-            geom_bar(stat = 'identity') +
-            theme_classic() +
-            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
-            labs(title = paste0(i," GO_Cellular_Component_2021"))
+#     CC <- enriched[[2]] %>%
+#         arrange(Adjusted.P.value) %>%
+#         head(10) %>%
+#         ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
+#             geom_bar(stat = 'identity') +
+#             theme_classic() +
+#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+#             labs(title = paste0(i," GO_Cellular_Component_2021"))
 
-    MF <- enriched[[3]] %>%
-        arrange(Adjusted.P.value) %>%
-        head(10) %>%
-        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
-            geom_bar(stat = 'identity') +
-            theme_classic() +
-            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
-            labs(title = paste0(i," GO_Molecular_Function_2021"))
+#     MF <- enriched[[3]] %>%
+#         arrange(Adjusted.P.value) %>%
+#         head(10) %>%
+#         ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
+#             geom_bar(stat = 'identity') +
+#             theme_classic() +
+#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+#             labs(title = paste0(i," GO_Molecular_Function_2021"))
 
-    # ggsave(MF, dpi = 400,
-    #     filename = paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_",i,".png"),
-    #     width=20, height= 8, unit="cm")
-    
-    ls_BP[[i]] <- BP
-    ls_CC[[i]] <- CC    
-    ls_MF[[i]] <- MF
-}
+#     kegg <- enriched[[4]] %>%
+#         arrange(Adjusted.P.value) %>%
+#         head(10) %>%
+#         ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
+#             geom_bar(stat = 'identity') +
+#             theme_classic() +
+#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+#             labs(title = paste0(i," KEGG_2021_Human"))
 
+#     # Add to list so plots can be combined
+#     ls_BP[[i]] <- BP
+#     ls_CC[[i]] <- CC    
+#     ls_MF[[i]] <- MF
+#     ls_kegg[[i]] <- kegg
+# }
 
-plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]], nrow=3, align = 'v', axis = 'l')
-ggsave(paste0(fig_output_path,"enrichr/","GO_Biological_Process_2021_all.png"), width=30, height=30, unit="cm")
+# plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]], nrow=3, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"enrichr/","GO_Biological_Process_2021_all.png"), width=30, height=30, unit="cm")
 
-plot_grid(ls_CC[[1]],ls_CC[[2]],ls_CC[[3]], nrow=3, align = 'v', axis = 'l')
-ggsave(paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_all.png"), width=30, height=30, unit="cm")
+# plot_grid(ls_CC[[1]],ls_CC[[2]],ls_CC[[3]], nrow=3, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_all.png"), width=30, height=30, unit="cm")
 
-plot_grid(ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], nrow=3, align = 'v', axis = 'l')
-ggsave(paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_all.png"), width=30, height=30, unit="cm")
+# plot_grid(ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], nrow=3, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_all.png"), width=30, height=30, unit="cm")
 
-plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]],ls_CC[[1]],ls_CC[[2]],ls_CC[[3]],ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], 
-        nrow=3,ncol=3, align = 'v', axis = 'l')
-ggsave(paste0(fig_output_path,"enrichr/","all.png"), width=120, height=40, unit="cm", dpi =400)
+# plot_grid(ls_kegg[[1]],ls_kegg[[2]],ls_kegg[[3]], nrow=3, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"enrichr/","KEGG_2021_Human_all.png"), width=30, height=30, unit="cm")
+
+# plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]],ls_CC[[1]],ls_CC[[2]],ls_CC[[3]],ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], 
+#         nrow=3,ncol=3, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"enrichr/","all.png"), width=120, height=40, unit="cm", dpi =400)
 
 # ###########################
 # # fig 3 splice vs gene
@@ -508,21 +634,21 @@ ggsave(paste0(fig_output_path,"enrichr/","all.png"), width=120, height=40, unit=
 # ################################
 
 # # Get union of sets in both to iterate through 
-# ls_all_sets <- union(df_spice_set$set, df_gene_set$set)
+# ls_all_sets <- union(df_splice_set$set, df_gene_set$set)
 # # print(length(ls_all_sets))
 
 # # Get intersection of spliced genes and genes
-# gene_intersection <- intersect(unique(df_spice_set$overlapping), unique(df_gene_set$X))
+# gene_intersection <- intersect(unique(df_splice_set$overlapping), unique(df_gene_set$X))
 # # print(gene_intersection)
 
 # cat("\n Number of common genes in gene and splice sets: \n")
 # print(length(gene_intersection))
 
 # cat("\n Number of unique genes in splice set: \n")
-# print(length(unique(df_spice_set$overlapping)))
+# print(length(unique(df_splice_set$overlapping)))
 
 # cat("\n Number of unique junctions in splice set: \n")
-# print(length(unique(df_spice_set$event)))
+# print(length(unique(df_splice_set$event)))
 
 # cat("\n Number of unique genes in gene set: \n")
 # print(length(unique(df_gene_set$X)))
@@ -539,7 +665,7 @@ ggsave(paste0(fig_output_path,"enrichr/","all.png"), width=120, height=40, unit=
 #   print(s)
 
 #   # Counting 
-#   df_splice <- df_spice_set %>% 
+#   df_splice <- df_splice_set %>% 
 #     filter(set == s) 
 #   df_IR <- df_IR_set %>% 
 #     filter(set == s) 
@@ -577,7 +703,3 @@ ggsave(paste0(fig_output_path,"enrichr/","all.png"), width=120, height=40, unit=
 #   filter(gene < 100) %>%
 #   arrange(desc(gene))
 
-
-###############################
-# Compare on set level 
-###############################
