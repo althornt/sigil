@@ -295,6 +295,19 @@ df_splice_set %>%
 
 ggsave(paste0(fig_output_path,"alt_promoter_count.png"), width=40, height=10, unit="cm", dpi = 300)
 
+# Get number to randomly sample from PS file 
+num_unique_ref_juncs <- length(unique(df_splice_set$event))
+print(length(unique(num_unique_ref_juncs)))
+
+print(head(df_all_PS))
+
+ls_random_sample <- sample(rownames(df_all_PS), num_unique_ref_juncs, replace=F)
+
+print(head(ls_random_sample))
+print(length(ls_random_sample))
+print(length(unique(ls_random_sample)))
+
+quit()
 
 ##########################################################
 # Fig 2 rGREAT splice ref
@@ -327,7 +340,7 @@ for (pval_type in c( "Binom_Adjp_BH" )) {
             geom_bar(stat = 'identity') +
             theme_classic() +
             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
-            labs(title = paste0("PS GO Biological Process"))
+            labs(title = paste0("PS GO Biological Process"), x = "Binom_Adjp_BH")
 
     ggsave(paste0(fig_output_path,"rGREAT_GO_BP_all_splice_ref_",pval_type,".png"), width=30, height=20, unit="cm", dpi = 300)
 
@@ -341,7 +354,7 @@ for (pval_type in c( "Binom_Adjp_BH" )) {
              geom_bar(stat = 'identity') +
              theme_classic() +
              theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
-             labs(title = paste0("PS GO Molecular Function"))
+             labs(title = paste0("PS GO Molecular Function"), x = "Binom_Adjp_BH")
 
     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_all_splice_ref_", pval_type, ".png"), width=30, height=20, unit="cm", dpi = 300)
 
@@ -366,70 +379,69 @@ for (pval_type in c( "Binom_Adjp_BH" )) {
 ##########################################################
 # Fig 2 rGREAT IR
 ############################################################
-df_IR_set <- df_IR_set %>%
-  rowwise() %>%
-    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
-    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
-    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
-    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
-    as.data.frame() 
+# df_IR_set <- df_IR_set %>%
+#   rowwise() %>%
+#     mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
+#     mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+#     mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+#     mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+#     as.data.frame() 
 
-print(head(df_IR_set))
-
-
-# Run Great
-job_IR = submitGreatJob(makeGRangesFromDataFrame(df_IR_set),
-                        species= "hg38", version = "4")
-
-# Get tables from Run
-tb_IR = getEnrichmentTables(job_IR, category = c("GO"))
+# print(head(df_IR_set))
 
 
-print(head(tb_IR[["GO Molecular Function"]], n=25))
-print(head(tb_IR[[ "GO Biological Process" ]], n=60))
+# # Run Great
+# job_IR = submitGreatJob(makeGRangesFromDataFrame(df_IR_set),
+#                         species= "hg38", version = "4")
 
-for (pval_type in c("Binom_Adjp_BH" )) {
-# for (pval_type in c("Hyper_Adjp_BH", "Binom_Adjp_BH" )) {
-
-    # Make barplot of adjusted pvalues
-    BP <- tb_IR[["GO Biological Process"]] %>%
-        mutate(pval_type = -log10(get(pval_type))) %>%
-        arrange(desc(pval_type)) %>%
-        head(40) %>%
-        ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
-            geom_bar(stat = 'identity') +
-            theme_classic() +
-            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
-            labs(title = paste0("IR GO Biological Process"))
-
-    ggsave(paste0(fig_output_path,"rGREAT_GO_BP_all_IR_ref_",pval_type,".png"), width=30, height=20, unit="cm", dpi = 300)
+# # Get tables from Run
+# tb_IR = getEnrichmentTables(job_IR, category = c("GO"))
 
 
-    # Make barplot of adjusted pvalues
-    MF <- tb_IR[["GO Molecular Function"]] %>%
-        mutate(pval_type = -log10(get(pval_type))) %>%
-        arrange(desc(pval_type)) %>%
-        head(40) %>%
-        ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
-             geom_bar(stat = 'identity') +
-             theme_classic() +
-             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
-             labs(title = paste0("IR GO Molecular Function"))
+# print(head(tb_IR[["GO Molecular Function"]], n=25))
+# print(head(tb_IR[[ "GO Biological Process" ]], n=60))
 
-    ggsave(paste0(fig_output_path,"rGREAT_GO_MF_all_IR_ref_", pval_type, ".png"), width=30, height=20, unit="cm", dpi = 300)
+# for (pval_type in c("Binom_Adjp_BH" )) {
+# # for (pval_type in c("Hyper_Adjp_BH", "Binom_Adjp_BH" )) {
 
-    plot_grid(BP, MF, nrow=1, align = 'v', axis = 'l')
-    ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_IR_ref_", pval_type, ".png"), width=70, height=30, unit="cm")
+#     # Make barplot of adjusted pvalues
+#     BP <- tb_IR[["GO Biological Process"]] %>%
+#         mutate(pval_type = -log10(get(pval_type))) %>%
+#         arrange(desc(pval_type)) %>%
+#         head(40) %>%
+#         ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
+#             geom_bar(stat = 'identity') +
+#             theme_classic() +
+#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
+#             labs(title = paste0("IR GO Biological Process"), x = "Binom_Adjp_BH")
+#     ggsave(paste0(fig_output_path,"rGREAT_GO_BP_all_IR_ref_",pval_type,".png"), width=30, height=20, unit="cm", dpi = 300)
 
-    ls_great_plots$PS_BP <- BP
-    ls_great_plots$PS_MF <- MF
 
-}
+#     # Make barplot of adjusted pvalues
+#     MF <- tb_IR[["GO Molecular Function"]] %>%
+#         mutate(pval_type = -log10(get(pval_type))) %>%
+#         arrange(desc(pval_type)) %>%
+#         head(40) %>%
+#         ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
+#              geom_bar(stat = 'identity') +
+#              theme_classic() +
+#              theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
+#              labs(title = paste0("IR GO Molecular Function"), x = "Binom_Adjp_BH")
 
-print(length(ls_great_plots))
-plot_grid(ls_great_plots[[1]], ls_great_plots[[2]], ls_great_plots[[3]], ls_great_plots[[4]],
-             nrow=2, align = 'v', axis = 'l')
-ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_PS_IR_ref_Binom_Adjp_BH.png"), width=75, height=60, unit="cm")
+#     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_all_IR_ref_", pval_type, ".png"), width=30, height=20, unit="cm", dpi = 300)
+
+#     plot_grid(BP, MF, nrow=1, align = 'v', axis = 'l')
+#     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_IR_ref_", pval_type, ".png"), width=70, height=30, unit="cm")
+
+#     ls_great_plots$PS_BP <- BP
+#     ls_great_plots$PS_MF <- MF
+
+# }
+
+# print(length(ls_great_plots))
+# plot_grid(ls_great_plots[[1]], ls_great_plots[[2]], ls_great_plots[[3]], ls_great_plots[[4]],
+#              nrow=2, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_PS_IR_ref_Binom_Adjp_BH.png"), width=75, height=60, unit="cm")
 
 
 ##########################################################
@@ -524,61 +536,61 @@ ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_PS_IR_ref_Binom_Adjp_BH.png")
 # ###########################
 # # fig 3 splice vs gene
 # ###########################
-# if (!dir.exists(paste0(fig_output_path,"PS/withinType/"))){
-# dir.create(paste0(fig_output_path,"PS/withinType/"),
-# recursive = TRUE, showWarnings = TRUE)}
-# if (!dir.exists(paste0(fig_output_path,"PS/group_label/"))){
-# dir.create(paste0(fig_output_path,"PS/group_label/"),
-# recursive = TRUE, showWarnings = TRUE)}
-# if (!dir.exists(paste0(fig_output_path,"PS/main_label/"))){
-# dir.create(paste0(fig_output_path,"PS/main_label/"),
-# recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(paste0(fig_output_path,"PS/withinType/"))){
+dir.create(paste0(fig_output_path,"PS/withinType/"),
+recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(paste0(fig_output_path,"PS/group_label/"))){
+dir.create(paste0(fig_output_path,"PS/group_label/"),
+recursive = TRUE, showWarnings = TRUE)}
+if (!dir.exists(paste0(fig_output_path,"PS/main_label/"))){
+dir.create(paste0(fig_output_path,"PS/main_label/"),
+recursive = TRUE, showWarnings = TRUE)}
 
-# print(head(df_metadata))
+print(head(df_metadata))
 
-# # df_splice_ref_z %>%
-# #     arrange(desc(ratio)) %>%
-# #     head(10)
-
-# # df_splice_ref_z$high_ratio_2 <- NA
-
-# df_splice_ref_z_plot <- df_splice_ref_z %>%
-#     mutate(ratio = abs(splice_z/gene_z)) %>%
-#     mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
+# df_splice_ref_z %>%
 #     arrange(desc(ratio)) %>%
-#     filter(ratio != "NA")
+#     head(10)
+
+# df_splice_ref_z$high_ratio_2 <- NA
+
+df_splice_ref_z_plot <- df_splice_ref_z %>%
+    mutate(ratio = abs(splice_z/gene_z)) %>%
+    mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
+    arrange(desc(ratio)) %>%
+    filter(ratio != "NA")
 
 
 
 # ############################
 # # fig 3 zscore scatter plot
 # ###############################
-# # Splice vs Gene________________________________________________________________
-# p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
-#     scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
-#     geom_point(size=.85, alpha = .6) +
-#     labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
-#     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-#     # geom_text(
-#     #           label= df_splice_ref_z[["high_ratio_2"]],
-#     #           nudge_x = 0.01, nudge_y = 0.01,
-#     #           check_overlap =F, col = "black", size = 3
-#     #         ) +
-#     theme_classic() +
-#     theme(legend.position="right", 
-#             # legend.title=element_blank(),
-#         #   legend.title = element_text(size = 6), 
-#           legend.text = element_text(size = 8),
-#           axis.title.x=element_text(size=12),
-#           axis.title.y=element_text(size=12))  
-#         #   +
-#     # guides(color = guide_legend(nrow = 3)) 
-#     # +
-#     # ylim(-1, 1) 
+# Splice vs Gene________________________________________________________________
+p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
+    scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+    geom_point(size=.85, alpha = .6) +
+    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
+    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+    # geom_text(
+    #           label= df_splice_ref_z[["high_ratio_2"]],
+    #           nudge_x = 0.01, nudge_y = 0.01,
+    #           check_overlap =F, col = "black", size = 3
+    #         ) +
+    theme_classic() +
+    theme(legend.position="right", 
+            # legend.title=element_blank(),
+        #   legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 8),
+          axis.title.x=element_text(size=12),
+          axis.title.y=element_text(size=12))  
+        #   +
+    # guides(color = guide_legend(nrow = 3)) 
+    # +
+    # ylim(-1, 1) 
 
-# ggsave(plot = p_vs_gene, dpi = 400,
-#     filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
+ggsave(plot = p_vs_gene, dpi = 400,
+    filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
 
 
 # ############################
