@@ -316,10 +316,10 @@ compAltProm <- function(df_bed ){
     print(df_res_counts)
     # Add alt promoter info the input df 
     df_bed <- df_bed %>%
-        mutate(contains_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_int), 1, 0)) %>%
+        mutate(contains_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_int), TRUE, FALSE)) %>%
         mutate(downstream_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_close), 1, 0)) %>%
-        mutate(both = ifelse(((event %in% unique_splice_juncs_alt_pro_int) & (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) %>%
-        mutate(either = ifelse(((event %in% unique_splice_juncs_alt_pro_int) | (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) 
+        mutate(contains_and_downstream_alt_pro = ifelse(((event %in% unique_splice_juncs_alt_pro_int) & (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) %>%
+        mutate(AltPromoter = ifelse(((event %in% unique_splice_juncs_alt_pro_int) | (event %in% unique_splice_juncs_alt_pro_close)), TRUE, FALSE)) 
 
     return(list(df_bed, df_res_perc, df_res_counts))
 
@@ -401,9 +401,8 @@ df_alt_pro_res_perc %>%
 
 ggsave(paste0(fig_output_path,"alt_promoter.png"), width=20, height=10, unit="cm", dpi = 300)
 
+head(df_splice_set)
 
-
-quit()
 
 
 ##########################################################
@@ -657,7 +656,19 @@ df_splice_ref_z_plot <- df_splice_ref_z %>%
     arrange(desc(ratio)) %>%
     filter(ratio != "NA")
 
+print(head(df_splice_set[c("event","contains_alt_pro","downstream_alt_pro","contains_and_downstream_alt_pro","AltPromoter")]))
+print(head(df_splice_ref_z_plot))
 
+df_splice_ref_z_plot <- merge(df_splice_set[c("event","contains_alt_pro","downstream_alt_pro","contains_and_downstream_alt_pro","AltPromoter")],
+            df_splice_ref_z_plot,by="event")
+
+print(dim(df_splice_ref_z_plot))
+
+print("_________________________________")
+print(head(df_splice_ref_z_plot))
+print(dim(df_splice_ref_z_plot))
+
+# count how many are missing alt pro info 
 
 # ############################
 # # fig 3 zscore scatter plot
@@ -688,6 +699,29 @@ p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_re
 
 ggsave(plot = p_vs_gene, dpi = 400,
     filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
+
+# coloring Alt promoter
+# Splice vs Gene________________________________________________________________
+p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = AltPromoter), data=df_splice_ref_z_plot) + 
+    # scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+    geom_point(size=.85, alpha = .6) +
+    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
+    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+    # geom_text(
+    #           label= df_splice_ref_z[["high_ratio_2"]],
+    #           nudge_x = 0.01, nudge_y = 0.01,
+    #           check_overlap =F, col = "black", size = 3
+    #         ) +
+    theme_classic() +
+    theme(legend.position="right", 
+          legend.title = element_text(size = 6), 
+          legend.text = element_text(size = 8),
+          axis.title.x=element_text(size=12),
+          axis.title.y=element_text(size=12))  
+
+ggsave(plot = p_vs_gene, dpi = 400,
+    filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene_AltProm.png"),  width=20, height= 8, unit="cm")
 
 
 # ############################
