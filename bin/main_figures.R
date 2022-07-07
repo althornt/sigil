@@ -209,105 +209,202 @@ print(head(df_splice_set))
 print(dim(df_splice_set))
 print("~~~~~~~~~~~")
 
-# Set up alt promoter df
-df_alt_events_promoter <- df_alt_events %>%
-    filter(name=="altPromoter") %>%
-    select("chrom","start","end","name","strand")
-
-# Find intersection of splice ref junctions with alt promoters; 
-# if they intersect/overlap it suggests the alt promoter its intersected with 
-# is being skipped
-df_alt_promoter_splice_ref_int <- bed_intersect(df_splice_set, df_alt_events_promoter, 
-         suffix = c(".splice_ref", ".alt_pro"))  %>%
-        as.data.frame() 
-head(df_alt_promoter_splice_ref_int)
-
-
-# Find which junctions within 200 of an alt promoter 
-# but do not overlap with an alt promoter, since thats accounted for in the other value
-df_alt_promoter_splice_ref_closest <- bed_closest(df_splice_set, df_alt_events_promoter, 
-         suffix = c(".splice_ref", ".alt_pro"))  %>%
-        as.data.frame() %>%
-        filter(abs(.dist) <= 200) %>%
-        filter(.overlap == 0) %>%
-        as.data.frame()  
-head(df_alt_promoter_splice_ref_closest, n=20)
-
-# Count promoter interesection per junction 
-df_alt_promoter_splice_ref_int %>%
-    group_by(event.splice_ref, set.splice_ref) %>%
-    count() %>%
-    arrange(desc(n)) %>%
-    as.data.frame()  %>%
-    head(10)
-
-# Count promoter close per junction 
-df_alt_promoter_splice_ref_closest %>%
-    group_by(event.splice_ref, set.splice_ref) %>%
-    count() %>%
-    arrange(desc(n)) %>%
-    as.data.frame()  %>%
-    head(10)
-
-unique_splice_juncs <- unique(df_splice_set$event)
-print(length(unique_splice_juncs))
-unique_splice_juncs_alt_pro_int <- unique(df_alt_promoter_splice_ref_int$event.splice_ref)
-print(length(unique_splice_juncs_alt_pro_int))
-unique_splice_juncs_alt_pro_close <- unique(df_alt_promoter_splice_ref_closest$event.splice_ref)
-print(length(unique_splice_juncs_alt_pro_close))
-
-unique_splice_juncs_alt_pro_either <- union(df_alt_promoter_splice_ref_int$event.splice_ref, 
-                                            df_alt_promoter_splice_ref_closest$event.splice_ref )
-print(length(unique_splice_juncs_alt_pro_either))
-
-
-cat("\n Percent of splice ref junctions that contain an alt promoter: \n")
-cat((length(unique_splice_juncs_alt_pro_int)/length(unique_splice_juncs))*100 )
-cat("\n")
-
-cat("\n Percent of splice ref junctions that are 200 bp downstream of an alt promoter: \n")
-cat((length(unique_splice_juncs_alt_pro_close)/length(unique_splice_juncs))*100 )
-cat("\n")
-
-cat("\n Percent of splice ref junctions that are either: \n")
-cat((length(unique_splice_juncs_alt_pro_either)/length(unique_splice_juncs))*100 )
-cat("\n")
-
-# Add alt promoter info splice set df 
-df_splice_set <- df_splice_set %>%
-    mutate(contains_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_int), 1, 0)) %>%
-    mutate(downstream_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_close), 1, 0)) %>%
-    mutate(both = ifelse(((event %in% unique_splice_juncs_alt_pro_int) & (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) %>%
-    mutate(either = ifelse(((event %in% unique_splice_juncs_alt_pro_int) | (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) 
-
-print(head(df_splice_set))
-
-# Bar plot of mean jucntions intersect alt promoter 
-df_splice_set %>%
-    select(set, either) %>%
-    group_by(set) %>%
-    summarise_at(vars(either), list(alt_mean = mean)) %>%
-    ggplot(aes(x = set, y = alt_mean))  + 
-        geom_bar(stat = 'identity') +
-        theme_classic() +
-        theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
-
-
-ggsave(paste0(fig_output_path,"alt_promoter_count.png"), width=40, height=10, unit="cm", dpi = 300)
-
 # Get number to randomly sample from PS file 
 num_unique_ref_juncs <- length(unique(df_splice_set$event))
 print(length(unique(num_unique_ref_juncs)))
 
-print(head(df_all_PS))
-
+# Randonmly sample from the file with all junctions 
 ls_random_sample <- sample(rownames(df_all_PS), num_unique_ref_juncs, replace=F)
 
 print(head(ls_random_sample))
 print(length(ls_random_sample))
 print(length(unique(ls_random_sample)))
 
+print("#############")
+
+# Format random junctions into bed 
+df_random_juncs <- as.data.frame(ls_random_sample) %>%
+    dplyr::rename(event = ls_random_sample )  %>%
+    rowwise() %>%
+    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1]))  %>%
+    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+    as.data.frame() 
+
+
+print(head(df_random_juncs))
+print(dim(df_random_juncs))
+
+
+# Format all junctions into bed 
+ls_all_juncs <- rownames(df_all_PS)
+print(length(ls_all_juncs))
+ls_all_juncs <- ls_all_juncs[!(ls_all_juncs %in% df_splice_set$event)]
+print(length(ls_all_juncs))
+
+df_all_background_juncs <- as.data.frame(ls_all_juncs) %>%
+    dplyr::rename(event = ls_all_juncs )  %>%
+    rowwise() %>%
+    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1]))  %>%
+    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+    as.data.frame() 
+
+
+print(head(df_all_background_juncs))
+print(dim(df_all_background_juncs))
+
+
+# Set up alt promoter df
+df_alt_events_promoter <- df_alt_events %>%
+    filter(name=="altPromoter") %>%
+    select("chrom","start","end","name","strand")
+
+
+compAltProm <- function(df_bed ){
+
+    # Find intersection of splice ref junctions with alt promoters; 
+    # if they intersect/overlap it suggests the alt promoter its intersected with 
+    # is being skipped
+    df_alt_promoter_splice_ref_int <- bed_intersect(df_bed, df_alt_events_promoter, 
+            suffix = c(".splice_ref", ".alt_pro"))  %>%
+            as.data.frame() 
+    print(head(df_alt_promoter_splice_ref_int))
+
+    # Find which junctions within 200 of an alt promoter 
+    # but do not overlap with an alt promoter, since thats accounted for in the other value
+    df_alt_promoter_splice_ref_closest <- bed_closest(df_bed, df_alt_events_promoter, 
+            suffix = c(".splice_ref", ".alt_pro"))  %>%
+            as.data.frame() %>%
+            filter(abs(.dist) <= 200) %>%
+            filter(.overlap == 0) %>%
+            as.data.frame()  
+    head(df_alt_promoter_splice_ref_closest, n=20)
+
+    # Count results
+    unique_splice_juncs <- unique(df_bed$event)
+    unique_splice_juncs_alt_pro_int <- unique(df_alt_promoter_splice_ref_int$event.splice_ref)
+    unique_splice_juncs_alt_pro_close <- unique(df_alt_promoter_splice_ref_closest$event.splice_ref)
+    unique_splice_juncs_alt_pro_either <- union(df_alt_promoter_splice_ref_int$event.splice_ref, 
+                                                df_alt_promoter_splice_ref_closest$event.splice_ref )
+
+    cat("\n Percent of splice ref junctions that contain an alt promoter: \n")
+    perc_contain_alt <- length(unique_splice_juncs_alt_pro_int)/length(unique_splice_juncs)*100 
+    cat(perc_contain_alt)
+    cat("\n")
+
+    cat("\n Percent of splice ref junctions that are 200 bp downstream of an alt promoter: \n")
+    perc_downstream_alt <- length(unique_splice_juncs_alt_pro_close)/length(unique_splice_juncs)*100
+    cat(perc_downstream_alt )
+    cat("\n")
+
+    cat("\n Percent of splice ref junctions that are either: \n")
+    percent_alt <-length(unique_splice_juncs_alt_pro_either)/length(unique_splice_juncs)*100 
+    cat(percent_alt)
+    cat("\n")
+
+    # Make alt pro calc res into df
+    df_res_perc <- t(data.frame(list("Contains Alt Promoter"=perc_contain_alt,
+                                    "Downstream Alt Promoter"=perc_downstream_alt, 
+                                    "Alt Promoter"=percent_alt )))
+    print(df_res_perc)
+    df_res_counts <- t(data.frame(list("Contains Alt Promoter"= length(unique_splice_juncs_alt_pro_int),
+                                    "Downstream Alt Promoter"=length(unique_splice_juncs_alt_pro_close),
+                                     "Alt Promoter"=length(unique_splice_juncs_alt_pro_either) )))
+    print(df_res_counts)
+    # Add alt promoter info the input df 
+    df_bed <- df_bed %>%
+        mutate(contains_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_int), 1, 0)) %>%
+        mutate(downstream_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_close), 1, 0)) %>%
+        mutate(both = ifelse(((event %in% unique_splice_juncs_alt_pro_int) & (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) %>%
+        mutate(either = ifelse(((event %in% unique_splice_juncs_alt_pro_int) | (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) 
+
+    return(list(df_bed, df_res_perc, df_res_counts))
+
+}
+
+ls_alt_res_splice_sets <- compAltProm(df_splice_set)
+df_splice_set <- ls_alt_res_splice_sets[[1]] 
+head(df_splice_set)
+
+print("~~~~~~~~~~~")
+ls_alt_res_random <- compAltProm(df_random_juncs)
+df_random_juncs <- ls_alt_res_random[[1]]
+head(df_random_juncs)
+
+
+print("~~~~~~~~~~~")
+ls_alt_res_background <- compAltProm(df_all_background_juncs)
+df_all_background <- ls_alt_res_background[[1]]
+head(df_all_background)
+
+# Make plot comparing alt promoter count in splice sets to random junctions
+
+# df_alt_pro_res <- cbind(ls_alt_res_splice_sets[[2]], ls_alt_res_random[[2]], ls_alt_res_background[[2]])
+# colnames(df_alt_pro_res) <- list("splice_ref", "random_sample", "background")
+
+
+# Fishers exact test 
+
+##                      Non-AFE      AFE
+## Splice ref           4.5           4.5
+## Non splice ref       2.5             2.5
+df_alt_pro_res_count <- cbind(ls_alt_res_splice_sets[[3]], ls_alt_res_background[[3]])
+colnames(df_alt_pro_res_count) <- list("splice_ref", "background")
+print(df_alt_pro_res_count)
+
+
+# Building contingency table 
+AltPro_splice_ref <- df_alt_pro_res_count["Alt.Promoter","splice_ref"]
+AltPro_splice_background <- df_alt_pro_res_count["Alt.Promoter","background"]
+
+NotAltPro_splice_ref <- num_unique_ref_juncs - AltPro_splice_ref
+NotAltPro_splice_background <- length(ls_all_juncs) - AltPro_splice_background
+
+print(paste0(AltPro_splice_ref, AltPro_splice_background, NotAltPro_splice_ref, NotAltPro_splice_background, sep= " "))
+
+df_fishers <- data.frame("nonAFE" = c(NotAltPro_splice_ref, NotAltPro_splice_background), 
+                "AFE" = c(AltPro_splice_ref, AltPro_splice_background), 
+                row.names = c("spliceRef", "background"))
+
+
+# Run Fishers test
+print(df_fishers)
+
+res_fishers <- stats::fisher.test(df_fishers)
+print(res_fishers)
+print(res_fishers$p.value)
+
+df_alt_pro_res_perc <- cbind(ls_alt_res_splice_sets[[2]], ls_alt_res_background[[2]])
+colnames(df_alt_pro_res_perc) <- list("splice_ref", "background")
+print(df_alt_pro_res_perc)
+
+
+df_alt_pro_res_perc <- df_alt_pro_res_perc %>% 
+    as.data.frame() %>%
+    rownames_to_column( var= "type")
+print(df_alt_pro_res_perc)
+
+df_alt_pro_res_perc <- pivot_longer(df_alt_pro_res_perc,  values_to = "percent",  names_to = "name",  cols = c("splice_ref", "background")) 
+print(df_alt_pro_res_perc)
+
+# Number of cars in each class:
+df_alt_pro_res_perc %>% 
+    ggplot(aes(x=type, y=percent, fill=name)) +
+    geom_bar(stat = 'identity', position = "dodge") +
+    theme_classic() +
+    scale_fill_manual("name", values=c("#999999", "black"))+
+    theme(legend.title= element_blank(), axis.title.x=element_blank()) +
+    labs(title = paste0("Fishers test p-value = ", signif(res_fishers$p.value, 4)))
+
+ggsave(paste0(fig_output_path,"alt_promoter.png"), width=20, height=10, unit="cm", dpi = 300)
+
+
+
 quit()
+
 
 ##########################################################
 # Fig 2 rGREAT splice ref
