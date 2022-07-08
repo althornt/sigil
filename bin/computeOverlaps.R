@@ -55,11 +55,34 @@ for (row in ls_imsigdb_rows){
 }
 names(ls_imsigdb)<- ls_set_names
 
+ls_sigil_types <- list("gene"=df_gene_set$X,
+                    "splice"=df_splice_set$overlapping,
+                    "IR"=df_IR_set$overlapping)
+
+for (i in names(ls_sigil_types)){
+
+    intx <- length(intersect(
+                        unique(ls_sigil_types[[i]]),
+                        unique(unlist(ls_imsigdb))
+                        ))
+    # print(intx)
+    # print(length(unique(ls_sigil_types[[i]])))
+    cat(paste0("Percent overlap with ImmuneSigDB ",i, "\n"))
+    # print(intx)
+    # print(length(unique(ls_sigil_types[[i]])))
+    print((intx/length(unique(ls_sigil_types[[i]])))*100)
+
+}
+
+
+
 compare_genes_to_imsigdb_sets <-  function(ls_imsigdb, df_sets, tag,col){
     ls_phyper <- list()
 
-    total <- length(union(unique(df_sets$overlapping),
-                    unique(unlist(ls_imsigdb))))
+    total <- length(union(
+                    unique(df_sets$overlapping),
+                    unique(unlist(ls_imsigdb))
+                    ))
 
     df_comb <- crossing(unique(df_sets$set), names(ls_imsigdb)) %>% as.data.frame()               
     names(df_comb) <- list("sigil", "imsigdb")
@@ -124,15 +147,15 @@ compare_genes_to_imsigdb_sets <-  function(ls_imsigdb, df_sets, tag,col){
 }
 
 
-# phyper_splice <- compare_genes_to_imsigdb_sets(ls_imsigdb, df_splice_set, "splice","overlapping")
+phyper_splice <- compare_genes_to_imsigdb_sets(ls_imsigdb, df_splice_set, "splice","overlapping")
 
 phyper_IR <- compare_genes_to_imsigdb_sets(ls_imsigdb, df_IR_set, "IR", "event")
-print(head(phyper_IR$res))
-print(dim(phyper_IR$res))
+# print(head(phyper_IR$res))
+# print(dim(phyper_IR$res))
 
 phyper_gene <- compare_genes_to_imsigdb_sets(ls_imsigdb, df_gene_set, "gene", "X")
-print(head(phyper_gene$res))
-print(dim(phyper_gene$res))
+# print(head(phyper_gene$res))
+# print(dim(phyper_gene$res))
 
 # # Make combined pval cowplot with all 3 types of sets
 # plot_grid(phyper_gene$hist_pval, phyper_splice$hist_pval, phyper_IR$hist_pval, 
@@ -146,145 +169,147 @@ print(dim(phyper_gene$res))
 #         ncol = 1)
 # ggsave(paste0(fig_output_path,"gene_splice_IR_phyper_overlap_imsigdb.png"), width=8, height=20, unit="cm")
 
-# # Combine 3 dfs to make plot showing is set is significant or not
-# phyper_gene$res$type <- "gene"
-# phyper_splice$res$type <- "splice"
-# phyper_IR$res$type <- "IR"
-# df_combined_phyper <- do.call("rbind", list(phyper_gene$res, phyper_splice$res, phyper_IR$res)) %>%
-#     as.data.frame()
+# Combine 3 dfs to make plot showing is set is significant or not
+phyper_gene$res$type <- "gene"
+phyper_splice$res$type <- "splice"
+phyper_IR$res$type <- "IR"
+df_combined_phyper <- do.call("rbind", list(phyper_gene$res, phyper_splice$res, phyper_IR$res)) %>%
+    as.data.frame() %>%
+    group_by(type) %>%
+    count(sig)
 
-# ggplot(df_combined_phyper, aes(x=sig, y= ..count..,fill=type )) + 
-#         geom_bar( position = "dodge") +
-#         theme_classic() +
-#         theme(axis.title.x = element_blank()) +
-#         scale_color_manual(values=c("orange","splice","darkgreen"))
-#         # scale_color_manual(values=c("gene"="orange","splice"="skyblue","IR"="darkgreen"))
+# Bar plot
+imsig <- ggplot(df_combined_phyper, aes(x=sig, y= n,fill=type )) + 
+        geom_bar( stat = "identity", position = "dodge") +
+        theme_classic() +
+        theme(axis.title.x = element_blank(), legend.title=element_blank()) +
+        scale_fill_manual(values=c("gene"="orange","splice"="skyblue","IR"="darkgreen")) +
+        ylab("Number of pairwise set comparisons")
 
-# ggsave(paste0(fig_output_path,"gene_splice_IR_sig_imsigdb.png"), width=15, height=6, unit="cm")
-
-
+ggsave(paste0(fig_output_path,"gene_splice_IR_sig_imsigdb.png"), width=15, height=8, unit="cm", dpi=400)
 
 ####################################################
 # Comparing sets within each sigil set type  
 ##################################################
 
-# compare_sets <-  function(df_sets, tag,total,col){
-#     ls_phyper <- list()
+compare_sets <-  function(df_sets, tag,total,col){
+    ls_phyper <- list()
 
-#     df_comb <- combn(unique(df_sets$set), 2) %>%
-#         t() %>%
-#         as.data.frame()
+    df_comb <- combn(unique(df_sets$set), 2) %>%
+        t() %>%
+        as.data.frame()
 
-#     df_out <- foreach(i = 1:nrow(df_comb),.combine='rbind', .packages=c('magrittr','dplyr','ggplot2'))  %dopar% {
+    df_out <- foreach(i = 1:nrow(df_comb),.combine='rbind', .packages=c('magrittr','dplyr','ggplot2'))  %dopar% {
 
-#         setA <- df_comb[i,"V1"]
-#         setB <- df_comb[i,"V2"]
+        setA <- df_comb[i,"V1"]
+        setB <- df_comb[i,"V2"]
 
-#         # print(paste(setA,setB,sep=" : "))
-#         ls_events_A <- df_sets %>% 
-#             filter(set==setA) %>%
-#             pull(col)
+        # print(paste(setA,setB,sep=" : "))
+        ls_events_A <- df_sets %>% 
+            filter(set==setA) %>%
+            pull(col)
 
-#         #    print(length(ls_events_A))
-#         ls_events_B <- df_sets %>% 
-#             filter(set==setB) %>%
-#             pull(col)
-#         #    print(length(ls_events_B))
+        #    print(length(ls_events_A))
+        ls_events_B <- df_sets %>% 
+            filter(set==setB) %>%
+            pull(col)
+        #    print(length(ls_events_B))
 
-#         overlap <- length(intersect(ls_events_A,ls_events_B))
-#         # print(overlap)
+        overlap <- length(intersect(ls_events_A,ls_events_B))
+        # print(overlap)
 
-#         #Run hypergeometric test to find enrichment
-#         pval <- phyper(
-#                         overlap-1, 
-#                         length(ls_events_B),
-#                         total-length(ls_events_B), 
-#                         length(ls_events_A),
-#                         lower.tail= FALSE
-#                         )
-#         # print(pval)
+        #Run hypergeometric test to find enrichment
+        pval <- phyper(
+                        overlap-1, 
+                        length(ls_events_B),
+                        total-length(ls_events_B), 
+                        length(ls_events_A),
+                        lower.tail= FALSE
+                        )
+        # print(pval)
 
-#         ls_phyper[[paste(setA,setB,sep=" : ")]] <- pval
+        ls_phyper[[paste(setA,setB,sep=" : ")]] <- pval
 
-#         # print(paste(setA,setB,sep=" : "))
+        # print(paste(setA,setB,sep=" : "))
 
-#         if (overlap ==200){print(paste(setA,setB,sep=" : "))}
-#         g <- c(setA,setB,pval,overlap)
-#         }
+        if (overlap ==200){print(paste(setA,setB,sep=" : "))}
+        g <- c(setA,setB,pval,overlap)
+        }
 
-#     colnames(df_out) <- c("setA","setB","pval","overlap")
-#     df_out <- df_out %>% as.data.frame()
-#     df_out$pval = as.numeric(as.character(df_out$pval))
-#     df_out$overlap = as.numeric(as.character(df_out$overlap))
+    colnames(df_out) <- c("setA","setB","pval","overlap")
+    df_out <- df_out %>% as.data.frame()
+    df_out$pval = as.numeric(as.character(df_out$pval))
+    df_out$overlap = as.numeric(as.character(df_out$overlap))
 
-#     df_out<- df_out %>%
-#         mutate(sig = ifelse(pval < .05, "significant overlap", "no significant overlap"))
+    df_out<- df_out %>%
+        mutate(sig = ifelse(pval < .05, "significant overlap", "no significant overlap"))
     
-#     # Make histogram of pvalues
-#     hist_pval <- ggplot(df_out, aes(x=pval)) + 
-#         geom_histogram() +
-#         ggtitle(tag) +
-#         ylim(0, 4000) +
-#         theme_classic() 
-#     # ggsave(paste0(fig_output_path,"phyper_hist_",tag,".png"), width=10, height=5, unit="cm")
+    # Make histogram of pvalues
+    hist_pval <- ggplot(df_out, aes(x=pval)) + 
+        geom_histogram() +
+        ggtitle(tag) +
+        ylim(0, 4000) +
+        theme_classic() 
+    # ggsave(paste0(fig_output_path,"phyper_hist_",tag,".png"), width=10, height=5, unit="cm")
 
-#     # Make histogram of overlap
-#     hist_overlap <- ggplot(df_out, aes(x=overlap)) + 
-#         geom_histogram() +
-#         ggtitle(tag) +
-#         ylim(0, 4000) +
-#         theme_classic() 
+    # Make histogram of overlap
+    hist_overlap <- ggplot(df_out, aes(x=overlap)) + 
+        geom_histogram() +
+        ggtitle(tag) +
+        ylim(0, 4000) +
+        theme_classic() 
 
-#     return(list("res" = df_out, "hist_pval"=hist_pval,"hist_overlap"=hist_overlap ))
-# }
+    return(list("res" = df_out, "hist_pval"=hist_pval,"hist_overlap"=hist_overlap ))
+}
 
-# # Run function to get overlap among sigil sets 
-# phyper_splice <- compare_sets(df_splice_set, "splice", length(unique(df_splice_set$event)), "event")
-# print(head(phyper_splice$res))
-# print(dim(phyper_splice$res))
+# Run function to get overlap among sigil sets 
+phyper_splice <- compare_sets(df_splice_set, "splice", length(unique(df_splice_set$event)), "event")
+print(head(phyper_splice$res))
+print(dim(phyper_splice$res))
 
-# phyper_IR <- compare_sets(df_IR_set, "IR",length(unique(df_IR_set$event)), "event")
-# print(head(phyper_IR$res))
-# print(dim(phyper_IR$res))
+phyper_IR <- compare_sets(df_IR_set, "IR",length(unique(df_IR_set$event)), "event")
+print(head(phyper_IR$res))
+print(dim(phyper_IR$res))
 
-# phyper_gene <- compare_sets(df_gene_set, "gene",length(unique(df_gene_set$X)), "X")
-# print(head(phyper_gene$res))
-# print(dim(phyper_gene$res))
+phyper_gene <- compare_sets(df_gene_set, "gene",length(unique(df_gene_set$X)), "X")
+print(head(phyper_gene$res))
+print(dim(phyper_gene$res))
 
-# # Make combined pval cowplot with all 3 types of sets
-# plot_grid(phyper_gene$hist_pval, phyper_splice$hist_pval, phyper_IR$hist_pval, 
-#         # labels = c('gene','splice', 'IR'),
-#         ncol = 1)
-# ggsave(paste0(fig_output_path,"gene_splice_IR_phyper_hist.png"), width=8, height=20, unit="cm")
+# Make combined pval cowplot with all 3 types of sets
+plot_grid(phyper_gene$hist_pval, phyper_splice$hist_pval, phyper_IR$hist_pval, 
+        # labels = c('gene','splice', 'IR'),
+        ncol = 1)
+ggsave(paste0(fig_output_path,"gene_splice_IR_phyper_hist.png"), width=8, height=20, unit="cm")
 
-# # Make combined overlap cowplot with all 3 types of sets
-# plot_grid(phyper_gene$hist_overlap, phyper_splice$hist_overlap, phyper_IR$hist_overlap, 
-#         # labels = c('gene','splice', 'IR'),
-#         ncol = 1)
-# ggsave(paste0(fig_output_path,"gene_splice_IR_phyper_overlap.png"), width=8, height=20, unit="cm")
+# Make combined overlap cowplot with all 3 types of sets
+plot_grid(phyper_gene$hist_overlap, phyper_splice$hist_overlap, phyper_IR$hist_overlap, 
+        # labels = c('gene','splice', 'IR'),
+        ncol = 1)
+ggsave(paste0(fig_output_path,"gene_splice_IR_phyper_overlap.png"), width=8, height=20, unit="cm")
 
-# # Combine 3 dfs to make plot showing is set is significant or not
-# phyper_gene$res$type <- "gene"
-# phyper_splice$res$type <- "splice"
-# phyper_IR$res$type <- "IR"
-# df_combined_phyper <- do.call("rbind", list(phyper_gene$res, phyper_splice$res, phyper_IR$res)) %>%
-#     as.data.frame()
+# Combine 3 dfs to make plot showing is set is significant or not
+phyper_gene$res$type <- "gene"
+phyper_splice$res$type <- "splice"
+phyper_IR$res$type <- "IR"
+df_combined_phyper <- do.call("rbind", list(phyper_gene$res, phyper_splice$res, phyper_IR$res)) %>%
+    as.data.frame() %>%
+    group_by(type) %>%
+    count(sig)
 
-# ggplot(df_combined_phyper, aes(x=sig, y= ..count..,fill=type )) + 
-#         geom_bar( position = "dodge") +
-#         theme_classic() +
-#         theme(axis.title.x = element_blank()) +
-#         scale_color_manual(values=c("orange","splice","darkgreen"))
-#         # scale_color_manual(values=c("gene"="orange","splice"="skyblue","IR"="darkgreen"))
+# Bar plot
+within <- ggplot(df_combined_phyper, aes(x=sig, y= n,fill=type )) + 
+        geom_bar( stat = "identity", position = "dodge") +
+        theme_classic() +
+        theme(axis.title.x = element_blank(), legend.title=element_blank()) +
+        scale_fill_manual(values=c("gene"="orange","splice"="skyblue","IR"="darkgreen")) +
+        ylab("Number of pairwise set comparisons")
 
-# ggsave(paste0(fig_output_path,"gene_splice_IR_sig.png"), width=15, height=6, unit="cm")
-
-
-
-
-
-
+ggsave(paste0(fig_output_path,"gene_splice_IR_sig.png"), width=15, height=8, unit="cm", dpi=400)
 
 stopCluster(cl)
+
+plot_grid(within, imsig, nrow=1, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"gene_splice_IR_sig_within_and_vs_immsigdb.png"),
+         width=30, height=8, unit="cm", dpi=400)
 
 
