@@ -101,6 +101,68 @@ print(head(df_bam_id))
 df_bam_id$File.Name <- str_remove(df_bam_id$File.Name, ".rna_seq.genomic.gdc_realn.bam")
 print(head(df_bam_id))
 
+# make mesa manifests
+# tumor_samples <- df_bam_id %>%
+#     filter(Sample.Type %in% c("Primary Tumor", "Recurrent Tumor")) %>%
+#     select(File.Name)
+# print(length(tumor_samples))
+# # quit()
+# write.table(x = tumor_samples,row.names = FALSE, quote=FALSE,col.names=FALSE,
+#         file = paste0(paste0(fig_output_path,"manifest_LUAD_tumor.txt")))
+
+# normal_samples <- df_bam_id %>%
+#     filter(Sample.Type == "Solid Tissue Normal") %>%
+#     select(File.Name)
+# print(length(normal_samples))
+
+# write.table(x = normal_samples,row.names = FALSE, quote=FALSE,col.names=FALSE,
+#         file = paste0(paste0(fig_output_path,"manifest_LUAD_normal.txt")))
+
+
+# Read in mesa normal vs tumor results 
+df_mesa_tumor_vs_norm <- read.table(
+        file = "/mnt/tcga/outputs/LUAD_normal_vs_tumor_mesa_comp.txt",
+        sep="\t", header = TRUE) %>%
+    arrange(corrected)
+
+df_mesa_tumor_vs_norm$event <- str_remove(df_mesa_tumor_vs_norm$event, "chr")
+
+df_mesa_tumor_vs_norm_sigil <- df_mesa_tumor_vs_norm %>%
+    filter(event %in% unique(df_splice_set$event))  %>%
+    filter((corrected < .05) & (abs(delta) > .2)) %>%
+    rename(normal_mean = mean1) %>%
+    rename(cancer_mean = mean2) %>%
+    rename(norm_vs_cancer_delta = delta ) %>%
+    rename(norm_vs_cancer_corrected_pval = corrected) %>%
+    column_to_rownames("event") %>%
+    select(normal_mean, cancer_mean,norm_vs_cancer_delta, norm_vs_cancer_corrected_pval ) 
+
+#merge into splice set 
+
+head(df_mesa_tumor_vs_norm_sigil)
+print("luad sigil")
+dim(df_mesa_tumor_vs_norm_sigil)
+
+print("full splice set")
+dim(df_splice_set)
+
+df_splice_set_byevent <- df_splice_set %>%
+    group_by(event) %>%
+    summarise(ls_cells = toString(set)) %>%
+    as.data.frame() %>%
+    column_to_rownames("event") 
+
+print("splcie set by event")
+head(df_splice_set_byevent)
+dim(df_splice_set_byevent)
+
+df_splice_set_byevent <- merge(df_splice_set_byevent, df_mesa_tumor_vs_norm_sigil, by=0, all=FALSE)
+
+print("merge")
+dim(df_splice_set_byevent)
+head(df_splice_set_byevent)
+
+
 # df_LUAD_dcc <- read.table(file = "/mnt/tcga/dcc_sample_data_scrape_all.tsv",
 #                           sep="\t", header = TRUE) %>%
 #                     filter(cases.0.project.project_id == "TCGA-LUAD") 
@@ -109,8 +171,14 @@ df_tcga_clinical <- read.table(file = "/mnt/tcga/luad_tcga_pan_can_atlas_2018_cl
                           filter(Patient.ID %in% df_bam_id$Case.ID)
 
 df_meta <- merge(df_bam_id, df_tcga_clinical, by.x = "Case.ID", by.y = "Patient.ID", all= FALSE) 
-# %>%
-    # tibble::column_to_rownames("File.ID")
+
+print(length(df_bam_id$Case.ID))
+print(length(unique(df_bam_id$Case.ID)))
+
+print(length(unique(df_meta$Case.ID)))
+print(length(df_meta$Case.ID))
+print(head(df_meta$Case.ID))
+
 
 cat("Dim of bam meta")
 print(dim(df_bam_id))
@@ -120,32 +188,34 @@ print(dim(df_tcga_clinical))
 
 cat("Dim merged metadata ")
 dim(df_meta)
-# quit()
 
 cat("Intersection of samples in metadata and PS table")
 print(length(intersect(colnames(df_LUAD_spliceset), df_meta$File.Name)))
-print(length(unique(df_meta$File.Name)))
 
-print(colnames(df_meta))
+cat("Intersection of samples in bam metadata and PS table")
+print(length(intersect(colnames(df_LUAD_spliceset),df_bam_id$File.Name)))
 
+
+df_meta %>%
+    filter(Sample.Type.x == "Solid Tissue Normal") %>%
+    select(c("Sample.Type.x", "Case.ID"))
 
 df_meta <- df_meta %>%
     filter(File.Name %in% colnames(df_LUAD_spliceset)) %>%
     # distinct() %>%
-    select(c("Tumor.Type", "File.Name", "MSI.MANTIS.Score", "Mutation.Count", "Person.Neoplasm.Cancer.Status", "Ragnum.Hypoxia.Score", "Sex", "Sample.Type.x")) %>%
+    select(c("Tumor.Type", "File.Name", "MSI.MANTIS.Score", "Mutation.Count", 
+                "Person.Neoplasm.Cancer.Status", "Ragnum.Hypoxia.Score", 
+                "Sex", "Sample.Type.x")) %>%
     column_to_rownames("File.Name")
-    # %>%
-    # t() %>%
-    # as.data.frame()
 
-# head(df_meta)
-
-# print(length(unique(df_meta["File.Name",])))
-
-# names(df_meta) <- df_meta["File.Name",]
 head(df_meta)
 dim(df_meta)
-# quit()
+df_bam_id <- df_bam_id %>%
+    filter(File.Name %in% colnames(df_LUAD_spliceset)) %>%
+    column_to_rownames("File.Name") %>%
+    arrange(rownames(.))
+head(df_bam_id)
+
 
 # ,"Neoplasm.Disease.Stage.American.Joint.Committee.on.Cancer.Code"
 # Tumor Type
@@ -155,12 +225,63 @@ dim(df_meta)
 # Tissue Source Site	TMB (nonsynonymous)	Patient Smoking History Category
 # Sex
 
-#########################
-# Heatmap
-#########################
+########################
+# Heatmap 1
+##########################
 
+head(df_splice_set_byevent)
+
+df_LUAD_sig_diff_and_sigil <- df_LUAD_spliceset %>%
+    select( intersect(colnames(.),rownames(df_bam_id))) %>%
+    filter(rownames(.) %in% rownames(df_mesa_tumor_vs_norm_sigil))%>%
+    select(sort(names(.)))
+
+
+
+df_LUAD_sig_diff_and_sigil_scaled = t(scale(t(df_LUAD_sig_diff_and_sigil)))
+
+
+ha <- HeatmapAnnotation(
+    df = df_bam_id %>% select("Sample.Type") , 
+    col = list(Sample.Type = c("Primary Tumor" ="green", 
+                            "Solid Tissue Normal"= "orange",
+                             "Recurrent Tumor"="purple"    ))
+)
+
+ht <- ComplexHeatmap::Heatmap(df_LUAD_sig_diff_and_sigil_scaled,
+                # cluster_columns = FALSE,
+                                # row_title = "UP", row_title_rot = 0,
+                                # column_order =order(colnames(df_enr_median_heat_UP)),
+                                # row_order = order(rownames(df_enr_median_heat_UP)), 
+                                show_row_names= FALSE,
+                                show_column_names = FALSE,
+                                # row_names_gp = grid::gpar(fontsize =8),
+                                # column_names_gp = grid::gpar(fontsize =7),
+                                # show_heatmap_legend = FALSE
+                                top_annotation=ha,
+                                show_row_dend = FALSE,
+                                # heatmap_legend_param = list(
+                                # legend_direction = "horizontal", 
+                                # legend_height = unit(1, "cm"),
+                                # legend_gp = gpar(fontsize = 5)
+                                )
+# combined gene and splice heatmaps
+png(file=paste0(fig_output_path,"LUAD_sig_diff_spliceset_heatmap.png"),
+    width = 50,
+    height    = 20,
+    units     = "cm",
+    res       = 1200)
+
+draw(ht)
+dev.off()
+
+quit()
+########################
+# Heatmap 2
+##########################
 df_LUAD_spliceset_clean <- df_LUAD_spliceset[which(rowMeans(!is.na(df_LUAD_spliceset)) > 0.5), ] %>%
     select(rownames(df_meta))
+print(dim(df_LUAD_spliceset_clean))
 
 # Drop rows with low variance
 print(dim(df_LUAD_spliceset_clean))
@@ -176,7 +297,9 @@ df_LUAD_spliceset_clean_scaled = t(scale(t(df_LUAD_spliceset_clean_highVar)))
 
 ha <- HeatmapAnnotation(
     df = df_meta %>% select("Sample.Type.x"), 
-    col = list(Sample.Type.x = c("Primary Tumor" ="green", "Solid Tissue Normal"= "orange", "Recurrent Tumor"="purple"    ))
+    col = list(Sample.Type.x = c("Primary Tumor" ="green", 
+                            "Solid Tissue Normal"= "orange",
+                             "Recurrent Tumor"="purple"    ))
 )
 
 ht <- ComplexHeatmap::Heatmap(df_LUAD_spliceset_clean_scaled,
@@ -212,13 +335,73 @@ dev.off()
 #########################
 
 
+df_LUAD_spliceset_clean <- df_LUAD_spliceset[which(rowMeans(!is.na(df_LUAD_spliceset)) > 0.5), ]  %>%
+    select(intersect(colnames(df_LUAD_spliceset),rownames(df_bam_id))) %>%
+    mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x))
+
+
+
+print(dim(df_LUAD_spliceset_clean))
+# quit()
+df_bam_id <- df_bam_id %>%
+    filter(rownames(.) %in% colnames(df_LUAD_spliceset_clean))
+print(dim(df_bam_id))
+
+# Only keep events over .75 variance cut off
+# var <- apply(df_LUAD_spliceset_clean[, -1], 1, var)
+var <- apply(df_LUAD_spliceset_clean, 1, var,  na.rm=T)
+
+head(var)
+
+param <- quantile(var, c(.75), na.rm=T)
+df_LUAD_spliceset_clean_filt <- df_LUAD_spliceset_clean[var > param & !is.na(var), ]
+
+# Transpose and format
+df_LUAD_spliceset_clean_filt_t <- as.data.frame(t(df_LUAD_spliceset_clean_filt))
+rownames(df_LUAD_spliceset_clean_filt_t) <- colnames(df_LUAD_spliceset_clean)
+
+
+# Make color palette
+n <- length(unique(df_bam_id[["Sample.Type"]]))
+qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+print(dim(df_LUAD_spliceset_clean_filt_t))
+
+# run PCA
+prcomp.out = as.data.frame(prcomp(na.omit(df_LUAD_spliceset_clean_filt_t), center=T,  scale = T)$x)
+print(dim(prcomp.out ))
+
+# Merge PCA results with metadata
+df_PCA <- data.frame(x = prcomp.out[,1],  y = prcomp.out[,2])
+rownames(df_PCA) <- rownames(df_LUAD_spliceset_clean_filt_t)
+pca.out.merge = cbind(df_PCA, df_bam_id)
+print(dim(pca.out.merge ))
+
+# Plot PCA all s
+plt <- ggplot(pca.out.merge, aes(x, y, color = Sample.Type)) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="top",legend.title = element_blank()) +
+    scale_color_manual(values=pal) +
+    labs(title= "", sep = ' ')
+
+# Save plot
+ggsave(file.path(fig_output_path,
+                paste("PCA.png", sep = '.')),
+        device = "png",
+        width = 5, height = 4,
+        dpi = 300)
+
+#########################
+
 make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
 
   set.seed(123)
 
   # Make color palette
-  n <- length(unique(df_meta[[meta_col]]))
-  print(unique(df_meta[[meta_col]]))
+  n <- length(unique(df_bam_id[[meta_col]]))
+  print(unique(df_bam_id[[meta_col]]))
   qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
   pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
@@ -228,7 +411,7 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
   umap.out$Run <- rownames(df_PCA)
 
   # Merge UMAP results with metadata
-  umap.out.merge = cbind(umap.out, df_meta)
+  umap.out.merge = cbind(umap.out, df_bam_id)
 
   # Plot UMAP
   plt <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col))) +
@@ -247,55 +430,16 @@ make_umap <- function(num_neighbor,meta_col,df_PCA,out_path) {
          dpi = 300)
 }
 
-
-# Only keep events over .75 variance cut off
-var <- apply(df_LUAD_spliceset_clean[, -1], 1, var)
-param <- quantile(var, c(.75), na.rm=T)
-df_LUAD_spliceset_clean_filt <- df_LUAD_spliceset_clean[var > param & !is.na(var), ]
-
-# Transpose and format
-df_LUAD_spliceset_clean_filt_t <- as.data.frame(t(df_LUAD_spliceset_clean_filt))
-rownames(df_LUAD_spliceset_clean_filt_t) <- colnames(df_LUAD_spliceset_clean)
-
-
-# Make color palette
-n <- length(unique(df_meta[["Sample.Type.x"]]))
-qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
-pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
-
-# PCA
-prcomp.out = as.data.frame(prcomp(na.omit(df_LUAD_spliceset_clean_filt_t), center=T,  scale = T)$x)
-
-# Merge PCA results with metadata
-df_PCA <- data.frame(x = prcomp.out[,1],  y = prcomp.out[,2])
-pca.out.merge = cbind(df_PCA, df_meta)
-
-# Plot PCA
-plt <- ggplot(pca.out.merge, aes(x, y, color = Sample.Type.x)) +
-    geom_point(size = 2) +
-    theme_classic() +
-    theme(legend.position="bottom",legend.title = element_blank()) +
-    scale_color_manual(values=pal) +
-    labs(title= "", sep = ' ')
-
-# Save plot
-ggsave(file.path(fig_output_path,
-                paste("PCA.png", sep = '.')),
-        device = "png",
-        width = 5, height = 4,
-        dpi = 300)
-
-
-# Plot UMAPS from PCA
-# Making variations of UMAPs with different numbers of neighbors
-# lapply(c(3,5,10, 20), make_umap, meta_col="Tumor.Type",
+# # Plot UMAPS from PCA
+# # Making variations of UMAPs with different numbers of neighbors
+# # lapply(c(3,5,10, 20), make_umap, meta_col="Tumor.Type",
+# #     df_PCA = prcomp.out, out_path = paste0("PCA.UMAP"))
+# # lapply(c(3,5,10, 20), make_umap, meta_col="Person.Neoplasm.Cancer.Status",
+# #     df_PCA = prcomp.out, out_path = paste0("PCA.UMAP"))
+# # lapply(c(5, 20), make_umap, meta_col="Sex",
+# #     df_PCA = prcomp.out, out_path = paste0("PCA.UMAP"))
+# lapply(c(3,5,10, 20), make_umap, meta_col="Sample.Type.x",
 #     df_PCA = prcomp.out, out_path = paste0("PCA.UMAP"))
-# lapply(c(3,5,10, 20), make_umap, meta_col="Person.Neoplasm.Cancer.Status",
-#     df_PCA = prcomp.out, out_path = paste0("PCA.UMAP"))
-# lapply(c(5, 20), make_umap, meta_col="Sex",
-#     df_PCA = prcomp.out, out_path = paste0("PCA.UMAP"))
-lapply(c(3,5,10, 20), make_umap, meta_col="Sample.Type.x",
-    df_PCA = prcomp.out, out_path = paste0("PCA.UMAP"))
 
 
 # Plot UMAPS from df
@@ -306,5 +450,5 @@ lapply(c(3,5,10, 20), make_umap, meta_col="Sample.Type.x",
 #     df_PCA = df_LUAD_spliceset_clean_filt_t, out_path = paste0("UMAP"))
 # lapply(c(5, 20), make_umap, meta_col="Sex",
 #     df_PCA = df_LUAD_spliceset_clean_filt_t, out_path = paste0("UMAP"))
-lapply(c(3,5,10, 20), make_umap, meta_col="Sample.Type.x",
+lapply(c(3,5,10, 20), make_umap, meta_col="Sample.Type",
     df_PCA = df_LUAD_spliceset_clean_filt_t, out_path = paste0("UMAP"))
