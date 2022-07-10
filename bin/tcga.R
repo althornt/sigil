@@ -170,7 +170,7 @@ df_tcga_clinical <- read.table(file = "/mnt/tcga/luad_tcga_pan_can_atlas_2018_cl
                           sep="\t", header = TRUE) %>%
                           filter(Patient.ID %in% df_bam_id$Case.ID)
 
-df_meta <- merge(df_bam_id, df_tcga_clinical, by.x = "Case.ID", by.y = "Patient.ID", all= FALSE) 
+df_meta <- merge(df_bam_id, df_tcga_clinical, by.x = "Case.ID", by.y = "Patient.ID",sort=FALSE, all= TRUE) 
 
 print(length(df_bam_id$Case.ID))
 print(length(unique(df_bam_id$Case.ID)))
@@ -178,8 +178,7 @@ print(length(unique(df_bam_id$Case.ID)))
 print(length(unique(df_meta$Case.ID)))
 print(length(df_meta$Case.ID))
 print(head(df_meta$Case.ID))
-
-
+# quit()
 cat("Dim of bam meta")
 print(dim(df_bam_id))
 
@@ -194,7 +193,6 @@ print(length(intersect(colnames(df_LUAD_spliceset), df_meta$File.Name)))
 
 cat("Intersection of samples in bam metadata and PS table")
 print(length(intersect(colnames(df_LUAD_spliceset),df_bam_id$File.Name)))
-
 
 df_meta %>%
     filter(Sample.Type.x == "Solid Tissue Normal") %>%
@@ -227,7 +225,7 @@ head(df_bam_id)
 
 ########################
 # Heatmap 1
-##########################
+########################
 
 head(df_splice_set_byevent)
 
@@ -275,7 +273,70 @@ png(file=paste0(fig_output_path,"LUAD_sig_diff_spliceset_heatmap.png"),
 draw(ht)
 dev.off()
 
+
+
+#################
+# PCA
+##################
+
+# Remove columns/sampels with no variance
+# df_LUAD_spliceset <- df_LUAD_spliceset[, sapply(df_LUAD_spliceset, var) != 0]
+# df_LUAD_sig_diff_and_sigil_pca <- df_LUAD_sig_diff_and_sigil[apply(df_LUAD_sig_diff_and_sigil, 1, var, na.rm = TRUE) != 0, ]
+
+df_LUAD_sig_diff_and_sigil_clean <- df_LUAD_sig_diff_and_sigil[which(rowMeans(!is.na(df_LUAD_sig_diff_and_sigil)) > 0.5), ]  %>%
+    select(intersect(colnames(df_LUAD_sig_diff_and_sigil),rownames(df_bam_id))) %>%
+    mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x))
+
+
+
+# print(head(apply(df_LUAD_sig_diff_and_sigil, 1, var, na.rm = TRUE)))
+# quit()
+# print(head(apply(df_LUAD_sig_diff_and_sigil_pca, 1, var, na.rm = FALSE)))
+
+print(dim(df_LUAD_sig_diff_and_sigil))
+print(min(df_LUAD_sig_diff_and_sigil))
+print(max(df_LUAD_sig_diff_and_sigil))
+
+# print(dim(df_LUAD_sig_diff_and_sigil_pca))
+# sapply( is.finite( df_LUAD_sig_diff_and_sigil ) )
+
+
+prcomp.out <- prcomp(as.data.frame(t(df_LUAD_sig_diff_and_sigil_clean)),
+                   center = TRUE,
+                   scale. = TRUE)$x
+  
+print(head(prcomp.out ))
+print(dim(prcomp.out ))
+
+
+
+# Merge PCA results with metadata
+df_PCA <- data.frame(x = prcomp.out[,1],  y = prcomp.out[,2])
+rownames(df_PCA) <- colnames(df_LUAD_sig_diff_and_sigil_clean)
+pca.out.merge = cbind(df_PCA, df_bam_id)
+print(dim(pca.out.merge ))
+
+# # Make color palette
+# n <- length(unique(df_bam_id[["Sample.Type"]]))
+# qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+# pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+# Plot PCA all s
+plt <- ggplot(pca.out.merge, aes(x, y, color = Sample.Type)) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="top",legend.title = element_blank()) +
+    # scale_color_manual(values=pal) +
+    labs(title= "", sep = ' ')
+
+# Save plot
+ggsave(file.path(fig_output_path,
+                paste("PCA.png", sep = '.')),
+        device = "png",
+        width = 5, height = 4,
+        dpi = 300)
 quit()
+
 ########################
 # Heatmap 2
 ##########################
