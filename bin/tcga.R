@@ -129,9 +129,10 @@ df_mesa_tumor_vs_norm <- read.table(
 
 df_mesa_tumor_vs_norm$event <- str_remove(df_mesa_tumor_vs_norm$event, "chr")
 
+# Rename the tcga associated columns
 df_mesa_tumor_vs_norm_sigil <- df_mesa_tumor_vs_norm %>%
     filter(event %in% unique(df_splice_set$event))  %>%
-    filter((corrected < .01) & (abs(delta) > .2)) %>%
+    filter((corrected < .05) & (abs(delta) > .1)) %>%
     rename(normal_mean = mean1) %>%
     rename(cancer_mean = mean2) %>%
     rename(norm_vs_cancer_delta = delta ) %>%
@@ -141,44 +142,47 @@ df_mesa_tumor_vs_norm_sigil <- df_mesa_tumor_vs_norm %>%
 
 print(dim(df_mesa_tumor_vs_norm_sigil))
 
-#merge into splice set 
+# Merge tcga info into splice set
+df_splice_set <- merge(df_splice_set, df_mesa_tumor_vs_norm_sigil, by.x = "event", by.y = 0,sort=FALSE, all= TRUE) 
+df_splice_set <- df_splice_set %>%
+    mutate(delta_match= ifelse(sign(delta) == sign(norm_vs_cancer_delta), "match", "no_match" )) 
 
-head(df_mesa_tumor_vs_norm_sigil)
-print("luad sigil")
-dim(df_mesa_tumor_vs_norm_sigil)
-
-print("full splice set")
-dim(df_splice_set)
-
+# Make df with row per event listing sets 
 df_splice_set_byevent <- df_splice_set %>%
     group_by(event) %>%
-    summarise(ls_cells = toString(set)) %>%
+    summarise(ls_sets = toString(set)) %>%
     as.data.frame() %>%
     column_to_rownames("event") 
 
 print("splcie set by event")
-head(df_splice_set_byevent)
 dim(df_splice_set_byevent)
 
+# Merge tcga and splice set 
 df_splice_set_byevent <- merge(df_splice_set_byevent, df_mesa_tumor_vs_norm_sigil, by=0, all=FALSE)
+print(dim(df_splice_set_byevent))
+
 df_splice_set_byevent <- merge(df_splice_set_byevent, df_splice_set, by=0, all=FALSE)
 
 print("merge")
 dim(df_splice_set_byevent)
 head(df_splice_set_byevent)
 
+cat("Number of events: \n")
 print(length(unique(df_splice_set_byevent$event)))
+cat("Number of genes: \n")
 print(length(unique(df_splice_set_byevent$overlapping)))
 
 # for (i in sort(unique(df_splice_set_byevent$overlapping))){
 #     cat("\n")
 #     cat( i )
-
-
 # }
-df_splice_set_byevent
-# quit()
 
+unique(colnames(df_splice_set_byevent))
+
+
+###########################
+# Merging metadata 
+###############################
 # df_LUAD_dcc <- read.table(file = "/mnt/tcga/dcc_sample_data_scrape_all.tsv",
 #                           sep="\t", header = TRUE) %>%
 #                     filter(cases.0.project.project_id == "TCGA-LUAD") 
@@ -245,6 +249,57 @@ head(df_meta)
 # Person Neoplasm Status
 # Tissue Source Site	TMB (nonsynonymous)	Patient Smoking History Category
 # Sex
+
+
+################################################
+# Counts matching sign of delta 
+################################################
+total_potential <- df_splice_set %>% 
+    filter(!is.na(norm_vs_cancer_delta)) %>%
+    nrow()
+
+cat("\n number of potential LUAD junction set matches: \n")
+cat(total_potential, "\n")
+
+matches <- df_splice_set    %>%
+    filter(delta_match == "match") %>%
+    select(event, delta_match, set) %>%
+    arrange(set)
+    # select( norm_vs_cancer_delta, delta)
+
+cat("\n number of LUAD junction set matches with same delta: \n")
+cat(nrow(matches), "\n")
+
+
+cat("\n percent of LUAD junction set matches with same delta: \n")
+cat(100*(nrow(matches)/total_potential), "\n")
+
+
+cat("\n count unique junctions that match a set delta: \n")
+cat(length(unique(matches$event)), "\n")
+
+################################################
+# Counts of sets in the sigil LUAD junctions 
+################################################
+
+head(df_splice_set)
+
+df_set_cnt <- df_splice_set %>%
+    filter(event %in% rownames(df_mesa_tumor_vs_norm_sigil)) %>%
+    count(set) %>%
+    arrange(desc(n))
+
+print(head(df_set_cnt, n=20))
+print(dim(df_set_cnt))
+
+# print(head(table(df_set_cnt)))
+
+
+# ggplot(as.data.frame(tbl), aes(factor(Depth), Freq, fill = Species)) +     
+#   geom_col(position = 'dodge')
+
+#     ggplot(yes, aes(x=key, y=value)) + 
+#   geom_bar(stat="identity")
 
 ################################################
 # Heatmap sigil set
@@ -360,19 +415,20 @@ ggsave(file.path(fig_output_path,
         width = 5, height = 4,
         dpi = 300)
 
-##################################################################################################################
+############################################################################
 ################################################
-# Heatmap tumor vs normal + sigil set
+# Heatmap tumor vs normal + sigil set + matched delta
 ################################################
 df_LUAD_sig_diff_and_sigil <- df_LUAD_spliceset %>%
     select( intersect(colnames(.),rownames(df_meta))) %>%
-    filter(rownames(.) %in% rownames(df_mesa_tumor_vs_norm_sigil))%>%
-    select(sort(names(.)))
+    # filter(rownames(.) %in% rownames(df_mesa_tumor_vs_norm_sigil))%>%
+    filter(rownames(.) %in% matches$event)%>%
+    select(sort(names(.))) 
 
 df_LUAD_sig_diff_and_sigil_scaled = t(scale(t(df_LUAD_sig_diff_and_sigil)))
 
 ha <- HeatmapAnnotation(
-    df = df_meta %>% select(c("LUAD.Sample.Type")) , 
+    df = df_meta %>% select(c("LUAD.Sample.Type")), 
     col = list(LUAD.Sample.Type = c("Primary Tumor" ="#F8766D", 
                             "Solid Tissue Normal"= "#619CFF",
                              "Recurrent Tumor"="#00BA38"    )
@@ -405,9 +461,8 @@ ht <- ComplexHeatmap::Heatmap(df_LUAD_sig_diff_and_sigil_scaled,
                                 # show_row_dend = TRUE,
                                 heatmap_legend_param = list(
                                 # legend_direction = "horizontal", 
-                                legend_height = unit(2, "cm"),
-                                # legend_gp = gpar(fontsize = 5), 
-                                legend_gp = gpar(fontsize = 14)
+                                legend_height = unit(10, "cm"),
+                                legend_gp = gpar(fontsize = 20)
                                 ))
 # combined gene and splice heatmaps
 png(file=paste0(fig_output_path,"LUAD_sig_diff_sigil_heatmap_scaled.png"),
