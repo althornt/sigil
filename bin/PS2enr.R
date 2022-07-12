@@ -34,7 +34,7 @@ opt <- optparse::parse_args(opt_parser)
 
 # Read in all MESA PS 
 df_all_PS <- read.table(file = opt$inputPS, stringsAsFactors=FALSE,
-                          sep="\t", header = TRUE, row.names=1) 
+                          sep="\t", header = TRUE, row.names=1, check.names=FALSE) 
 # print(head(df_all_PS))
 print(dim(df_all_PS))
 
