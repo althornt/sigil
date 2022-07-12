@@ -4,6 +4,7 @@ library(dplyr)
 library(pheatmap)
 library(purrr)
 library(tidyr)
+library(stringr)
 
 # Arguments
 option_list <- list(
@@ -16,6 +17,13 @@ option_list <- list(
   optparse::make_option(
     c("-o", "--outputPS"),
     type = "character",
+    default = NULL,
+    help = "full path to put outputs"), 
+
+  optparse::make_option(
+    c("-c", "--removeChr"),
+    type = "character",
+    action = "store_true",
     default = NULL,
     help = "full path to put outputs")
   )
@@ -39,6 +47,12 @@ df_all_PS <- as.data.frame(df_all_PS *100)
 df_all_PS <- as.data.frame(log2(df_all_PS +1))
 # print(head(df_all_PS))
 print(dim(df_all_PS))
+
+if (opt$removeChr){
+  #reformat events/rownames to drop "chr"
+  rownames(df_all_PS) <- stringr::str_remove(rownames(df_all_PS) , "chr")
+}
+
 
 # Write output
 write.table(
