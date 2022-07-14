@@ -40,11 +40,27 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
   #   dir.create(paste0(plot_out_dir,label_type),
   #    recursive = TRUE, showWarnings = TRUE)
   # }
+  ls_chr_keep <- list(
+    "chr1",          "chr10",         "chr11",         "chr12",
+    "chr13",         "chr14",         "chr15",         "chr16",
+    "chr17",         "chr18",         "chr19",         "chr2", 
+    "chr20",         "chr21",         "chr22",         "chr3",
+    "chr4",          "chr5",          "chr6",          "chr7",
+    "chr8",          "chr9",           "chrX",         "chrY")
 
   # Open mesa css
   df_css <- read.table(
             file = paste0(css_dir, filename),
-            sep="\t", header = TRUE)
+            sep="\t", header = TRUE, stringsAsFactors = FALSE)
+
+  df_css <- df_css %>%
+    rowwise() %>%
+      mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
+      mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+      mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+      mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+      filter(chrom %in% ls_chr_keep) %>%
+      as.data.frame() 
 
   # # Make volcano plot before filtering
   # volcano(df_css, paste0(plot_out_dir,"volcanos/"),
@@ -62,6 +78,7 @@ import_mesa_css <- function(filename, topN, plot_out_dir, css_dir, meta_col, com
 
   print("all")
   print(df_css %>% dplyr::arrange(p.value) %>% head(20))
+
 
   # Get top negative delta events
   top_sig_by_pval_negdelta <- df_css %>%
