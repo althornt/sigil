@@ -1,23 +1,22 @@
 #!/usr/bin/env Rscript
 library(optparse)
 library(magrittr)
-library(pheatmap)
 library(ggplot2)
 library(tidyverse)
 library(tidyr)
 library(dplyr)
 library(RColorBrewer)
 library(uwot)
-library(magrittr)
 library(purrr)
-library(tidyr)
 library(ComplexHeatmap)
 library(UpSetR)
 library(cowplot)
-# library(enrichR)
-# library(GenomicRanges)
+library(enrichR)
+library(GenomicRanges)
 library(valr)
 library(rGREAT)
+library(ggpubr)
+library(ggrepel)
 
 sigil_out_path = "/mnt/results_sigil_combine/sigil_results_SongChoi_newlabels_20220614/"
 fig_output_path = "/mnt/figures/"
@@ -86,65 +85,191 @@ print(head(df_alt_events))
 
 # print(metadata_summary)
 
-# ggplot(df_metadata, aes(x=group_label, fill=data_source)) +
+# group <- ggplot(df_metadata, aes(x=group_label, fill=data_source)) +
 #   geom_bar(position="stack") +
 #   theme_classic() +
-#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-#   theme(legend.position="None",    axis.title.x = element_blank()) +
-#   scale_fill_manual(values=c("#999999", "black")) 
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+#           axis.title.y = element_text(size=8),
+#           legend.position="None", 
+#             axis.title.x = element_blank()) +
+#   scale_fill_manual(values=c("#999999", "black")) +
+#     ylab("Number of samples")
 
-# ggsave(paste0(fig_output_path,"metadata_bar_group.png"), width=10, height=5, unit="cm")
+# ggsave(paste0(fig_output_path,"metadata_bar_group.png"), width=10, height=5.5, unit="cm")
 
 # ggplot(df_metadata, aes(x=main_label, fill=data_source)) +
 #   geom_bar(position="stack") +
 #   theme_classic() +
-#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-#     theme(legend.position="None",    axis.title.x = element_blank()) +
-#     scale_fill_manual(values=c("#999999", "black"))
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+#     legend.position="None",
+#     axis.title.x = element_blank()) +
+#     scale_fill_manual(values=c("#999999", "black"))+
+#     scale_y_continuous(breaks= scales::pretty_breaks())
 
-# ggsave(paste0(fig_output_path,"metadata_bar_main.png"), width=10, height=10, unit="cm")
+# ggsave(paste0(fig_output_path,"metadata_bar_main.png"), width=10, height=15, unit="cm")
 
-# ggplot(df_metadata, aes(x=main_label, fill=data_source)) +
+# main<-ggplot(df_metadata, aes(x=main_label, fill=data_source)) +
 #   geom_bar(position="stack") +
 #   theme_classic() +
-#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
-#     theme(legend.position="top",    axis.title.x = element_blank()) +
-#     scale_fill_manual("data source", values=c("#999999", "black"))
+#   theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+#         axis.title.y = element_text(size=8),
+#             legend.position="top",   
+#             axis.title.x = element_blank(),
+#             legend.title=element_text(size=8),
+#             legend.text=element_text(size=8))+
+#             # legend.box="vertical", 
+#             # legend.margin=margin())+
+#     # guides(color = guide_legend(override.aes = list(size=1)))+
+#     scale_fill_manual("data source", values=c("#999999", "black"))+
+#     scale_y_continuous(breaks= scales::pretty_breaks()) +
+#     ylab("Number of samples")
 
-# ggsave(paste0(fig_output_path,"metadata_bar_main_legend.png"), width=10, height=10, unit="cm")
+# ggsave(paste0(fig_output_path,"metadata_bar_main_legend.png"), width=10, height=15, unit="cm")
 
-# ###########################################
-# # Fig1D UpSet plot comparing type of sets
-# ############################################
+# # ggpubr::ggarrange(main, group, # list of plots
+# #                 #   labels = "AUTO", # labels
+# #                   common.legend = T, # COMMON LEGEND
+# #                   legend = "top", # legend position
+# #                   align = "hv", # Align them both, horizontal and vertical
+# #                   nrow = 2)  # number of rows
 
-# Read in gene reference matrix 
-df_gene_ref <- read.csv(file= paste0(sigil_out_path,"/combine_gene_out/ref_matrix/combined_main_group_withingroup_combinedRefMat.tsv"),
-                         sep = "\t",header=TRUE) 
+# pg <- plot_grid(main, group, nrow=2, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"metadata_bar_combined.png"), width=10, height=20, unit="cm")
+# #############################
+# # Fig 2A comparing sets 
+# ################################
+
+# Get union of sets in both to iterate through 
+ls_all_sets <- union(df_splice_set$set, df_gene_set$set)
+# print(length(ls_all_sets))
+
+# Get intersection of spliced genes and genes
+gene_intersection <- intersect(unique(df_splice_set$overlapping), unique(df_gene_set$X))
+# print(gene_intersection)
+
+cat("\n Number of common genes in gene and splice sets: \n")
+print(length(gene_intersection))
+
+cat("\n Number of unique genes in splice set: \n")
+print(length(unique(df_splice_set$overlapping)))
+
+cat("\n Number of unique junctions in splice set: \n")
+print(length(unique(df_splice_set$event)))
+
+cat("\n Number of unique genes in gene set: \n")
+print(length(unique(df_gene_set$X)))
+cat("\n")
+
+# ###############################
+# # Fig 2A Compare on set level 
+# ###############################
+df_counts <- data.frame(matrix(ncol = 3, nrow = length(ls_all_sets)))
+rownames(df_counts) <- ls_all_sets
+colnames(df_counts) <- list("Gene", "Splice","IR")
+
+for (s in ls_all_sets){
+  print(s)
+
+  # Counting 
+  df_splice <- df_splice_set %>% 
+    filter(set == s) 
+  df_IR <- df_IR_set %>% 
+    filter(set == s) 
+  df_gene <- df_gene_set %>% 
+    filter(set == s) 
+  df_counts[s, "Splice"] <- nrow(df_splice)
+  df_counts[s, "Gene"] <- nrow(df_gene)
+  df_counts[s, "IR"] <- nrow(df_IR)
+
+  # Comparing 
+#   gene_intersection <- intersect(df_splice$overlapping, df_gene$X)
+#   print(length(gene_intersection))
+#   df_counts[s, "gene and splice"] <- length(gene_intersection)
+}
+
+print(head(df_counts))
+
+#     cell_type_ <- sub("_", " ", cell_type)
+
+
+df_counts %>% 
+    rownames_to_column("set") %>%
+    rowwise() %>%
+  pivot_longer(!set, names_to = "variable", values_to = "value") %>%
+  mutate(setlabel = "") %>%
+  mutate(setlabel = ifelse(((value < 100)&(variable=="Gene")), set, setlabel)) %>%
+  # mutate(setlabel = sub("_", " ", setlabel)) %>%
+  # mutate(setlabel = sub("_", " ", setlabel)) %>% #needed 3
+  ggplot(aes(x = fct_inorder(variable), y = value, color = variable)) +
+    geom_jitter(alpha = 0.5, size = 1.5) +
+    theme_classic() +
+    theme(legend.position = "none", axis.text.x = element_text(size=10), axis.title.y = element_text(size=12), axis.text.y = element_text(size=10)) +
+    labs(x = "", y = "Marker count per set") +
+    scale_color_manual(values=c("Gene"="orange","Splice"="skyblue","IR"="darkgreen"))
+    # +
+#     coord_cartesian(clip = "off")+
+#     geom_text_repel(aes(label = setlabel), size = 3.5,
+#         xlim = c(NA, Inf), ylim = c(NA, Inf),
+#         # min.segment.length = 0, 
+#       force        = 2,
+#     # # nudge_x      = 2,
+#     # direction    = "x",
+#     hjust        = 1, segment.square = FALSE, 
+#     # segment.size = 0.2,
+#     # box.padding = 0.3
+#   )+
+#   scale_x_discrete(
+#   # breaks = 1:2, labels = c("Gene", "Splice", "Intron Retention"),
+#   expand = expansion(mult = 1)
+# )
+#     # # Repel away from the left edge, not from the right.
+#     # xlim = c(NA, Inf),
+#     # # Do not repel from top or bottom edges.
+#     # ylim = c(-Inf, Inf), fill = "white") +
+
+ggsave(paste0(fig_output_path, "count_per_set_plot.png"), width=6, height=8, dpi=300, units=c("cm"))
+
+# # df_counts %>% 
+# #   tibble::rownames_to_column("set") %>%
+# #   arrange(desc(splice))
+
+# df_counts %>% 
+#   tibble::rownames_to_column("set") %>%
+#   filter(Gene < 100) %>%
+#   arrange(desc(Gene))
+
+# #######################################################
+# # Fig2B UpSet plot comparing type of sets gene usage
+# ######################################################
+
+# # Read in gene reference matrix 
+# df_gene_ref <- read.csv(file= paste0(sigil_out_path,"/combine_gene_out/ref_matrix/combined_main_group_withingroup_combinedRefMat.tsv"),
+#                          sep = "\t",header=TRUE) 
                          
-                        #  %>%
-            #   rename(gene = X)
+#                         #  %>%
+#             #   rename(gene = X)
 
-# Read in splice reference matrix 
-df_splice_ref <- read.csv(file= paste0(
-                               sigil_out_path,
-                                "/combine_mesa_out/ref_matrix_PS/combined_main_group_withingroup_combinedRefMat.tsv"),
-                          sep = "\t",header=TRUE) 
+# # Read in splice reference matrix 
+# df_splice_ref <- read.csv(file= paste0(
+#                                sigil_out_path,
+#                                 "/combine_mesa_out/ref_matrix_PS/combined_main_group_withingroup_combinedRefMat.tsv"),
+#                           sep = "\t",header=TRUE) 
 
-print(head(df_splice_ref))
-print(dim(df_splice_ref))
+# print(head(df_splice_ref))
+# print(dim(df_splice_ref))
 
-# Read in MESA intron retention reference matrix
-df_IR_ref <- read.csv(file= paste0(
-                                sigil_out_path,
-                                "/combine_mesa_out/ref_matrix_IR/combined_main_group_withingroup_combinedRefMat.tsv"),
-                          sep = "\t",header=TRUE) 
-print(head(df_IR_ref))
-print(dim(df_IR_ref))
+# # Read in MESA intron retention reference matrix
+# df_IR_ref <- read.csv(file= paste0(
+#                                 sigil_out_path,
+#                                 "/combine_mesa_out/ref_matrix_IR/combined_main_group_withingroup_combinedRefMat.tsv"),
+#                           sep = "\t",header=TRUE) 
+# print(head(df_IR_ref))
+# print(dim(df_IR_ref))
 
 # Genes affected by splice, IR, and gene
-ls_gene_ref_genes <- unique(df_gene_ref$X)
-ls_splice_ref_genes <- unique(df_splice_ref$overlapping)
-ls_IR_ref_genes <- unique(df_IR_ref$overlapping)
+ls_gene_ref_genes <- unique(df_gene_set$X)
+ls_splice_ref_genes <- unique(df_splice_set$overlapping)
+ls_IR_ref_genes <- unique(df_IR_set$overlapping)
 
 # Find genes in all 3
 ls_ref_genes_splice_IR <- Reduce(intersect, 
@@ -157,14 +282,14 @@ print(ls_ref_genes_splice_IR)
 #     cat("\n",i,"\n")
 # }
 
-df_splice_ref %>%
-    filter(overlapping %in% ls_ref_genes_splice_IR) %>%
-    select(event, overlapping, cell_type, group)
+# df_splice_set %>%
+#     filter(overlapping %in% ls_ref_genes_splice_IR) %>%
+#     select(event, overlapping, cell_type, group)
 
 
-df_IR_ref %>%
-    filter(overlapping %in% ls_ref_genes_splice_IR) %>%
-    select(event, overlapping, cell_type, group)
+# df_IR_set %>%
+#     filter(overlapping %in% ls_ref_genes_splice_IR) %>%
+#     select(event, overlapping, cell_type, group)
 
 # for (i in ls_IR_ref_genes){
 #     cat("\n",i)
@@ -178,299 +303,324 @@ print(length(ls_splice_ref_genes))
 print("Number of IR ref genes:")
 print(length(ls_IR_ref_genes))
 
+# Gene level 
+listInput <- list("Gene" = ls_gene_ref_genes,
+                 "Splice" = ls_splice_ref_genes, 
+                 "Intron Retention" = ls_IR_ref_genes)
+
+plotObject <- upset(fromList(listInput), order.by = "freq", text.scale = c(1.6, 1.6, 1.6, 1.6, 2, 1.3),sets.bar.color=c("orange","skyblue","darkgreen"))
+png(file= paste0(fig_output_path, "/upsetplot_ref_genes_vs_splice_vs_IR.png"),
+    width = 20,
+    height    = 14,
+    units     = "cm",
+    res       = 1200)
+print(plotObject)
+dev.off()
+
+# Junction level 
+listInput <- list(
+                 "Splice" = unique(df_splice_set$event), 
+                 "Intron Retention" = unique(df_IR_set$event))
+
+plotObject <- upset(fromList(listInput), order.by = "freq", text.scale = c(1.6, 1.6, 1.6, 1.6, 2, 1.3),sets.bar.color=c("skyblue","darkgreen"))
+png(file= paste0(fig_output_path, "/upsetplot_junctions_splice_vs_IR.png"),
+    width = 20,
+    height    = 14,
+    units     = "cm",
+    res       = 1200)
+print(plotObject)
+dev.off()
+#########################
+
+# ##########################################################
+# # Fig 3 compare junctions to UCSC Alt track alt promoter
+# ############################################################
+# # Add bed cols to splice ref 
+# df_splice_set <- df_splice_set %>%
+#   rowwise() %>%
+#     mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
+#     mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+#     mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+#     mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+#     as.data.frame() 
+#     # %>%
+#     # head(10)
+# print(head(df_splice_set))
+# print(dim(df_splice_set))
+# print("~~~~~~~~~~~")
+
+# # Get number to randomly sample from PS file 
+# num_unique_ref_juncs <- length(unique(df_splice_set$event))
+# print(length(unique(num_unique_ref_juncs)))
+
+# # Randonmly sample from the file with all junctions 
+# ls_random_sample <- sample(rownames(df_all_PS), num_unique_ref_juncs, replace=F)
+
+# print(head(ls_random_sample))
+# print(length(ls_random_sample))
+# print(length(unique(ls_random_sample)))
+
+# print("#############")
+
+# # Format random junctions into bed 
+# df_random_juncs <- as.data.frame(ls_random_sample) %>%
+#     dplyr::rename(event = ls_random_sample )  %>%
+#     rowwise() %>%
+#     mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1]))  %>%
+#     mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+#     mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+#     mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+#     as.data.frame() 
+
+
+# print(head(df_random_juncs))
+# print(dim(df_random_juncs))
+
+
+# # Format all junctions into bed 
+# ls_all_juncs <- rownames(df_all_PS)
+# print(length(ls_all_juncs))
+# ls_all_juncs <- ls_all_juncs[!(ls_all_juncs %in% df_splice_set$event)]
+# print(length(ls_all_juncs))
+
+# df_all_background_juncs <- as.data.frame(ls_all_juncs) %>%
+#     dplyr::rename(event = ls_all_juncs )  %>%
+#     rowwise() %>%
+#     mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1]))  %>%
+#     mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+#     mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+#     mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+#     as.data.frame() 
+
+
+# print(head(df_all_background_juncs))
+# print(dim(df_all_background_juncs))
+
+
+# # Set up alt promoter df
+# df_alt_events_promoter <- df_alt_events %>%
+#     filter(name=="altPromoter") %>%
+#     select("chrom","start","end","name","strand")
+
+
+# compAltProm <- function(df_bed ){
+
+#     # Find intersection of splice ref junctions with alt promoters; 
+#     # if they intersect/overlap it suggests the alt promoter its intersected with 
+#     # is being skipped
+#     df_alt_promoter_splice_ref_int <- bed_intersect(df_bed, df_alt_events_promoter, 
+#             suffix = c(".splice_ref", ".alt_pro"))  %>%
+#             as.data.frame() 
+#     print(head(df_alt_promoter_splice_ref_int))
+
+#     recurring_int <- df_alt_promoter_splice_ref_int %>%
+#         group_by(event.splice_ref, set.splice_ref) %>%
+#         count() %>%
+#         arrange(desc(n)) %>%
+#         as.data.frame()
+
+#     # print(head(recurring_int, n=40))
+#     # print(dim(df_alt_promoter_splice_ref_int))
+#     # print(dim(df_bed))
+
+#     # Find which junctions within 200 of an alt promoter 
+#     # but do not overlap with an alt promoter, since thats accounted for in the other value
+#     df_alt_promoter_splice_ref_closest <- bed_closest(df_bed, df_alt_events_promoter, 
+#             suffix = c(".splice_ref", ".alt_pro"))  %>%
+#             as.data.frame() %>%
+#             filter(abs(.dist) <= 200) %>%
+#             filter(.overlap == 0) %>%
+#             as.data.frame()  
+#     head(df_alt_promoter_splice_ref_closest, n=20)
+
+#     # Count results | need unique because the input df has repeat events for every set its present in
+#     unique_splice_juncs <- unique(df_bed$event)
+#     unique_splice_juncs_alt_pro_int <- unique(df_alt_promoter_splice_ref_int$event.splice_ref)
+#     unique_splice_juncs_alt_pro_close <- unique(df_alt_promoter_splice_ref_closest$event.splice_ref)
+#     unique_splice_juncs_alt_pro_either <- union(df_alt_promoter_splice_ref_int$event.splice_ref, 
+#                                                 df_alt_promoter_splice_ref_closest$event.splice_ref )
+
+#     cat("\n Percent of splice ref junctions that contain an alt promoter: \n")
+#     perc_contain_alt <- length(unique_splice_juncs_alt_pro_int)/length(unique_splice_juncs)*100 
+#     cat(perc_contain_alt)
+#     cat("\n")
+
+#     cat("\n Percent of splice ref junctions that are 200 bp downstream of an alt promoter: \n")
+#     perc_downstream_alt <- length(unique_splice_juncs_alt_pro_close)/length(unique_splice_juncs)*100
+#     cat(perc_downstream_alt )
+#     cat("\n")
+
+#     cat("\n Percent of splice ref junctions that are either: \n")
+#     percent_alt <-length(unique_splice_juncs_alt_pro_either)/length(unique_splice_juncs)*100 
+#     cat(percent_alt)
+#     cat("\n")
+
+#     # Make alt pro calc res into df
+#     df_res_perc <- t(data.frame(list("Contains Alt Promoter"=perc_contain_alt,
+#                                     "Downstream Alt Promoter"=perc_downstream_alt, 
+#                                     "Alt Promoter"=percent_alt )))
+#     print(df_res_perc)
+#     df_res_counts <- t(data.frame(list("Contains Alt Promoter"= length(unique_splice_juncs_alt_pro_int),
+#                                     "Downstream Alt Promoter"=length(unique_splice_juncs_alt_pro_close),
+#                                      "Alt Promoter"=length(unique_splice_juncs_alt_pro_either) )))
+#     print(df_res_counts)
+#     # Add alt promoter info the input df 
+#     df_bed <- df_bed %>%
+#         mutate(contains_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_int), TRUE, FALSE)) %>%
+#         mutate(downstream_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_close), 1, 0)) %>%
+#         mutate(contains_and_downstream_alt_pro = ifelse(((event %in% unique_splice_juncs_alt_pro_int) & (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) %>%
+#         mutate(AltPromoter = ifelse(((event %in% unique_splice_juncs_alt_pro_int) | (event %in% unique_splice_juncs_alt_pro_close)), TRUE, FALSE)) 
 
-# listInput <- list("Gene" = ls_gene_ref_genes,
-#                  "Splice" = ls_splice_ref_genes, 
-#                  "Intron Retention" = ls_IR_ref_genes)
-
-# plotObject <- upset(fromList(listInput), order.by = "freq", text.scale = c(1.6, 1.6, 1.6, 1.6, 2, 1.3),sets.bar.color=c("orange","skyblue","darkgreen"))
-# png(file= paste0(fig_output_path, "/upsetplot_ref_genes_vs_splice_vs_IR.png"),
-#     width = 20,
-#     height    = 14,
-#     units     = "cm",
-#     res       = 1200)
-# print(plotObject)
-# dev.off()
-
-##########################################################
-# Fig 2 compare junctions to UCSC Alt track alt promoter
-############################################################
-# Add bed cols to splice ref 
-df_splice_set <- df_splice_set %>%
-  rowwise() %>%
-    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
-    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
-    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
-    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
-    as.data.frame() 
-    # %>%
-    # head(10)
-print(head(df_splice_set))
-print(dim(df_splice_set))
-print("~~~~~~~~~~~")
-
-# Get number to randomly sample from PS file 
-num_unique_ref_juncs <- length(unique(df_splice_set$event))
-print(length(unique(num_unique_ref_juncs)))
-
-# Randonmly sample from the file with all junctions 
-ls_random_sample <- sample(rownames(df_all_PS), num_unique_ref_juncs, replace=F)
-
-print(head(ls_random_sample))
-print(length(ls_random_sample))
-print(length(unique(ls_random_sample)))
-
-print("#############")
-
-# Format random junctions into bed 
-df_random_juncs <- as.data.frame(ls_random_sample) %>%
-    dplyr::rename(event = ls_random_sample )  %>%
-    rowwise() %>%
-    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1]))  %>%
-    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
-    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
-    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
-    as.data.frame() 
-
-
-print(head(df_random_juncs))
-print(dim(df_random_juncs))
-
-
-# Format all junctions into bed 
-ls_all_juncs <- rownames(df_all_PS)
-print(length(ls_all_juncs))
-ls_all_juncs <- ls_all_juncs[!(ls_all_juncs %in% df_splice_set$event)]
-print(length(ls_all_juncs))
-
-df_all_background_juncs <- as.data.frame(ls_all_juncs) %>%
-    dplyr::rename(event = ls_all_juncs )  %>%
-    rowwise() %>%
-    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1]))  %>%
-    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
-    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
-    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
-    as.data.frame() 
-
-
-print(head(df_all_background_juncs))
-print(dim(df_all_background_juncs))
-
-
-# Set up alt promoter df
-df_alt_events_promoter <- df_alt_events %>%
-    filter(name=="altPromoter") %>%
-    select("chrom","start","end","name","strand")
-
-
-compAltProm <- function(df_bed ){
-
-    # Find intersection of splice ref junctions with alt promoters; 
-    # if they intersect/overlap it suggests the alt promoter its intersected with 
-    # is being skipped
-    df_alt_promoter_splice_ref_int <- bed_intersect(df_bed, df_alt_events_promoter, 
-            suffix = c(".splice_ref", ".alt_pro"))  %>%
-            as.data.frame() 
-    print(head(df_alt_promoter_splice_ref_int))
-
-    # Find which junctions within 200 of an alt promoter 
-    # but do not overlap with an alt promoter, since thats accounted for in the other value
-    df_alt_promoter_splice_ref_closest <- bed_closest(df_bed, df_alt_events_promoter, 
-            suffix = c(".splice_ref", ".alt_pro"))  %>%
-            as.data.frame() %>%
-            filter(abs(.dist) <= 200) %>%
-            filter(.overlap == 0) %>%
-            as.data.frame()  
-    head(df_alt_promoter_splice_ref_closest, n=20)
+#     return(list(df_bed, df_res_perc, df_res_counts))
 
-    # Count results
-    unique_splice_juncs <- unique(df_bed$event)
-    unique_splice_juncs_alt_pro_int <- unique(df_alt_promoter_splice_ref_int$event.splice_ref)
-    unique_splice_juncs_alt_pro_close <- unique(df_alt_promoter_splice_ref_closest$event.splice_ref)
-    unique_splice_juncs_alt_pro_either <- union(df_alt_promoter_splice_ref_int$event.splice_ref, 
-                                                df_alt_promoter_splice_ref_closest$event.splice_ref )
+# }
 
-    cat("\n Percent of splice ref junctions that contain an alt promoter: \n")
-    perc_contain_alt <- length(unique_splice_juncs_alt_pro_int)/length(unique_splice_juncs)*100 
-    cat(perc_contain_alt)
-    cat("\n")
 
-    cat("\n Percent of splice ref junctions that are 200 bp downstream of an alt promoter: \n")
-    perc_downstream_alt <- length(unique_splice_juncs_alt_pro_close)/length(unique_splice_juncs)*100
-    cat(perc_downstream_alt )
-    cat("\n")
-
-    cat("\n Percent of splice ref junctions that are either: \n")
-    percent_alt <-length(unique_splice_juncs_alt_pro_either)/length(unique_splice_juncs)*100 
-    cat(percent_alt)
-    cat("\n")
+# ls_alt_res_splice_sets <- compAltProm(df_splice_set)
+# df_splice_set <- ls_alt_res_splice_sets[[1]] 
+# head(df_splice_set)
 
-    # Make alt pro calc res into df
-    df_res_perc <- t(data.frame(list("Contains Alt Promoter"=perc_contain_alt,
-                                    "Downstream Alt Promoter"=perc_downstream_alt, 
-                                    "Alt Promoter"=percent_alt )))
-    print(df_res_perc)
-    df_res_counts <- t(data.frame(list("Contains Alt Promoter"= length(unique_splice_juncs_alt_pro_int),
-                                    "Downstream Alt Promoter"=length(unique_splice_juncs_alt_pro_close),
-                                     "Alt Promoter"=length(unique_splice_juncs_alt_pro_either) )))
-    print(df_res_counts)
-    # Add alt promoter info the input df 
-    df_bed <- df_bed %>%
-        mutate(contains_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_int), TRUE, FALSE)) %>%
-        mutate(downstream_alt_pro = ifelse((event %in% unique_splice_juncs_alt_pro_close), 1, 0)) %>%
-        mutate(contains_and_downstream_alt_pro = ifelse(((event %in% unique_splice_juncs_alt_pro_int) & (event %in% unique_splice_juncs_alt_pro_close)), 1, 0)) %>%
-        mutate(AltPromoter = ifelse(((event %in% unique_splice_juncs_alt_pro_int) | (event %in% unique_splice_juncs_alt_pro_close)), TRUE, FALSE)) 
+# print("~~~~~~~~~~~")
+# ls_alt_res_random <- compAltProm(df_random_juncs)
+# df_random_juncs <- ls_alt_res_random[[1]]
+# head(df_random_juncs)
+
+# print("~~~~~~~~~~~")
+# ls_alt_res_background <- compAltProm(df_all_background_juncs)
+# df_all_background <- ls_alt_res_background[[1]]
+# head(df_all_background)
+
+# # Make plot comparing alt promoter count in splice sets to random junctions
 
-    return(list(df_bed, df_res_perc, df_res_counts))
+# # df_alt_pro_res <- cbind(ls_alt_res_splice_sets[[2]], ls_alt_res_random[[2]], ls_alt_res_background[[2]])
+# # colnames(df_alt_pro_res) <- list("splice_ref", "random_sample", "background")
 
-}
 
-ls_alt_res_splice_sets <- compAltProm(df_splice_set)
-df_splice_set <- ls_alt_res_splice_sets[[1]] 
-head(df_splice_set)
+# # Fishers exact test 
+
+# ##                      Non-AFE      AFE
+# ## Splice ref           4.5           4.5
+# ## Non splice ref       2.5             2.5
+# df_alt_pro_res_count <- cbind(ls_alt_res_splice_sets[[3]], ls_alt_res_background[[3]])
+# colnames(df_alt_pro_res_count) <- list("splice_ref", "background")
+# print(df_alt_pro_res_count)
+
+
+# # Building contingency table 
+# AltPro_splice_ref <- df_alt_pro_res_count["Alt.Promoter","splice_ref"]
+# AltPro_splice_background <- df_alt_pro_res_count["Alt.Promoter","background"]
+
+# NotAltPro_splice_ref <- num_unique_ref_juncs - AltPro_splice_ref
+# NotAltPro_splice_background <- length(ls_all_juncs) - AltPro_splice_background
 
-print("~~~~~~~~~~~")
-ls_alt_res_random <- compAltProm(df_random_juncs)
-df_random_juncs <- ls_alt_res_random[[1]]
-head(df_random_juncs)
+# print(paste0(AltPro_splice_ref, AltPro_splice_background, NotAltPro_splice_ref, NotAltPro_splice_background, sep= " "))
 
-
-print("~~~~~~~~~~~")
-ls_alt_res_background <- compAltProm(df_all_background_juncs)
-df_all_background <- ls_alt_res_background[[1]]
-head(df_all_background)
-
-# Make plot comparing alt promoter count in splice sets to random junctions
-
-# df_alt_pro_res <- cbind(ls_alt_res_splice_sets[[2]], ls_alt_res_random[[2]], ls_alt_res_background[[2]])
-# colnames(df_alt_pro_res) <- list("splice_ref", "random_sample", "background")
-
-
-# Fishers exact test 
-
-##                      Non-AFE      AFE
-## Splice ref           4.5           4.5
-## Non splice ref       2.5             2.5
-df_alt_pro_res_count <- cbind(ls_alt_res_splice_sets[[3]], ls_alt_res_background[[3]])
-colnames(df_alt_pro_res_count) <- list("splice_ref", "background")
-print(df_alt_pro_res_count)
-
-
-# Building contingency table 
-AltPro_splice_ref <- df_alt_pro_res_count["Alt.Promoter","splice_ref"]
-AltPro_splice_background <- df_alt_pro_res_count["Alt.Promoter","background"]
-
-NotAltPro_splice_ref <- num_unique_ref_juncs - AltPro_splice_ref
-NotAltPro_splice_background <- length(ls_all_juncs) - AltPro_splice_background
-
-print(paste0(AltPro_splice_ref, AltPro_splice_background, NotAltPro_splice_ref, NotAltPro_splice_background, sep= " "))
-
-df_fishers <- data.frame("nonAFE" = c(NotAltPro_splice_ref, NotAltPro_splice_background), 
-                "AFE" = c(AltPro_splice_ref, AltPro_splice_background), 
-                row.names = c("spliceRef", "background"))
-
-
-# Run Fishers test
-print(df_fishers)
-
-res_fishers <- stats::fisher.test(df_fishers)
-print(res_fishers)
-print(res_fishers$p.value)
-
-df_alt_pro_res_perc <- cbind(ls_alt_res_splice_sets[[2]], ls_alt_res_background[[2]])
-colnames(df_alt_pro_res_perc) <- list("splice_ref", "background")
-print(df_alt_pro_res_perc)
-
-
-df_alt_pro_res_perc <- df_alt_pro_res_perc %>% 
-    as.data.frame() %>%
-    rownames_to_column( var= "type")
-print(df_alt_pro_res_perc)
-
-df_alt_pro_res_perc <- pivot_longer(df_alt_pro_res_perc,  values_to = "percent",  names_to = "name",  cols = c("splice_ref", "background")) 
-print(df_alt_pro_res_perc)
-
-# Number of cars in each class:
-df_alt_pro_res_perc %>% 
-    ggplot(aes(x=type, y=percent, fill=name)) +
-    geom_bar(stat = 'identity', position = "dodge") +
-    theme_classic() +
-    scale_fill_manual("name", values=c("#999999", "black"))+
-    theme(legend.title= element_blank(), axis.title.x=element_blank()) +
-    labs(title = paste0("Fishers test p-value = ", signif(res_fishers$p.value, 4)))
-
-ggsave(paste0(fig_output_path,"alt_promoter.png"), width=20, height=10, unit="cm", dpi = 300)
-
-head(df_splice_set)
-
-
-
-##########################################################
-# Fig 2 rGREAT splice ref
-############################################################
-
-df_splice_set_clean <- df_splice_set %>%
-    filter(! chrom %in% c("chrGL000219.1", "chrKI270711.1", "chrKI270745.1"))
-
-# Run Great
-job = submitGreatJob(makeGRangesFromDataFrame(df_splice_set_clean),
-                        species= "hg38", version = "4")
-
-# Get tables from Run
-tb = getEnrichmentTables(job, category = c("GO"))
-
-
-# print(head(tb[["GO Molecular Function"]], n=25))
-# print(head(tb[[ "GO Biological Process" ]], n=50))
-
-ls_great_plots <- list()
-# for (pval_type in c("Hyper_Adjp_BH", "Binom_Adjp_BH","Binom_Fold_Enrichment" )) {
-for (pval_type in c( "Binom_Adjp_BH" )) {
-
-    # Make barplot of adjusted pvalues
-    BP <- tb[["GO Biological Process"]] %>%
-        mutate(pval_type = -log10(get(pval_type))) %>%
-        arrange(desc(pval_type)) %>%
-        head(40) %>%
-        ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
-            geom_bar(stat = 'identity') +
-            theme_classic() +
-            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
-            labs(title = paste0("PS GO Biological Process"), x = "Binom_Adjp_BH")
-
-    ggsave(paste0(fig_output_path,"rGREAT_GO_BP_all_splice_ref_",pval_type,".png"), width=30, height=20, unit="cm", dpi = 300)
-
-
-    # Make barplot of adjusted pvalues
-    MF <- tb[["GO Molecular Function"]] %>%
-        mutate(pval_type = -log10(get(pval_type))) %>%
-        arrange(desc(pval_type)) %>%
-        head(40) %>%
-        ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
-             geom_bar(stat = 'identity') +
-             theme_classic() +
-             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
-             labs(title = paste0("PS GO Molecular Function"), x = "Binom_Adjp_BH")
-
-    ggsave(paste0(fig_output_path,"rGREAT_GO_MF_all_splice_ref_", pval_type, ".png"), width=30, height=20, unit="cm", dpi = 300)
-
-    plot_grid(BP, MF, nrow=1, align = 'v', axis = 'l')
-    ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_splice_ref_", pval_type, ".png"), width=70, height=30, unit="cm")
-
-    ls_great_plots$IR_BP <- BP
-    ls_great_plots$IR_MF <- MF
-
-}
-
-# # This isnt saving?
-# plotObject <- plotRegionGeneAssociationGraphs(job)
-# png(file= paste0(fig_output_path, "rGREAT_region_associations.png"),
-#     width = 20,
-#     height    = 14,
-#     units     = "cm",
-#     res       = 1200)
-# print(plotObject)
-# dev.off()
+# df_fishers <- data.frame("nonAFE" = c(NotAltPro_splice_ref, NotAltPro_splice_background), 
+#                 "AFE" = c(AltPro_splice_ref, AltPro_splice_background), 
+#                 row.names = c("spliceRef", "background"))
+
+
+# # Run Fishers test
+# print(df_fishers)
+
+# res_fishers <- stats::fisher.test(df_fishers)
+# print(res_fishers)
+# print(res_fishers$p.value)
+
+# df_alt_pro_res_perc <- cbind(ls_alt_res_splice_sets[[2]], ls_alt_res_background[[2]])
+# colnames(df_alt_pro_res_perc) <- list("splice_ref", "background")
+# print(df_alt_pro_res_perc)
+
+
+# df_alt_pro_res_perc <- df_alt_pro_res_perc %>% 
+#     as.data.frame() %>%
+#     rownames_to_column( var= "type")
+# print(df_alt_pro_res_perc)
+
+# df_alt_pro_res_perc <- pivot_longer(df_alt_pro_res_perc,  values_to = "percent",  names_to = "name",  cols = c("splice_ref", "background")) 
+# print(df_alt_pro_res_perc)
+
+# # Number of cars in each class:
+# df_alt_pro_res_perc %>% 
+#     ggplot(aes(x=type, y=percent, fill=name)) +
+#     geom_bar(stat = 'identity', position = "dodge") +
+#     theme_classic() +
+#     scale_fill_manual("name", values=c("#999999", "black"))+
+#     theme(legend.title= element_blank(), axis.title.x=element_blank()) +
+#     labs(title = paste0("Fishers test p-value = ", signif(res_fishers$p.value, 4)))
+
+# ggsave(paste0(fig_output_path,"alt_promoter.png"), width=20, height=10, unit="cm", dpi = 300)
+
+# head(df_splice_set)
+
+
+
+# ##########################################################
+# # Fig 2 rGREAT splice ref
+# ############################################################
+
+# df_splice_set_clean <- df_splice_set %>%
+#     filter(! chrom %in% c("chrGL000219.1", "chrKI270711.1", "chrKI270745.1"))
+
+# # Run Great
+# job = submitGreatJob(makeGRangesFromDataFrame(df_splice_set_clean),
+#                         species= "hg38", version = "4")
+
+# # Get tables from Run
+# tb = getEnrichmentTables(job, category = c("GO"))
+
+
+# # print(head(tb[["GO Molecular Function"]], n=25))
+# # print(head(tb[[ "GO Biological Process" ]], n=50))
+
+# ls_great_plots <- list()
+# # for (pval_type in c("Hyper_Adjp_BH", "Binom_Adjp_BH","Binom_Fold_Enrichment" )) {
+# for (pval_type in c( "Binom_Adjp_BH" )) {
+
+#     # Make barplot of adjusted pvalues
+#     BP <- tb[["GO Biological Process"]] %>%
+#         mutate(pval_type = -log10(get(pval_type))) %>%
+#         arrange(desc(pval_type)) %>%
+#         head(40) %>%
+#         ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
+#             geom_bar(stat = 'identity') +
+#             theme_classic() +
+#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
+#             labs(title = paste0("PS GO Biological Process"), x = "Binom_Adjp_BH")
+
+#     ggsave(paste0(fig_output_path,"rGREAT_GO_BP_all_splice_ref_",pval_type,".png"), width=30, height=20, unit="cm", dpi = 300)
+
+
+#     # Make barplot of adjusted pvalues
+#     MF <- tb[["GO Molecular Function"]] %>%
+#         mutate(pval_type = -log10(get(pval_type))) %>%
+#         arrange(desc(pval_type)) %>%
+#         head(40) %>%
+#         ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
+#              geom_bar(stat = 'identity') +
+#              theme_classic() +
+#              theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
+#              labs(title = paste0("PS GO Molecular Function"), x = "Binom_Adjp_BH")
+
+#     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_all_splice_ref_", pval_type, ".png"), width=30, height=20, unit="cm", dpi = 300)
+
+#     plot_grid(BP, MF, nrow=1, align = 'v', axis = 'l')
+#     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_splice_ref_", pval_type, ".png"), width=70, height=30, unit="cm")
+
+#     ls_great_plots$IR_BP <- BP
+#     ls_great_plots$IR_MF <- MF
+
+# }
+
+# # # This isnt saving?
+# # plotObject <- plotRegionGeneAssociationGraphs(job)
+# # png(file= paste0(fig_output_path, "rGREAT_region_associations.png"),
+# #     width = 20,
+# #     height    = 14,
+# #     units     = "cm",
+# #     res       = 1200)
+# # print(plotObject)
+# # dev.off()
 
 ##########################################################
 # Fig 2 rGREAT IR
@@ -543,185 +693,193 @@ for (pval_type in c( "Binom_Adjp_BH" )) {
 ##########################################################
 # Fig 2 Enrichr on all genes from each set type
 ############################################################
-# if (!dir.exists(paste0(fig_output_path,"enrichr"))){
-# dir.create(paste0(fig_output_path,"enrichr"),
+if (!dir.exists(paste0(fig_output_path,"enrichr"))){
+dir.create(paste0(fig_output_path,"enrichr"),
+recursive = TRUE, showWarnings = TRUE)}
+
+
+dbs <- c("GO_Biological_Process_2021",
+        "GO_Cellular_Component_2021", 
+        "GO_Molecular_Function_2021",
+        "KEGG_2021_Human")
+
+ls_sigil_types <- list("Gene"=ls_gene_ref_genes,
+                    "Splice"=ls_splice_ref_genes,
+                    "Intron Retention"=ls_IR_ref_genes)
+ls_BP <-ls_CC <- ls_MF <- ls_kegg <- list()
+for (i in names(ls_sigil_types)){
+    cat("-------------------------------------------------------")
+    cat("\n",i,"\n")
+
+    # Run enrichr
+    enriched <- enrichr(ls_sigil_types[[i]], dbs)
+
+    # Save results to files
+    write.csv(enriched[[1]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
+    write.csv(enriched[[2]], paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_", i, ".csv"))
+    write.csv(enriched[[3]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
+
+    # Make barplot of adjusted pvalues
+    BP <- enriched[[1]] %>%
+        arrange(Adjusted.P.value) %>%
+        head(10) %>%
+      rowwise() %>%
+        mutate(term_clean = strsplit(Term, "[(]" )[[1]][1]) %>%
+        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(term_clean, -Adjusted.P.value)))  + 
+            geom_bar(stat = 'identity') +
+            theme_classic() +
+            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+            labs(title = paste0(i," GO BP"))
+
+    CC <- enriched[[2]] %>%
+        arrange(Adjusted.P.value) %>%
+        head(10) %>%
+      rowwise() %>%
+        mutate(term_clean = strsplit(Term, "[(]" )[[1]][1]) %>%
+        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(term_clean, -Adjusted.P.value)))   + 
+                    geom_bar(stat = 'identity') +
+            theme_classic() +
+            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+            labs(title = paste0(i," GO_Cellular_Component_2021"))
+
+    MF <- enriched[[3]] %>%
+        arrange(Adjusted.P.value) %>%
+        head(10) %>%
+      rowwise() %>%
+        mutate(term_clean = strsplit(Term, "[(]" )[[1]][1]) %>%
+        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(term_clean, -Adjusted.P.value)))   + 
+                    geom_bar(stat = 'identity') +
+            theme_classic() +
+            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+            labs(title = paste0(i," GO MF"))
+
+    kegg <- enriched[[4]] %>%
+        arrange(Adjusted.P.value) %>%
+      rowwise() %>%
+        mutate(term_clean = strsplit(Term, "[(]" )[[1]][1]) %>%
+        ggplot(aes(x = -log(Adjusted.P.value), y = reorder(term_clean, -Adjusted.P.value)))   + 
+            geom_bar(stat = 'identity') +
+            theme_classic() +
+            theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
+            labs(title = paste0(i," KEGG_2021_Human"))
+
+    # Add to list so plots can be combined
+    ls_BP[[i]] <- BP
+    ls_CC[[i]] <- CC    
+    ls_MF[[i]] <- MF
+    ls_kegg[[i]] <- kegg
+}
+
+plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]], nrow=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","GO_Biological_Process_2021_all.png"), width=30, height=30, unit="cm")
+
+plot_grid(ls_CC[[1]],ls_CC[[2]],ls_CC[[3]], nrow=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_all.png"), width=30, height=30, unit="cm")
+
+plot_grid(ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], nrow=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_all.png"), width=30, height=30, unit="cm")
+
+plot_grid(ls_kegg[[1]],ls_kegg[[2]],ls_kegg[[3]], nrow=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","KEGG_2021_Human_all.png"), width=30, height=30, unit="cm")
+
+plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]],ls_CC[[1]],ls_CC[[2]],ls_CC[[3]],ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], 
+        nrow=3,ncol=3, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"enrichr/","all.png"), width=120, height=40, unit="cm", dpi =400)
+
+# # ###########################
+# # # fig 3 splice vs gene
+# # ###########################
+# if (!dir.exists(paste0(fig_output_path,"PS/withinType/"))){
+# dir.create(paste0(fig_output_path,"PS/withinType/"),
+# recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(paste0(fig_output_path,"PS/group_label/"))){
+# dir.create(paste0(fig_output_path,"PS/group_label/"),
+# recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(paste0(fig_output_path,"PS/main_label/"))){
+# dir.create(paste0(fig_output_path,"PS/main_label/"),
 # recursive = TRUE, showWarnings = TRUE)}
 
+# print(head(df_metadata))
 
-# dbs <- c("GO_Biological_Process_2021",
-#         "GO_Cellular_Component_2021", 
-#         "GO_Molecular_Function_2021",
-#         "KEGG_2021_Human")
+# # df_splice_ref_z %>%
+# #     arrange(desc(ratio)) %>%
+# #     head(10)
 
-# ls_sigil_types <- list("gene"=ls_gene_ref_genes,
-#                     "splice"=ls_splice_ref_genes,
-#                     "IR"=ls_IR_ref_genes)
-# ls_BP <-ls_CC <- ls_MF <- ls_kegg <- list()
-# for (i in names(ls_sigil_types)){
-#     cat("-------------------------------------------------------")
-#     cat("\n",i,"\n")
+# # df_splice_ref_z$high_ratio_2 <- NA
 
-#     # Run enrichr
-#     enriched <- enrichr(ls_sigil_types[[i]], dbs)
-
-#     # Save results to files
-#     write.csv(enriched[[1]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
-#     write.csv(enriched[[2]], paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_", i, ".csv"))
-#     write.csv(enriched[[3]], paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_", i, ".csv"))
-
-#     # Make barplot of adjusted pvalues
-#     BP <- enriched[[1]] %>%
-#         arrange(Adjusted.P.value) %>%
-#         head(10) %>%
-#         ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
-#             geom_bar(stat = 'identity') +
-#             theme_classic() +
-#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
-#             labs(title = paste0(i," GO_Biological_Process_2021"))
-
-#     CC <- enriched[[2]] %>%
-#         arrange(Adjusted.P.value) %>%
-#         head(10) %>%
-#         ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
-#             geom_bar(stat = 'identity') +
-#             theme_classic() +
-#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
-#             labs(title = paste0(i," GO_Cellular_Component_2021"))
-
-#     MF <- enriched[[3]] %>%
-#         arrange(Adjusted.P.value) %>%
-#         head(10) %>%
-#         ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
-#             geom_bar(stat = 'identity') +
-#             theme_classic() +
-#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
-#             labs(title = paste0(i," GO_Molecular_Function_2021"))
-
-#     kegg <- enriched[[4]] %>%
-#         arrange(Adjusted.P.value) %>%
-#         head(10) %>%
-#         ggplot(aes(x = -log(Adjusted.P.value), y = reorder(Term, -Adjusted.P.value)))  + 
-#             geom_bar(stat = 'identity') +
-#             theme_classic() +
-#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=15)) +
-#             labs(title = paste0(i," KEGG_2021_Human"))
-
-#     # Add to list so plots can be combined
-#     ls_BP[[i]] <- BP
-#     ls_CC[[i]] <- CC    
-#     ls_MF[[i]] <- MF
-#     ls_kegg[[i]] <- kegg
-# }
-
-# plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]], nrow=3, align = 'v', axis = 'l')
-# ggsave(paste0(fig_output_path,"enrichr/","GO_Biological_Process_2021_all.png"), width=30, height=30, unit="cm")
-
-# plot_grid(ls_CC[[1]],ls_CC[[2]],ls_CC[[3]], nrow=3, align = 'v', axis = 'l')
-# ggsave(paste0(fig_output_path,"enrichr/","GO_Cellular_Component_2021_all.png"), width=30, height=30, unit="cm")
-
-# plot_grid(ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], nrow=3, align = 'v', axis = 'l')
-# ggsave(paste0(fig_output_path,"enrichr/","GO_Molecular_Function_2021_all.png"), width=30, height=30, unit="cm")
-
-# plot_grid(ls_kegg[[1]],ls_kegg[[2]],ls_kegg[[3]], nrow=3, align = 'v', axis = 'l')
-# ggsave(paste0(fig_output_path,"enrichr/","KEGG_2021_Human_all.png"), width=30, height=30, unit="cm")
-
-# plot_grid(ls_BP[[1]],ls_BP[[2]],ls_BP[[3]],ls_CC[[1]],ls_CC[[2]],ls_CC[[3]],ls_MF[[1]],ls_MF[[2]],ls_MF[[3]], 
-#         nrow=3,ncol=3, align = 'v', axis = 'l')
-# ggsave(paste0(fig_output_path,"enrichr/","all.png"), width=120, height=40, unit="cm", dpi =400)
-
-# ###########################
-# # fig 3 splice vs gene
-# ###########################
-if (!dir.exists(paste0(fig_output_path,"PS/withinType/"))){
-dir.create(paste0(fig_output_path,"PS/withinType/"),
-recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(paste0(fig_output_path,"PS/group_label/"))){
-dir.create(paste0(fig_output_path,"PS/group_label/"),
-recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(paste0(fig_output_path,"PS/main_label/"))){
-dir.create(paste0(fig_output_path,"PS/main_label/"),
-recursive = TRUE, showWarnings = TRUE)}
-
-print(head(df_metadata))
-
-# df_splice_ref_z %>%
+# df_splice_ref_z_plot <- df_splice_ref_z %>%
+#     mutate(ratio = abs(splice_z/gene_z)) %>%
+#     mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
 #     arrange(desc(ratio)) %>%
-#     head(10)
+#     filter(ratio != "NA")
 
-# df_splice_ref_z$high_ratio_2 <- NA
+# print(head(df_splice_set[c("event","contains_alt_pro","downstream_alt_pro","contains_and_downstream_alt_pro","AltPromoter")]))
+# print(head(df_splice_ref_z_plot))
 
-df_splice_ref_z_plot <- df_splice_ref_z %>%
-    mutate(ratio = abs(splice_z/gene_z)) %>%
-    mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
-    arrange(desc(ratio)) %>%
-    filter(ratio != "NA")
+# # Merge alt promoter cols into splice df
+# df_splice_ref_z_plot <- merge(df_splice_set[c("event","contains_alt_pro","downstream_alt_pro","contains_and_downstream_alt_pro","AltPromoter")],
+#             df_splice_ref_z_plot,by="event")
 
-print(head(df_splice_set[c("event","contains_alt_pro","downstream_alt_pro","contains_and_downstream_alt_pro","AltPromoter")]))
-print(head(df_splice_ref_z_plot))
+# print(dim(df_splice_ref_z_plot))
 
-df_splice_ref_z_plot <- merge(df_splice_set[c("event","contains_alt_pro","downstream_alt_pro","contains_and_downstream_alt_pro","AltPromoter")],
-            df_splice_ref_z_plot,by="event")
+# print("_________________________________")
+# print(head(df_splice_ref_z_plot))
+# print(dim(df_splice_ref_z_plot))
 
-print(dim(df_splice_ref_z_plot))
+# # count how many are missing alt pro info 
 
-print("_________________________________")
-print(head(df_splice_ref_z_plot))
-print(dim(df_splice_ref_z_plot))
+# # ############################
+# # # fig 3 zscore scatter plot
+# # ###############################
+# # Splice vs Gene________________________________________________________________
+# p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
+#     scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+#     geom_point(size=.85, alpha = .6) +
+#     labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
+#     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     # geom_text(
+#     #           label= df_splice_ref_z[["high_ratio_2"]],
+#     #           nudge_x = 0.01, nudge_y = 0.01,
+#     #           check_overlap =F, col = "black", size = 3
+#     #         ) +
+#     theme_classic() +
+#     theme(legend.position="right", 
+#             # legend.title=element_blank(),
+#         #   legend.title = element_text(size = 6), 
+#           legend.text = element_text(size = 8),
+#           axis.title.x=element_text(size=12),
+#           axis.title.y=element_text(size=12))  
+#         #   +
+#     # guides(color = guide_legend(nrow = 3)) 
+#     # +
+#     # ylim(-1, 1) 
 
-# count how many are missing alt pro info 
+# ggsave(plot = p_vs_gene, dpi = 400,
+#     filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
 
-# ############################
-# # fig 3 zscore scatter plot
-# ###############################
-# Splice vs Gene________________________________________________________________
-p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
-    scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
-    geom_point(size=.85, alpha = .6) +
-    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
-    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    # geom_text(
-    #           label= df_splice_ref_z[["high_ratio_2"]],
-    #           nudge_x = 0.01, nudge_y = 0.01,
-    #           check_overlap =F, col = "black", size = 3
-    #         ) +
-    theme_classic() +
-    theme(legend.position="right", 
-            # legend.title=element_blank(),
-        #   legend.title = element_text(size = 6), 
-          legend.text = element_text(size = 8),
-          axis.title.x=element_text(size=12),
-          axis.title.y=element_text(size=12))  
-        #   +
-    # guides(color = guide_legend(nrow = 3)) 
-    # +
-    # ylim(-1, 1) 
+# # coloring Alt promoter
+# # Splice vs Gene________________________________________________________________
+# p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = AltPromoter), data=df_splice_ref_z_plot) + 
+#     # scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+#     geom_point(size=.85, alpha = .6) +
+#     labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
+#     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     # geom_text(
+#     #           label= df_splice_ref_z[["high_ratio_2"]],
+#     #           nudge_x = 0.01, nudge_y = 0.01,
+#     #           check_overlap =F, col = "black", size = 3
+#     #         ) +
+#     theme_classic() +
+#     theme(legend.position="right", 
+#           legend.title = element_text(size = 6), 
+#           legend.text = element_text(size = 8),
+#           axis.title.x=element_text(size=12),
+#           axis.title.y=element_text(size=12))  
 
-ggsave(plot = p_vs_gene, dpi = 400,
-    filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
-
-# coloring Alt promoter
-# Splice vs Gene________________________________________________________________
-p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = AltPromoter), data=df_splice_ref_z_plot) + 
-    # scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
-    geom_point(size=.85, alpha = .6) +
-    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
-    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    # geom_text(
-    #           label= df_splice_ref_z[["high_ratio_2"]],
-    #           nudge_x = 0.01, nudge_y = 0.01,
-    #           check_overlap =F, col = "black", size = 3
-    #         ) +
-    theme_classic() +
-    theme(legend.position="right", 
-          legend.title = element_text(size = 6), 
-          legend.text = element_text(size = 8),
-          axis.title.x=element_text(size=12),
-          axis.title.y=element_text(size=12))  
-
-ggsave(plot = p_vs_gene, dpi = 400,
-    filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene_AltProm.png"),  width=20, height= 8, unit="cm")
+# ggsave(plot = p_vs_gene, dpi = 400,
+#     filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene_AltProm.png"),  width=20, height= 8, unit="cm")
 
 
 # ############################
@@ -917,77 +1075,4 @@ ggsave(plot = p_vs_gene, dpi = 400,
 
 # }
 
-# #############################
-# # comparing sets 
-# ################################
-
-# # Get union of sets in both to iterate through 
-# ls_all_sets <- union(df_splice_set$set, df_gene_set$set)
-# # print(length(ls_all_sets))
-
-# # Get intersection of spliced genes and genes
-# gene_intersection <- intersect(unique(df_splice_set$overlapping), unique(df_gene_set$X))
-# # print(gene_intersection)
-
-# cat("\n Number of common genes in gene and splice sets: \n")
-# print(length(gene_intersection))
-
-# cat("\n Number of unique genes in splice set: \n")
-# print(length(unique(df_splice_set$overlapping)))
-
-# cat("\n Number of unique junctions in splice set: \n")
-# print(length(unique(df_splice_set$event)))
-
-# cat("\n Number of unique genes in gene set: \n")
-# print(length(unique(df_gene_set$X)))
-# cat("\n")
-
-# ###############################
-# # Compare on set level 
-# ###############################
-# df_counts <- data.frame(matrix(ncol = 3, nrow = length(ls_all_sets)))
-# rownames(df_counts) <- ls_all_sets
-# colnames(df_counts) <- list("gene", "splice","IR")
-
-# for (s in ls_all_sets){
-#   print(s)
-
-#   # Counting 
-#   df_splice <- df_splice_set %>% 
-#     filter(set == s) 
-#   df_IR <- df_IR_set %>% 
-#     filter(set == s) 
-#   df_gene <- df_gene_set %>% 
-#     filter(set == s) 
-#   df_counts[s, "splice"] <- nrow(df_splice)
-#   df_counts[s, "gene"] <- nrow(df_gene)
-#   df_counts[s, "IR"] <- nrow(df_IR)
-
-#   # Comparing 
-# #   gene_intersection <- intersect(df_splice$overlapping, df_gene$X)
-# #   print(length(gene_intersection))
-# #   df_counts[s, "gene and splice"] <- length(gene_intersection)
-# }
-
-# print(head(df_counts))
-
-# df_counts %>% 
-#   pivot_longer(names_to = "variable", values_to = "value", cols = everything()) %>%
-#   ggplot(aes(x = fct_inorder(variable), y = value, color = variable)) +
-#     geom_jitter(alpha = 0.5, size = 2) +
-#     theme_classic() +
-#     theme(legend.position = "none") +
-#     labs(x = "", y = "marker count per set") +
-#     scale_color_manual(values=c("gene"="orange","splice"="skyblue","IR"="darkgreen"))
-
-# ggsave(paste0(fig_output_path, "count_per_set_plot.png"), width=6, height=10, dpi=300, units=c("cm"))
-
-# # df_counts %>% 
-# #   tibble::rownames_to_column("set") %>%
-# #   arrange(desc(splice))
-
-# df_counts %>% 
-#   tibble::rownames_to_column("set") %>%
-#   filter(gene < 100) %>%
-#   arrange(desc(gene))
 
