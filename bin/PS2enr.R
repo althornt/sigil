@@ -24,7 +24,7 @@ option_list <- list(
     c("-c", "--removeChr"),
     type = "character",
     action = "store_true",
-    default = NULL,
+    default=FALSE,
     help = "full path to put outputs")
   )
 
@@ -51,7 +51,10 @@ print(dim(df_all_PS))
 if (opt$removeChr){
   #reformat events/rownames to drop "chr"
   rownames(df_all_PS) <- stringr::str_remove(rownames(df_all_PS) , "chr")
+} else {
+  
 }
+
 
 
 # Write output
