@@ -533,169 +533,81 @@ print("~~~~~~~~~~~")
 
 
 
-# ##########################################################
-# # Fig 2 rGREAT splice ref  GO
-# ############################################################
-
-# # Run Great
-# job = submitGreatJob(makeGRangesFromDataFrame(df_splice_set_clean),
-#                         species= "hg38", version = "4")
-
-# # Get tables from Run
-# tb = getEnrichmentTables(job, category = c("GO"))
-
-
-
-# # print(head(tb[["GO Molecular Function"]], n=25))
-# # print(head(tb[[ "GO Biological Process" ]], n=50))
-
-# ls_great_plots <- list()
-# # for (pval_type in c("Hyper_Adjp_BH", "Binom_Adjp_BH","Binom_Fold_Enrichment" )) {
-# for (pval_type in c( "Binom_Adjp_BH" )) {
-
-#     # Make barplot of adjusted pvalues
-#     BP <- tb[["GO Biological Process"]] %>%
-#         mutate(pval_type = -log10(get(pval_type))) %>%
-#         arrange(desc(pval_type)) %>%
-#         head(40) %>%
-#         ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
-#             geom_bar(stat = 'identity') +
-#             theme_classic() +
-#             theme(axis.title.y=element_blank(), 
-#                   axis.text = element_text(size = 15), 
-#                   plot.title = element_text(size=20)) +
-#             labs(title = paste0("PS GO Biological Process"), x = "Binom_Adjp_BH")
-
-#     ggsave(paste0(fig_output_path,"rGREAT_GO_BP_all_splice_ref_",pval_type,".png"), 
-#                 width=30, height=20, unit="cm", dpi = 300)
-
-
-#     # Make barplot of adjusted pvalues
-#     MF <- tb[["GO Molecular Function"]] %>%
-#         mutate(pval_type = -log10(get(pval_type))) %>%
-#         arrange(desc(pval_type)) %>%
-#         head(40) %>%
-#         ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
-#              geom_bar(stat = 'identity') +
-#              theme_classic() +
-#              theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), 
-#                     plot.title = element_text(size=20)) +
-#              labs(title = paste0("PS GO Molecular Function"), x = "Binom_Adjp_BH")
-
-#     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_all_splice_ref_", pval_type, ".png"), 
-#               width=30, height=20, unit="cm", dpi = 300)
-
-#     plot_grid(BP, MF, nrow=1, align = 'v', axis = 'l')
-#     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_splice_ref_", pval_type, ".png"), 
-#                 width=70, height=30, unit="cm")
-
-#     ls_great_plots$IR_BP <- BP
-#     ls_great_plots$IR_MF <- MF
-
-# }
-
-# # # This isnt saving?
-# # plotObject <- plotRegionGeneAssociationGraphs(job)
-# # png(file= paste0(fig_output_path, "rGREAT_region_associations.png"),
-# #     width = 20,
-# #     height    = 14,
-# #     units     = "cm",
-# #     res       = 1200)
-# # print(plotObject)
-# # dev.off()
-
-# ##########################################################
-# # Fig 2 rGREAT splice ref  reg mot
-# ############################################################
-
-# "MSigDB Immunologic Signatures"
-# "MSigDB Predicted Promoter Motifs"
-# "InterPro"
-# "HGNC Gene Families"
-
-# print("-----------------")
-# job2 = submitGreatJob(makeGRangesFromDataFrame(df_splice_set_clean),
-#                         species= "hg38", version = "4")
-
-# tb2 = getEnrichmentTables(job2)
-# names(tb2)
-# availableCategories(job)
-# availableOntologies(job2)
-# availableOntologies(job2, category = "Pathway Data")
-
-
-# tb_reg = getEnrichmentTables(job, category = c("Regulatory Motifs"))
-
-# tb_reg
-# availableOntologies(job_reg, category = "Regulatory Motifs")
-
 ##########################################################
-# Fig 2 rGREAT IR
+# Fig 3 rGREAT splice ref and IR ref GO terms
 ############################################################
-# df_IR_set <- df_IR_set %>%
-#   rowwise() %>%
-#     mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
-#     mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
-#     mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
-#     mutate(strand = strsplit(event, ":")[[1]][3]) %>%
-#     as.data.frame() 
 
-# print(head(df_IR_set))
+# Run Great on Splice set junctions 
+job_PS = submitGreatJob(makeGRangesFromDataFrame(df_splice_set),
+                        species= "hg38", version = "4")
 
+# Get tables from Run
+tb_PS = getEnrichmentTables(job_PS, category = c("GO"))
 
-# # Run Great
-# job_IR = submitGreatJob(makeGRangesFromDataFrame(df_IR_set),
-#                         species= "hg38", version = "4")
+plotGREAT <- function(tb, GO_type, ggtitle){
+    # Make barplot of adjusted pvalues for top terms
+    plt <- tb[[GO_type]] %>%
+      filter((Binom_Adjp_BH <= 0.05) &(Hyper_Adjp_BH <= 0.05 )) %>%
+      filter((Binom_Fold_Enrichment >= 2) &(Hyper_Fold_Enrichment >= 2 )) %>%
+      arrange(Binom_Adjp_BH) %>%
+      mutate(Binom_Adjp_BH_log10 = -log10(Binom_Adjp_BH)) %>%
+        head(15) %>%
+        ggplot(aes(x = Binom_Adjp_BH_log10, y = reorder(name, Binom_Adjp_BH_log10), fill =Binom_Fold_Enrichment))  + 
+            geom_bar(stat = 'identity') +
+            theme_classic() +
+            theme(axis.title.y = element_blank(), axis.text.y = element_text(size = 22),
+                  axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 20),
+                  plot.title = element_text(size=25),
+                  legend.title = element_text(size = 20),legend.text = element_text(size = 20),
+                  legend.position = c(0.8, 0.1)) +
+           labs(title = paste0(ggtitle), x = "-log10(Adjusted P-value)", fill = "Fold Enrichment")+
+          scale_y_discrete(labels = function(x) str_wrap(x, width =40))
 
-# # Get tables from Run
-# tb_IR = getEnrichmentTables(job_IR, category = c("GO"))
+    ggsave(paste0(fig_output_path,"rGREAT_", paste(ggtitle,sep="_"),".png"), 
+                width=30, height=25, unit="cm", dpi = 300)
 
+  return(plt)
+}
 
-# print(head(tb_IR[["GO Molecular Function"]], n=25))
-# print(head(tb_IR[[ "GO Biological Process" ]], n=60))
+# Make plots for PS great results 
+great_PS_BP <- plotGREAT(tb_PS, "GO Biological Process", "Splice GO Biological Process" )
+great_PS_MF <-plotGREAT(tb_PS, "GO Molecular Function", "Splice GO Molecular Function" )
 
-# for (pval_type in c("Binom_Adjp_BH" )) {
-# # for (pval_type in c("Hyper_Adjp_BH", "Binom_Adjp_BH" )) {
+# Combined PS plot 
+plot_grid(great_PS_BP, great_PS_MF, nrow=1, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_splice_ref.png"), 
+            width=70, height=35, unit="cm", dpi=300)
 
-#     # Make barplot of adjusted pvalues
-#     BP <- tb_IR[["GO Biological Process"]] %>%
-#         mutate(pval_type = -log10(get(pval_type))) %>%
-#         arrange(desc(pval_type)) %>%
-#         head(40) %>%
-#         ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
-#             geom_bar(stat = 'identity') +
-#             theme_classic() +
-#             theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
-#             labs(title = paste0("IR GO Biological Process"), x = "Binom_Adjp_BH")
-#     ggsave(paste0(fig_output_path,"rGREAT_GO_BP_all_IR_ref_",pval_type,".png"), width=30, height=20, unit="cm", dpi = 300)
+# Format IR table to add the needed bed columns
+df_IR_set <- df_IR_set %>%
+  rowwise() %>%
+    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
+    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+    as.data.frame() 
 
+# Run Great on IR sigil junctions
+job_IR = submitGreatJob(makeGRangesFromDataFrame(df_IR_set),
+                        species= "hg38", version = "4")
 
-#     # Make barplot of adjusted pvalues
-#     MF <- tb_IR[["GO Molecular Function"]] %>%
-#         mutate(pval_type = -log10(get(pval_type))) %>%
-#         arrange(desc(pval_type)) %>%
-#         head(40) %>%
-#         ggplot(aes(x = pval_type, y = reorder(name, pval_type)))  + 
-#              geom_bar(stat = 'identity') +
-#              theme_classic() +
-#              theme(axis.title.y=element_blank(), axis.text = element_text(size = 15), plot.title = element_text(size=20)) +
-#              labs(title = paste0("IR GO Molecular Function"), x = "Binom_Adjp_BH")
+# Get tables from Run
+tb_IR = getEnrichmentTables(job_IR, category = c("GO"))
 
-#     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_all_IR_ref_", pval_type, ".png"), width=30, height=20, unit="cm", dpi = 300)
+# Make plots for IR great results 
+great_IR_BP <- plotGREAT(tb_IR, "GO Biological Process", "Intron Retention GO Biological Process" )
+great_IR_MF <-plotGREAT(tb_IR, "GO Molecular Function", "Intron Retention GO Molecular Function" )
 
-#     plot_grid(BP, MF, nrow=1, align = 'v', axis = 'l')
-#     ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_IR_ref_", pval_type, ".png"), width=70, height=30, unit="cm")
+plot_grid(great_IR_BP, great_IR_MF, nrow=1, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_IR_ref.png"), 
+            width=70, height=30, unit="cm", dpi=300)
 
-#     ls_great_plots$PS_BP <- BP
-#     ls_great_plots$PS_MF <- MF
+# Combined PS and IR GREAT plots
+plot_grid(great_PS_BP, great_PS_MF, great_IR_BP, great_IR_MF,
+             nrow=2, align = 'v', axis = 'l')
+ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_PS_IR_ref.png"), width=75, height=60, unit="cm")
 
-# }
-
-# print(length(ls_great_plots))
-# plot_grid(ls_great_plots[[1]], ls_great_plots[[2]], ls_great_plots[[3]], ls_great_plots[[4]],
-#              nrow=2, align = 'v', axis = 'l')
-# ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_PS_IR_ref_Binom_Adjp_BH.png"), width=75, height=60, unit="cm")
-
+quit()
 
 # # ##########################################################
 # # # Fig 2 Enrichr on all genes from each set type
