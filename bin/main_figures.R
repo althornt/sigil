@@ -533,81 +533,79 @@ print("~~~~~~~~~~~")
 
 
 
-##########################################################
-# Fig 3 rGREAT splice ref and IR ref GO terms
-############################################################
+# ##########################################################
+# # Fig 3 rGREAT splice ref and IR ref GO terms
+# ############################################################
 
-# Run Great on Splice set junctions 
-job_PS = submitGreatJob(makeGRangesFromDataFrame(df_splice_set),
-                        species= "hg38", version = "4")
+# # Run Great on Splice set junctions 
+# job_PS = submitGreatJob(makeGRangesFromDataFrame(df_splice_set),
+#                         species= "hg38", version = "4")
 
-# Get tables from Run
-tb_PS = getEnrichmentTables(job_PS, category = c("GO"))
+# # Get tables from Run
+# tb_PS = getEnrichmentTables(job_PS, category = c("GO"))
 
-plotGREAT <- function(tb, GO_type, ggtitle){
-    # Make barplot of adjusted pvalues for top terms
-    plt <- tb[[GO_type]] %>%
-      filter((Binom_Adjp_BH <= 0.05) &(Hyper_Adjp_BH <= 0.05 )) %>%
-      filter((Binom_Fold_Enrichment >= 2) &(Hyper_Fold_Enrichment >= 2 )) %>%
-      arrange(Binom_Adjp_BH) %>%
-      mutate(Binom_Adjp_BH_log10 = -log10(Binom_Adjp_BH)) %>%
-        head(15) %>%
-        ggplot(aes(x = Binom_Adjp_BH_log10, y = reorder(name, Binom_Adjp_BH_log10), fill =Binom_Fold_Enrichment))  + 
-            geom_bar(stat = 'identity') +
-            theme_classic() +
-            theme(axis.title.y = element_blank(), axis.text.y = element_text(size = 22),
-                  axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 20),
-                  plot.title = element_text(size=25),
-                  legend.title = element_text(size = 20),legend.text = element_text(size = 20),
-                  legend.position = c(0.8, 0.1)) +
-           labs(title = paste0(ggtitle), x = "-log10(Adjusted P-value)", fill = "Fold Enrichment")+
-          scale_y_discrete(labels = function(x) str_wrap(x, width =40))
+# plotGREAT <- function(tb, GO_type, ggtitle){
+#     # Make barplot of adjusted pvalues for top terms
+#     plt <- tb[[GO_type]] %>%
+#       filter((Binom_Adjp_BH <= 0.05) &(Hyper_Adjp_BH <= 0.05 )) %>%
+#       filter((Binom_Fold_Enrichment >= 2) &(Hyper_Fold_Enrichment >= 2 )) %>%
+#       arrange(Binom_Adjp_BH) %>%
+#       mutate(Binom_Adjp_BH_log10 = -log10(Binom_Adjp_BH)) %>%
+#         head(15) %>%
+#         ggplot(aes(x = Binom_Adjp_BH_log10, y = reorder(name, Binom_Adjp_BH_log10), fill =Binom_Fold_Enrichment))  + 
+#             geom_bar(stat = 'identity') +
+#             theme_classic() +
+#             theme(axis.title.y = element_blank(), axis.text.y = element_text(size = 22),
+#                   axis.title.x = element_text(size = 20), axis.text.x = element_text(size = 20),
+#                   plot.title = element_text(size=25),
+#                   legend.title = element_text(size = 20),legend.text = element_text(size = 20),
+#                   legend.position = c(0.8, 0.1)) +
+#            labs(title = paste0(ggtitle), x = "-log10(Adjusted P-value)", fill = "Fold Enrichment")+
+#           scale_y_discrete(labels = function(x) str_wrap(x, width =40))
 
-    ggsave(paste0(fig_output_path,"rGREAT_", paste(ggtitle,sep="_"),".png"), 
-                width=30, height=25, unit="cm", dpi = 300)
+#     ggsave(paste0(fig_output_path,"rGREAT_", paste(ggtitle,sep="_"),".png"), 
+#                 width=30, height=25, unit="cm", dpi = 300)
 
-  return(plt)
-}
+#   return(plt)
+# }
 
-# Make plots for PS great results 
-great_PS_BP <- plotGREAT(tb_PS, "GO Biological Process", "Splice GO Biological Process" )
-great_PS_MF <-plotGREAT(tb_PS, "GO Molecular Function", "Splice GO Molecular Function" )
+# # Make plots for PS great results 
+# great_PS_BP <- plotGREAT(tb_PS, "GO Biological Process", "Splice GO Biological Process" )
+# great_PS_MF <-plotGREAT(tb_PS, "GO Molecular Function", "Splice GO Molecular Function" )
 
-# Combined PS plot 
-plot_grid(great_PS_BP, great_PS_MF, nrow=1, align = 'v', axis = 'l')
-ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_splice_ref.png"), 
-            width=70, height=35, unit="cm", dpi=300)
+# # Combined PS plot 
+# plot_grid(great_PS_BP, great_PS_MF, nrow=1, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_splice_ref.png"), 
+#             width=70, height=35, unit="cm", dpi=300)
 
-# Format IR table to add the needed bed columns
-df_IR_set <- df_IR_set %>%
-  rowwise() %>%
-    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
-    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
-    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
-    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
-    as.data.frame() 
+# # Format IR table to add the needed bed columns
+# df_IR_set <- df_IR_set %>%
+#   rowwise() %>%
+#     mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
+#     mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+#     mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+#     mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+#     as.data.frame() 
 
-# Run Great on IR sigil junctions
-job_IR = submitGreatJob(makeGRangesFromDataFrame(df_IR_set),
-                        species= "hg38", version = "4")
+# # Run Great on IR sigil junctions
+# job_IR = submitGreatJob(makeGRangesFromDataFrame(df_IR_set),
+#                         species= "hg38", version = "4")
 
-# Get tables from Run
-tb_IR = getEnrichmentTables(job_IR, category = c("GO"))
+# # Get tables from Run
+# tb_IR = getEnrichmentTables(job_IR, category = c("GO"))
 
-# Make plots for IR great results 
-great_IR_BP <- plotGREAT(tb_IR, "GO Biological Process", "Intron Retention GO Biological Process" )
-great_IR_MF <-plotGREAT(tb_IR, "GO Molecular Function", "Intron Retention GO Molecular Function" )
+# # Make plots for IR great results 
+# great_IR_BP <- plotGREAT(tb_IR, "GO Biological Process", "Intron Retention GO Biological Process" )
+# great_IR_MF <-plotGREAT(tb_IR, "GO Molecular Function", "Intron Retention GO Molecular Function" )
 
-plot_grid(great_IR_BP, great_IR_MF, nrow=1, align = 'v', axis = 'l')
-ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_IR_ref.png"), 
-            width=70, height=30, unit="cm", dpi=300)
+# plot_grid(great_IR_BP, great_IR_MF, nrow=1, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_IR_ref.png"), 
+#             width=70, height=30, unit="cm", dpi=300)
 
-# Combined PS and IR GREAT plots
-plot_grid(great_PS_BP, great_PS_MF, great_IR_BP, great_IR_MF,
-             nrow=2, align = 'v', axis = 'l')
-ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_PS_IR_ref.png"), width=75, height=60, unit="cm")
-
-quit()
+# # Combined PS and IR GREAT plots
+# plot_grid(great_PS_BP, great_PS_MF, great_IR_BP, great_IR_MF,
+#              nrow=2, align = 'v', axis = 'l')
+# ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_PS_IR_ref.png"), width=75, height=60, unit="cm")
 
 # # ##########################################################
 # # # Fig 2 Enrichr on all genes from each set type
@@ -1002,6 +1000,8 @@ quit()
 
 plotPCA <- function(df_vals, list_vals, file_tag, meta_col, title ){
 
+  set.seed(123)
+
   head(df_vals)
   dim(df_vals)
 
@@ -1017,31 +1017,39 @@ plotPCA <- function(df_vals, list_vals, file_tag, meta_col, title ){
 
   print(dim(df_vals_sigil_clean))
 
+  df_vals_sigil_clean <- df_vals_sigil_clean[apply(df_vals_sigil_clean, 1, var) != 0, ]
+  print(dim(df_vals_sigil_clean))
+
+
   prcomp.out <- prcomp(as.data.frame(t(df_vals_sigil_clean)),
                     center = TRUE,
-                    scale. = TRUE)$x
+                    scale. = TRUE)
     
-  # print(head(prcomp.out ))
-  print(dim(prcomp.out ))
+  # print(summary(prcomp.out))
+  # Variance explained by each PC
+  var_explained <- prcomp.out$sdev^2/sum(prcomp.out$sdev^2)
 
   # Merge PCA results with metadata
-  df_PCA <- data.frame(x = prcomp.out[,1],  y = prcomp.out[,2])
+  df_PCA <- data.frame(x = prcomp.out$x[,1],  y = prcomp.out$x[,2])
   rownames(df_PCA) <- colnames(df_vals_sigil_clean)
   pca.out.merge = cbind(df_PCA, df_metadata)
   print(dim(pca.out.merge ))
+
 
   n <- length(unique(df_metadata[[meta_col]]))
   qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
   pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
   # Plot PCA all 
-  plt <- ggplot(pca.out.merge, aes(x, y, color = get(meta_col), shape = data_source)) +
+  plt_pca <- ggplot(pca.out.merge, aes(x, y, color = get(meta_col), shape = data_source)) +
       geom_point(size = 2.5) +
       theme_classic() +
       theme(legend.position="top",legend.title = element_blank(), legend.text = element_text(size = 10))+
       # guides(color=guide_legend(nrow=3,byrow=TRUE)) +
       scale_color_manual(values=pal) +
-      labs(title= paste0(title), sep = ' ', x = "PC1", y= "PC2")
+      labs(title= paste0(title), sep = ' ', 
+          x=paste0("PC1: ",round(var_explained[1]*100,1),"%"),
+          y=paste0("PC2: ",round(var_explained[2]*100,1),"%")) 
 
   # Save plot
   ggsave(file.path(fig_output_path,
@@ -1049,24 +1057,51 @@ plotPCA <- function(df_vals, list_vals, file_tag, meta_col, title ){
           device = "png",
           width = 5, height = 8,
           dpi = 300)
-  
-  return(plt)
+
+  # UMAP using PCA as input
+
+  # Run UMAP
+  umap.out <- umap(as.data.frame(prcomp.out$x), n_neighbors = 5, learning_rate = 0.5, init = "random", min_dist = 1, spread = 5)
+  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
+  rownames(umap.out) <- colnames(df_vals_sigil_clean)
+
+  # Merge UMAP results with metadata
+  umap.out.merge = cbind(umap.out, df_metadata)
+
+  # Plot UMAP
+  plt_umap <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col), shape = data_source)) +
+      geom_point(size = 2.5) +
+      theme_classic() +
+      theme(legend.position="top",legend.title = element_blank(), legend.text = element_text(size = 10))+
+      # guides(color=guide_legend(nrow=3,byrow=TRUE)) +
+      scale_color_manual(values=pal) +
+      labs(title= paste0(title), sep = ' ', 
+          x="UMAP1",
+          y="UMAP2") 
+
+  # Save plot
+  ggsave(file.path(fig_output_path,
+                  paste0("UMAP_",file_tag,".png")),
+          device = "png",
+          width = 5, height = 8,
+          dpi = 300)
+
+  return(list("pca"=plt_pca, "umap" = plt_umap))
 
 }
 
 ###################################################
-# GROUP LABEL
-# Make PCAs by group label 
+# GROUP LABEL SIGIL
+# Make PCAs and UMAPs by group label 
 gene_by_group <- plotPCA(df_exp,unique(df_gene_set$X), "Gene_sigil_by_group", "group_label", "Gene" )
 PS_by_group <- plotPCA(df_all_PS,unique(df_splice_set$event), "PS_sigil_by_group", "group_label", "Splice" )
 IR_by_group <- plotPCA(df_IR_table,unique(df_IR_set$event), "IR_sigil_by_group", "group_label", "Intron retention" )
 
-
 # Plot all by group label
 prow <- plot_grid(
-  gene_by_group + theme(legend.position="none"),
-  PS_by_group + theme(legend.position="none"),
-  IR_by_group + theme(legend.position="none"),
+  gene_by_group$pca + theme(legend.position="none"),
+  PS_by_group$pca + theme(legend.position="none"),
+  IR_by_group$pca + theme(legend.position="none"),
   align = 'vh',
   # labels = c("A", "B", "C"),
   hjust = -1,
@@ -1075,30 +1110,46 @@ prow <- plot_grid(
 
 # Get legend from plot
 legend <- get_legend(
-  gene_by_group + theme(legend.position="bottom")
+  gene_by_group$pca + theme(legend.position="bottom")
 )
 
 # Add the legend to the row 
-plot_grid(prow, legend, ncol = 1, rel_heights = c(1, .3))
+sigil_by_group_pca <- plot_grid(prow, legend, ncol = 1, rel_heights = c(1, .3))
 ggsave(file.path(fig_output_path,
                 paste0("PCA_all_by_group.png")),
         device = "png",
         width = 15, height = 6,
         dpi = 300, bg="white")
 
+#Plot UMAPS
+prow_umap <- plot_grid(
+  gene_by_group$umap + theme(legend.position="none"),
+  PS_by_group$umap + theme(legend.position="none"),
+  IR_by_group$umap + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+sigil_by_group_umap <- plot_grid(prow_umap, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("UMAP_all_by_group.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
 ###################################################
-# GROUP LABEL
-# Make PCAs by group label 
+# MAIN LABEL SIGIL
+# Make PCAs and UMAPs by main label 
 gene_by_main <- plotPCA(df_exp,unique(df_gene_set$X), "Gene_sigil_by_main", "main_label", "Gene" )
 PS_by_main <- plotPCA(df_all_PS,unique(df_splice_set$event), "PS_sigil_by_main", "main_label", "Splice" )
 IR_by_main <- plotPCA(df_IR_table,unique(df_IR_set$event), "IR_sigil_by_main", "main_label", "Intron retention" )
 
 
-# Plot all by group label
+# PCA Plot all by main label
 prow <- plot_grid(
-  gene_by_main + theme(legend.position="none"),
-  PS_by_main + theme(legend.position="none"),
-  IR_by_main + theme(legend.position="none"),
+  gene_by_main$pca + theme(legend.position="none"),
+  PS_by_main$pca + theme(legend.position="none"),
+  IR_by_main$pca + theme(legend.position="none"),
   align = 'vh',
   # labels = c("A", "B", "C"),
   hjust = -1,
@@ -1107,14 +1158,97 @@ prow <- plot_grid(
 
 # Get legend from plot
 legend <- get_legend(
-  gene_by_main + theme(legend.position="bottom")
+  gene_by_main$pca + theme(legend.position="bottom")
 )
 
-# Add the legend to the row 
-plot_grid(prow, legend, ncol = 1, rel_heights = c(1, .3))
+# PCA Add the legend to the row 
+sigil_by_main_pca <- plot_grid(prow, legend, ncol = 1, rel_heights = c(1, .3))
 ggsave(file.path(fig_output_path,
                 paste0("PCA_all_by_main.png")),
         device = "png",
         width = 15, height = 6,
         dpi = 300, bg="white")
+#Plot UMAPS
+prow_umap <- plot_grid(
+  gene_by_main$umap + theme(legend.position="none"),
+  PS_by_main$umap + theme(legend.position="none"),
+  IR_by_main$umap + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+sigil_by_main_umap <- plot_grid(prow_umap, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("UMAP_all_by_main.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
+###################################################
+# GROUP LABEL ALL JUNCTIONS/GENES
+# Make PCAs by group label 
+gene_by_group_all <- plotPCA(df_exp,rownames(df_exp), "Gene_sigil_by_group", "group_label", "Gene" )
+PS_by_group_all <- plotPCA(df_all_PS,rownames(df_all_PS), "PS_sigil_by_group", "group_label", "Splice" )
+IR_by_group_all <- plotPCA(df_IR_table,rownames(df_IR_table), "IR_sigil_by_group", "group_label", "Intron retention" )
 
+# Plot all by group label
+prow <- plot_grid(
+  gene_by_group_all$pca + theme(legend.position="none"),
+  PS_by_group_all$pca + theme(legend.position="none"),
+  IR_by_group_all$pca + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+
+# Get legend from plot
+legend <- get_legend(
+  gene_by_group_all$pca + theme(legend.position="bottom")
+)
+
+# Add the legend to the row 
+all_genes_juncs_by_group_pca <-plot_grid(prow, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("PCA_all_by_group_all_juncs_or_genes.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
+
+prow_umap <- plot_grid(
+  gene_by_group_all$umap + theme(legend.position="none"),
+  PS_by_group_all$umap + theme(legend.position="none"),
+  IR_by_group_all$umap + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+all_genes_juncs_by_group_umap <- plot_grid(prow_umap, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("UMAP_all_by_group_all_juncs_or_genes.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
+###################################################
+# Combining figure rows
+
+# Combine all 3 PCA fig rows
+plot_grid(all_genes_juncs_by_group_pca,sigil_by_group_pca, sigil_by_main_pca, ncol = 1)
+        # labels = c("All genes or junctions", "Sigil genes or junctions", "Sigil genes or junctions"), label_x = 0)
+        # labels = c("All genes or junctions", "Sigil genes or junctions", "Sigil genes or junctions")
+
+ggsave(file.path(fig_output_path,
+                paste0("PCA_all_figrows.png")),
+        device = "png",
+        width = 15, height = 22,
+        dpi = 300, bg="white")
+
+
+# Combine all 3 UMAP fig rows
+plot_grid(all_genes_juncs_by_group_umap,sigil_by_group_umap, sigil_by_main_umap, ncol = 1)
+ggsave(file.path(fig_output_path,
+                paste0("UMAP_all_figrows.png")),
+        device = "png",
+        width = 15, height = 22,
+        dpi = 300, bg="white")
