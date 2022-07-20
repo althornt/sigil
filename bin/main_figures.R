@@ -58,14 +58,27 @@ df_gene_set <- read.csv(file = paste0(sigil_out_path,
                           "combine_gene_out/gene_sets/df_gene_sets.csv"))
 print(head(df_gene_set))
 
+# Read in non batch corrected tables 
+# PS
+df_all_PS_nobc <- read.table(file = paste0(sigil_out_path,"combine_mesa_out/merged_mesa_allPS.tsv"),
+                          sep="\t", header = TRUE, row.names=1) 
+df_all_PS_nobc <- df_all_PS_nobc %>% mutate_if(is.character,as.numeric)
 
-# df_bed_PS <- distinct(read.table(file = paste0(sigil_out_path,
-#                         "combine_mesa_out/explore_ref_matrix_PS/RefMatrix.bed"), 
-#                         header = FALSE)) 
-# df_bed_IR <- distinct(read.table(file = paste0(sigil_out_path,
-#                         "combine_mesa_out/explore_ref_matrix_IR/RefMatrix.bed"),
-#                          header = FALSE))
-# names(df_bed_PS) <-  names(df_bed_IR) <- list("CHROM", "START","STOP")                        
+# IR
+df_IR_table_nobc <- read.table(file =paste0(sigil_out_path,
+                          "/combine_mesa_out/merged_mesa_ir_table_intron_retention.tsv"),
+                          sep="\t", header = TRUE, row.names=1) 
+df_IR_table_nobc <- df_IR_table_nobc %>% mutate_if(is.character,as.numeric)
+
+# gene
+df_exp_nobc <- read.table(file= paste0(sigil_out_path,
+                    "combine_gene_out/combined_kallisto_log2tpm.csv"),
+                    sep=",", header = TRUE, row.names=1)
+df_exp_nobc <- df_exp_nobc %>% mutate_if(is.character,as.numeric)
+
+print(dim(df_all_PS_nobc))                      
+print(dim(df_IR_table_nobc))                      
+print(dim(df_exp_nobc))                      
 
 # UCSC alt event track table
 df_alt_events <- read.table(file = "/mnt/files/UCSC_alt_events_track.tsv", header = TRUE)  %>%
@@ -749,55 +762,55 @@ df_splice_ref_z_plot <- df_splice_ref_z %>%
 # # ############################
 # # # fig 3 zscore scatter plot
 # # ###############################
-# Splice vs Gene________________________________________________________________
-p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
-    scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
-    geom_point(size= 1, alpha = .8) +
-    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
-    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    # geom_text(
-    #           label= df_splice_ref_z[["high_ratio_2"]],
-    #           nudge_x = 0.01, nudge_y = 0.01,
-    #           check_overlap =F, col = "black", size = 3
-    #         ) +
-    theme_classic() +
-    theme(
-          legend.text = element_text(size = 10),
-          axis.title=element_text(size=12),
-          axis.text=element_text(size=10),
-          legend.position = c(0.05, .9)
-          )  +
-    xlim(-6,6)
-    # guides(color = guide_legend(nrow = 3)) 
-    # +
-    # ylim(-1, 1) 
+# # Splice vs Gene________________________________________________________________
+# p_vs_gene <-  ggplot(aes(x=splice_z, y=gene_z, color = Color), data=df_splice_ref_z_plot) + 
+#     scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+#     geom_point(size= 1, alpha = .8) +
+#     labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Percent Spliced Z-score") +
+#     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     # geom_text(
+#     #           label= df_splice_ref_z[["high_ratio_2"]],
+#     #           nudge_x = 0.01, nudge_y = 0.01,
+#     #           check_overlap =F, col = "black", size = 3
+#     #         ) +
+#     theme_classic() +
+#     theme(
+#           legend.text = element_text(size = 10),
+#           axis.title=element_text(size=12),
+#           axis.text=element_text(size=10),
+#           legend.position = c(0.05, .9)
+#           )  +
+#     xlim(-6,6)
+#     # guides(color = guide_legend(nrow = 3)) 
+#     # +
+#     # ylim(-1, 1) 
 
-ggsave(plot = p_vs_gene, dpi = 400,
-    filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
-
-
-PS_z_hist <- ggplot(df_splice_ref_z_plot, aes(x=splice_z)) + 
-    geom_histogram(bins = 100, colour="black", fill="black")+
-    theme_classic()+
-    xlim(-6, 6) +
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    labs(x = "Percent Spliced Z-score") +
-    theme(   axis.title.x=element_text(size=12),
-          axis.title.y=element_text(size=12)) 
+# ggsave(plot = p_vs_gene, dpi = 400,
+#     filename = paste0(fig_output_path, "/zscore_splice_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
 
 
-ggsave(plot = PS_z_hist, dpi = 400,
-    filename = paste0(fig_output_path, "/zscore_splice_hist.png"),  width=20, height= 8, unit="cm")
+# PS_z_hist <- ggplot(df_splice_ref_z_plot, aes(x=splice_z)) + 
+#     geom_histogram(bins = 100, colour="black", fill="black")+
+#     theme_classic()+
+#     xlim(-6, 6) +
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     labs(x = "Percent Spliced Z-score") +
+#     theme(   axis.title.x=element_text(size=12),
+#           axis.title.y=element_text(size=12)) 
 
-plot_grid(PS_z_hist, p_vs_gene, ncol = 1, rel_heights = c(.35, 1))
-ggsave(file.path(fig_output_path,
-                paste0("zscore_splice_ref_vs_gene_with_hist.png")),
-        device = "png",
-        width = 12, height = 5,
-        dpi = 300, bg="white")
-# Count number of positive and negative PS z-scores
-table(sign(df_splice_ref_z_plot$splice_z))
+
+# ggsave(plot = PS_z_hist, dpi = 400,
+#     filename = paste0(fig_output_path, "/zscore_splice_hist.png"),  width=20, height= 8, unit="cm")
+
+# plot_grid(PS_z_hist, p_vs_gene, ncol = 1, rel_heights = c(.35, 1))
+# ggsave(file.path(fig_output_path,
+#                 paste0("zscore_splice_ref_vs_gene_with_hist.png")),
+#         device = "png",
+#         width = 12, height = 5,
+#         dpi = 300, bg="white")
+# # Count number of positive and negative PS z-scores
+# table(sign(df_splice_ref_z_plot$splice_z))
 
 # # coloring Alt promoter
 # # Splice vs Gene________________________________________________________________
@@ -948,249 +961,289 @@ table(sign(df_splice_ref_z_plot$splice_z))
 # }
 
 
-#########################
-# fig 4 IR vs gene
-#########################
-if (!dir.exists(paste0(fig_output_path,"IR/withinType/"))){
-dir.create(paste0(fig_output_path,"IR/withinType/"),
-recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(paste0(fig_output_path,"IR/group_label/"))){
-dir.create(paste0(fig_output_path,"IR/group_label/"),
-recursive = TRUE, showWarnings = TRUE)}
-if (!dir.exists(paste0(fig_output_path,"IR/main_label/"))){
-dir.create(paste0(fig_output_path,"IR/main_label/"),
-recursive = TRUE, showWarnings = TRUE)}
+# #########################
+# # fig 4 IR vs gene
+# #########################
+# if (!dir.exists(paste0(fig_output_path,"IR/withinType/"))){
+# dir.create(paste0(fig_output_path,"IR/withinType/"),
+# recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(paste0(fig_output_path,"IR/group_label/"))){
+# dir.create(paste0(fig_output_path,"IR/group_label/"),
+# recursive = TRUE, showWarnings = TRUE)}
+# if (!dir.exists(paste0(fig_output_path,"IR/main_label/"))){
+# dir.create(paste0(fig_output_path,"IR/main_label/"),
+# recursive = TRUE, showWarnings = TRUE)}
 
-print(head(df_metadata))
-print("----------")
-df_IR_ref_z  %>%
-    arrange(desc(ratio)) %>%
-    head(100)
+# print(head(df_metadata))
+# print("----------")
+# df_IR_ref_z  %>%
+#     arrange(desc(ratio)) %>%
+#     head(100)
 
-print(nrow(df_IR_ref_z))
-print(sum(is.na(df_IR_ref_z$gene_z)))
-print(sum(is.na(df_IR_ref_z$IR_z)))
+# print(nrow(df_IR_ref_z))
+# print(sum(is.na(df_IR_ref_z$gene_z)))
+# print(sum(is.na(df_IR_ref_z$IR_z)))
 
-print(nrow(df_splice_ref_z))
-print(sum(is.na(df_splice_ref_z$gene_z)))
-print(sum(is.na(df_splice_ref_z$splice_z)))
+# print(nrow(df_splice_ref_z))
+# print(sum(is.na(df_splice_ref_z$gene_z)))
+# print(sum(is.na(df_splice_ref_z$splice_z)))
 
-df_IR_ref_z_plot <- df_IR_ref_z %>%
-    mutate(ratio = abs(IR_z/gene_z)) %>%
-    mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
-    arrange(desc(ratio)) %>%
-    filter(ratio != "NA")
+# df_IR_ref_z_plot <- df_IR_ref_z %>%
+#     mutate(ratio = abs(IR_z/gene_z)) %>%
+#     mutate(Color = ifelse(ratio > 5, "ratio > 5", "ratio < 5")) %>%
+#     arrange(desc(ratio)) %>%
+#     filter(ratio != "NA")
 
-# ############################
-# # fig 4 IR zscore scatter plot
-# ###############################
-# IR vs Gene________________________________________________________________
-IR_vs_gene <-  ggplot(aes(x=IR_z, y=gene_z, color = Color), data=df_IR_ref_z_plot) + 
-    scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
-    geom_point(size=1, alpha = .8) +
-    labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Intron Retention Z-score") +
-    geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    theme_classic() +
-    theme(
-          legend.text = element_text(size = 10),
-          axis.title=element_text(size=12),
-          axis.text=element_text(size=10),
-          legend.position = c(0.05, .9)
-          )  +
-    guides(color = guide_legend(nrow = 2))+ 
-    xlim(-6, 6) 
+# # ############################
+# # # fig 4 IR zscore scatter plot
+# # ###############################
+# # IR vs Gene________________________________________________________________
+# IR_vs_gene <-  ggplot(aes(x=IR_z, y=gene_z, color = Color), data=df_IR_ref_z_plot) + 
+#     scale_color_manual(values=c("ratio > 5" = "red", "ratio < 5"="black")) +
+#     geom_point(size=1, alpha = .8) +
+#     labs(colour = NULL, title= "", y = "Gene Expression Z-score", x = "Intron Retention Z-score") +
+#     geom_hline(yintercept = 0, size = .5, linetype='dotted', color = "grey") +  
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     theme_classic() +
+#     theme(
+#           legend.text = element_text(size = 10),
+#           axis.title=element_text(size=12),
+#           axis.text=element_text(size=10),
+#           legend.position = c(0.05, .9)
+#           )  +
+#     guides(color = guide_legend(nrow = 2))+ 
+#     xlim(-6, 6) 
 
-ggsave(plot = IR_vs_gene, dpi = 400,
-    filename = paste0(fig_output_path, "/zscore_IR_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
-
-
-
-# for (row in 1:100) {
-#     junc <- as.character(df_IR_ref_z[row, "event"])
-#     gene <- as.character(df_IR_ref_z[row, "overlapping"])
-#     comp_type <- as.character(df_IR_ref_z[row, "group"])
-#     cell_type <- as.character(df_IR_ref_z[row, "cell_type"])
-
-#     plot_PS_gene(junc,gene, comp_type, cell_type , df_IR_table, "IR")
-
-# }
-
-IR_PS_z_hist <- ggplot(df_IR_ref_z_plot, aes(x=IR_z)) + 
-    geom_histogram(bins = 100, colour="black", fill="black")+
-    theme_classic()+
-    xlim(-6, 6) +
-    geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
-    labs(x = "Intron Retention Z-score") +
-    theme(   axis.title.x=element_text(size=12),
-          axis.title.y=element_text(size=12)) 
+# ggsave(plot = IR_vs_gene, dpi = 400,
+#     filename = paste0(fig_output_path, "/zscore_IR_ref_vs_gene.png"),  width=20, height= 8, unit="cm")
 
 
-ggsave(plot = IR_PS_z_hist, dpi = 400,
-    filename = paste0(fig_output_path, "/zscore_IR_hist.png"),  width=20, height= 8, unit="cm")
 
-plot_grid(IR_PS_z_hist, IR_vs_gene, ncol = 1, rel_heights = c(.35, 1))
-ggsave(file.path(fig_output_path,
-                paste0("zscore_IR_ref_vs_gene_with_hist.png")),
-        device = "png",
-        width = 12, height = 5,
-        dpi = 300, bg="white")
+# # for (row in 1:100) {
+# #     junc <- as.character(df_IR_ref_z[row, "event"])
+# #     gene <- as.character(df_IR_ref_z[row, "overlapping"])
+# #     comp_type <- as.character(df_IR_ref_z[row, "group"])
+# #     cell_type <- as.character(df_IR_ref_z[row, "cell_type"])
+
+# #     plot_PS_gene(junc,gene, comp_type, cell_type , df_IR_table, "IR")
+
+# # }
+
+# IR_PS_z_hist <- ggplot(df_IR_ref_z_plot, aes(x=IR_z)) + 
+#     geom_histogram(bins = 100, colour="black", fill="black")+
+#     theme_classic()+
+#     xlim(-6, 6) +
+#     geom_vline(xintercept = 0, size = .5, linetype='dotted', color = "grey") +
+#     labs(x = "Intron Retention Z-score") +
+#     theme(   axis.title.x=element_text(size=12),
+#           axis.title.y=element_text(size=12)) 
+
+
+# ggsave(plot = IR_PS_z_hist, dpi = 400,
+#     filename = paste0(fig_output_path, "/zscore_IR_hist.png"),  width=20, height= 8, unit="cm")
+
+# plot_grid(IR_PS_z_hist, IR_vs_gene, ncol = 1, rel_heights = c(.35, 1))
+# ggsave(file.path(fig_output_path,
+#                 paste0("zscore_IR_ref_vs_gene_with_hist.png")),
+#         device = "png",
+#         width = 12, height = 5,
+#         dpi = 300, bg="white")
 
 
   
-# Count number of positive and negative IR z-scores
-table(sign(df_IR_ref_z_plot$IR_z))
+# # Count number of positive and negative IR z-scores
+# table(sign(df_IR_ref_z_plot$IR_z))
 
 
 # ##############################
 # # sample PCA 
 # ################################
 
-# plotPCA <- function(df_vals, list_vals, file_tag, meta_col, title ){
+plotPCA <- function(df_vals, list_vals, file_tag, meta_col, title ){
 
-#   set.seed(123)
+  set.seed(123)
 
-#   head(df_vals)
-#   dim(df_vals)
+  head(df_vals)
+  dim(df_vals)
 
-#   df_vals_sigil <- df_vals %>%
-#     filter(row.names(.) %in% list_vals)
+  df_vals_sigil <- df_vals %>%
+    filter(row.names(.) %in% list_vals)
 
-#   head(df_vals)
-#   dim(df_vals_sigil)
+  head(df_vals)
+  dim(df_vals_sigil)
 
-#   # remove high nan; in remaining rows replace with row median
-#   df_vals_sigil_clean <- df_vals_sigil[which(rowMeans(!is.na(df_vals_sigil)) > 0.5), ]  %>%
-#       mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x))
+  # remove high nan; in remaining rows replace with row median
+  df_vals_sigil_clean <- df_vals_sigil[which(rowMeans(!is.na(df_vals_sigil)) > 0.5), ]  %>%
+      mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x))
 
-#   print(dim(df_vals_sigil_clean))
+  print(dim(df_vals_sigil_clean))
 
-#   df_vals_sigil_clean <- df_vals_sigil_clean[apply(df_vals_sigil_clean, 1, var) != 0, ]
-#   print(dim(df_vals_sigil_clean))
+  df_vals_sigil_clean <- df_vals_sigil_clean[apply(df_vals_sigil_clean, 1, var) != 0, ]
+  print(dim(df_vals_sigil_clean))
 
 
-#   prcomp.out <- prcomp(as.data.frame(t(df_vals_sigil_clean)),
-#                     center = TRUE,
-#                     scale. = TRUE)
+  prcomp.out <- prcomp(as.data.frame(t(df_vals_sigil_clean)),
+                    center = TRUE,
+                    scale. = TRUE)
     
-#   # print(summary(prcomp.out))
-#   # Variance explained by each PC
-#   var_explained <- prcomp.out$sdev^2/sum(prcomp.out$sdev^2)
+  # print(summary(prcomp.out))
+  # Variance explained by each PC
+  var_explained <- prcomp.out$sdev^2/sum(prcomp.out$sdev^2)
 
-#   # Merge PCA results with metadata
-#   df_PCA <- data.frame(x = prcomp.out$x[,1],  y = prcomp.out$x[,2])
-#   rownames(df_PCA) <- colnames(df_vals_sigil_clean)
-#   pca.out.merge = cbind(df_PCA, df_metadata)
-#   print(dim(pca.out.merge ))
+  # Merge PCA results with metadata
+  df_PCA <- data.frame(x = prcomp.out$x[,1],  y = prcomp.out$x[,2])
+  rownames(df_PCA) <- colnames(df_vals_sigil_clean)
+  pca.out.merge = cbind(df_PCA, df_metadata)
+  print(dim(pca.out.merge ))
 
 
-#   n <- length(unique(df_metadata[[meta_col]]))
-#   qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
-#   pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+  n <- length(unique(df_metadata[[meta_col]]))
+  qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+  pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
 
-#   # Plot PCA all 
-#   plt_pca <- ggplot(pca.out.merge, aes(x, y, color = get(meta_col), shape = data_source)) +
-#       geom_point(size = 2.5) +
-#       theme_classic() +
-#       theme(legend.position="top",legend.title = element_blank(), legend.text = element_text(size = 10))+
-#       # guides(color=guide_legend(nrow=3,byrow=TRUE)) +
-#       scale_color_manual(values=pal) +
-#       labs(title= paste0(title), sep = ' ', 
-#           x=paste0("PC1: ",round(var_explained[1]*100,1),"%"),
-#           y=paste0("PC2: ",round(var_explained[2]*100,1),"%")) 
+  # Plot PCA all 
+  plt_pca <- ggplot(pca.out.merge, aes(x, y, color = get(meta_col), shape = data_source)) +
+      geom_point(size = 2.5) +
+      theme_classic() +
+      theme(legend.position="top",legend.title = element_blank(), legend.text = element_text(size = 10))+
+         scale_color_manual(values=c("#006400",
+            "#9A6324",
+                "#ff0000",
+                "#ffd700",
+                "#00ff00",
+                "#00ffff",
+                "#ff00ff",
+                "#ffb6c1"))+
+      labs(title= paste0(title), sep = ' ', 
+          x=paste0("PC1: ",round(var_explained[1]*100,1),"%"),
+          y=paste0("PC2: ",round(var_explained[2]*100,1),"%")) 
 
-#   # Save plot
-#   ggsave(file.path(fig_output_path,
-#                   paste0("PCA_",file_tag,".png")),
-#           device = "png",
-#           width = 5, height = 8,
-#           dpi = 300)
+  # Save plot
+  ggsave(file.path(fig_output_path,
+                  paste0("PCA_",file_tag,".png")),
+          device = "png",
+          width = 5, height = 8,
+          dpi = 300)
 
-#   # UMAP using PCA as input
+  # UMAP using PCA as input
 
-#   # Run UMAP
-#   umap.out <- umap(as.data.frame(prcomp.out$x), n_neighbors = 5, learning_rate = 0.5, init = "random", min_dist = 1, spread = 5)
-#   umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
-#   rownames(umap.out) <- colnames(df_vals_sigil_clean)
+  # Run UMAP
+  umap.out <- umap(as.data.frame(prcomp.out$x), n_neighbors = 5, learning_rate = 0.5, init = "random", min_dist = 1, spread = 5)
+  umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
+  rownames(umap.out) <- colnames(df_vals_sigil_clean)
 
-#   # Merge UMAP results with metadata
-#   umap.out.merge = cbind(umap.out, df_metadata)
+  # Merge UMAP results with metadata
+  umap.out.merge = cbind(umap.out, df_metadata)
 
-#   # Plot UMAP
-#   plt_umap <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col), shape = data_source)) +
-#       geom_point(size = 2.5) +
-#       theme_classic() +
-#       theme(legend.position="top",legend.title = element_blank(), legend.text = element_text(size = 10))+
-#       # guides(color=guide_legend(nrow=3,byrow=TRUE)) +
-#       scale_color_manual(values=pal) +
-#       labs(title= paste0(title), sep = ' ', 
-#           x="UMAP1",
-#           y="UMAP2") 
+  # Plot UMAP
+  plt_umap <- ggplot(umap.out.merge, aes(x, y, color = get(meta_col), shape = data_source)) +
+      geom_point(size = 2.5) +
+      theme_classic() +
+      theme(legend.position="top",legend.title = element_blank(), legend.text = element_text(size = 10))+
+      # guides(color=guide_legend(nrow=3,byrow=TRUE)) +
+    #   scale_color_manual(values=pal) +
+        # scale_color_viridis_d() +
+        # scale_color_viridis_d(option="C")+
+        # scale_colour_brewer(palette = "Set2") +
+         scale_color_manual(values=c("#006400",
+            "#9A6324",
+                "#ff0000",
+                "#ffd700",
+                "#00ff00",
+                "#00ffff",
+                "#ff00ff",
+                "#ffb6c1"))+
+      labs(title= paste0(title), sep = ' ', 
+          x="UMAP1",
+          y="UMAP2") 
 
-#   # Save plot
-#   ggsave(file.path(fig_output_path,
-#                   paste0("UMAP_",file_tag,".png")),
-#           device = "png",
-#           width = 5, height = 8,
-#           dpi = 300)
+  # Save plot
+  ggsave(file.path(fig_output_path,
+                  paste0("UMAP_",file_tag,".png")),
+          device = "png",
+          width = 5, height = 8,
+          dpi = 300)
 
-#   return(list("pca"=plt_pca, "umap" = plt_umap))
+  return(list("pca"=plt_pca, "umap" = plt_umap))
 
-# }
+}
 
-# ###################################################
-# # GROUP LABEL SIGIL
-# # Make PCAs and UMAPs by group label 
-# gene_by_group <- plotPCA(df_exp,unique(df_gene_set$X), "Gene_sigil_by_group", "group_label", "Gene" )
-# PS_by_group <- plotPCA(df_all_PS,unique(df_splice_set$event), "PS_sigil_by_group", "group_label", "Splice" )
-# IR_by_group <- plotPCA(df_IR_table,unique(df_IR_set$event), "IR_sigil_by_group", "group_label", "Intron retention" )
+#9A6324 brown
+# midnightblue
+# #191970
+# darkgreen
+# #006400
+# red
+# #ff0000
+# gold
+# #ffd700
+# lime
+# #00ff00
+# aqua
+# #00ffff
+# fuchsia
+# #ff00ff
+# lightpink
+# #ffb6c1
 
-# # Plot all by group label
-# prow <- plot_grid(
-#   gene_by_group$pca + theme(legend.position="none"),
-#   PS_by_group$pca + theme(legend.position="none"),
-#   IR_by_group$pca + theme(legend.position="none"),
-#   align = 'vh',
-#   # labels = c("A", "B", "C"),
-#   hjust = -1,
-#   nrow = 1
-# )
 
-# # Get legend from plot
-# legend <- get_legend(
-#   gene_by_group$pca + theme(legend.position="bottom")
-# )
 
-# # Add the legend to the row 
-# sigil_by_group_pca <- plot_grid(prow, legend, ncol = 1, rel_heights = c(1, .3))
-# ggsave(file.path(fig_output_path,
-#                 paste0("PCA_all_by_group.png")),
-#         device = "png",
-#         width = 15, height = 6,
-#         dpi = 300, bg="white")
+###################################################
+# GROUP LABEL SIGIL
+# Make PCAs and UMAPs by group label 
+gene_by_group <- plotPCA(df_exp,unique(df_gene_set$X), "Gene_sigil_by_group", "group_label", "Gene" )
+PS_by_group <- plotPCA(df_all_PS,unique(df_splice_set$event), "PS_sigil_by_group", "group_label", "Splice" )
+IR_by_group <- plotPCA(df_IR_table,unique(df_IR_set$event), "IR_sigil_by_group", "group_label", "Intron Retention" )
 
-# #Plot UMAPS
-# prow_umap <- plot_grid(
-#   gene_by_group$umap + theme(legend.position="none"),
-#   PS_by_group$umap + theme(legend.position="none"),
-#   IR_by_group$umap + theme(legend.position="none"),
-#   align = 'vh',
-#   # labels = c("A", "B", "C"),
-#   hjust = -1,
-#   nrow = 1
-# )
-# sigil_by_group_umap <- plot_grid(prow_umap, legend, ncol = 1, rel_heights = c(1, .3))
-# ggsave(file.path(fig_output_path,
-#                 paste0("UMAP_all_by_group.png")),
-#         device = "png",
-#         width = 15, height = 6,
-#         dpi = 300, bg="white")
-# ###################################################
+# Plot all by group label
+prow_pca_sigil <- plot_grid(
+  gene_by_group$pca + theme(legend.position="none"),
+  PS_by_group$pca + theme(legend.position="none"),
+  IR_by_group$pca + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+
+# Get legend from plot
+legend_umap <- get_legend(
+  gene_by_group$umap + theme(legend.position="top", legend.title = element_blank(), legend.text = element_text(size = 12))
+)
+# Get legend from plot
+legend_pca <- get_legend(
+  gene_by_group$pca + theme(legend.position="top", legend.title = element_blank(), legend.text = element_text(size = 12))
+)
+# Add the legend to the row 
+sigil_by_group_pca <- plot_grid(prow_pca_sigil, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("PCA_all_by_group.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
+
+#Plot UMAPS
+prow_umap_sigil <- plot_grid(
+  gene_by_group$umap + theme(legend.position="none"),
+  PS_by_group$umap + theme(legend.position="none"),
+  IR_by_group$umap + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+sigil_by_group_umap <- plot_grid(prow_umap_sigil, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("UMAP_all_by_group.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
+###################################################
 # # MAIN LABEL SIGIL
 # # Make PCAs and UMAPs by main label 
 # gene_by_main <- plotPCA(df_exp,unique(df_gene_set$X), "Gene_sigil_by_main", "main_label", "Gene" )
 # PS_by_main <- plotPCA(df_all_PS,unique(df_splice_set$event), "PS_sigil_by_main", "main_label", "Splice" )
-# IR_by_main <- plotPCA(df_IR_table,unique(df_IR_set$event), "IR_sigil_by_main", "main_label", "Intron retention" )
+# IR_by_main <- plotPCA(df_IR_table,unique(df_IR_set$event), "IR_sigil_by_main", "main_label", "Intron Retention" )
 
 
 # # PCA Plot all by main label
@@ -1205,8 +1258,8 @@ table(sign(df_IR_ref_z_plot$IR_z))
 # )
 
 # # Get legend from plot
-# legend <- get_legend(
-#   gene_by_main$pca + theme(legend.position="bottom")
+# main_legend <- get_legend(
+#   gene_by_main$pca + theme(legend.position="top")
 # )
 
 # # PCA Add the legend to the row 
@@ -1232,71 +1285,121 @@ table(sign(df_IR_ref_z_plot$IR_z))
 #         device = "png",
 #         width = 15, height = 6,
 #         dpi = 300, bg="white")
-# ###################################################
-# # GROUP LABEL ALL JUNCTIONS/GENES
-# # Make PCAs by group label 
-# gene_by_group_all <- plotPCA(df_exp,rownames(df_exp), "Gene_sigil_by_group", "group_label", "Gene" )
-# PS_by_group_all <- plotPCA(df_all_PS,rownames(df_all_PS), "PS_sigil_by_group", "group_label", "Splice" )
-# IR_by_group_all <- plotPCA(df_IR_table,rownames(df_IR_table), "IR_sigil_by_group", "group_label", "Intron retention" )
+###################################################
+# GROUP LABEL ALL JUNCTIONS/GENES
+# Make PCAs by group label 
+gene_by_group_all <- plotPCA(df_exp,rownames(df_exp), "Gene_sigil_by_group", "group_label", "Gene" )
+PS_by_group_all <- plotPCA(df_all_PS,rownames(df_all_PS), "PS_sigil_by_group", "group_label", "Splice" )
+IR_by_group_all <- plotPCA(df_IR_table,rownames(df_IR_table), "IR_sigil_by_group", "group_label", "Intron Retention" )
 
-# # Plot all by group label
-# prow <- plot_grid(
-#   gene_by_group_all$pca + theme(legend.position="none"),
-#   PS_by_group_all$pca + theme(legend.position="none"),
-#   IR_by_group_all$pca + theme(legend.position="none"),
-#   align = 'vh',
-#   # labels = c("A", "B", "C"),
-#   hjust = -1,
-#   nrow = 1
-# )
+# Plot all by group label
+prow_pca_all_genes_bc <- plot_grid(
+  gene_by_group_all$pca + theme(legend.position="none"),
+  PS_by_group_all$pca + theme(legend.position="none"),
+  IR_by_group_all$pca + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
 
-# # Get legend from plot
-# legend <- get_legend(
-#   gene_by_group_all$pca + theme(legend.position="bottom")
-# )
+# Get legend from plot
+legend <- get_legend(
+  gene_by_group_all$pca + theme(legend.position="bottom")
+)
 
-# # Add the legend to the row 
-# all_genes_juncs_by_group_pca <-plot_grid(prow, legend, ncol = 1, rel_heights = c(1, .3))
-# ggsave(file.path(fig_output_path,
-#                 paste0("PCA_all_by_group_all_juncs_or_genes.png")),
-#         device = "png",
-#         width = 15, height = 6,
-#         dpi = 300, bg="white")
+# Add the legend to the row 
+all_genes_juncs_by_group_pca <-plot_grid(prow_pca_all_genes_bc, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("PCA_all_by_group_all_juncs_or_genes.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
 
-# prow_umap <- plot_grid(
-#   gene_by_group_all$umap + theme(legend.position="none"),
-#   PS_by_group_all$umap + theme(legend.position="none"),
-#   IR_by_group_all$umap + theme(legend.position="none"),
-#   align = 'vh',
-#   # labels = c("A", "B", "C"),
-#   hjust = -1,
-#   nrow = 1
-# )
-# all_genes_juncs_by_group_umap <- plot_grid(prow_umap, legend, ncol = 1, rel_heights = c(1, .3))
-# ggsave(file.path(fig_output_path,
-#                 paste0("UMAP_all_by_group_all_juncs_or_genes.png")),
-#         device = "png",
-#         width = 15, height = 6,
-#         dpi = 300, bg="white")
-# ###################################################
-# # Combining figure rows
-
-# # Combine all 3 PCA fig rows
-# plot_grid(all_genes_juncs_by_group_pca,sigil_by_group_pca, sigil_by_main_pca, ncol = 1)
-#         # labels = c("All genes or junctions", "Sigil genes or junctions", "Sigil genes or junctions"), label_x = 0)
-#         # labels = c("All genes or junctions", "Sigil genes or junctions", "Sigil genes or junctions")
-
-# ggsave(file.path(fig_output_path,
-#                 paste0("PCA_all_figrows.png")),
-#         device = "png",
-#         width = 15, height = 22,
-#         dpi = 300, bg="white")
+prow_umap_all_genes_bc <- plot_grid(
+  gene_by_group_all$umap + theme(legend.position="none"),
+  PS_by_group_all$umap + theme(legend.position="none"),
+  IR_by_group_all$umap + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+all_genes_juncs_by_group_umap <- plot_grid(prow_umap_all_genes_bc, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("UMAP_all_by_group_all_juncs_or_genes.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
 
 
-# # Combine all 3 UMAP fig rows
-# plot_grid(all_genes_juncs_by_group_umap,sigil_by_group_umap, sigil_by_main_umap, ncol = 1)
-# ggsave(file.path(fig_output_path,
-#                 paste0("UMAP_all_figrows.png")),
-#         device = "png",
-#         width = 15, height = 22,
-#         dpi = 300, bg="white")
+###################################################
+# GROUP LABEL ALL JUNCTIONS/GENES BEFORE BATCH CORRECTION
+# Make PCAs by group label 
+
+# Make PCAs by group label 
+gene_by_group_all_no_bc <- plotPCA(df_exp_nobc,rownames(df_exp_nobc), "Gene_sigil_by_group", "group_label", "Gene" )
+PS_by_group_all_no_bc <- plotPCA(df_all_PS_nobc,rownames(df_all_PS_nobc), "PS_sigil_by_group", "group_label", "Splice" )
+IR_by_group_all_no_bc <- plotPCA(df_IR_table_nobc,rownames(df_IR_table_nobc), "IR_sigil_by_group", "group_label", "Intron Retention" )
+
+# Plot all by group label
+prow_pca_all_genes_no_bc <- plot_grid(
+  gene_by_group_all_no_bc$pca + theme(legend.position="none"),
+  PS_by_group_all_no_bc$pca + theme(legend.position="none"),
+  IR_by_group_all_no_bc$pca + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+
+# Add the legend to the row 
+all_genes_juncs_by_group_pca_no_bc <-plot_grid(prow_pca_all_genes_no_bc, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("PCA_all_by_group_all_juncs_or_genes_no_bc.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
+
+prow_umap_all_genes_no_bc <- plot_grid(
+  gene_by_group_all_no_bc$umap + theme(legend.position="none"),
+  PS_by_group_all_no_bc$umap + theme(legend.position="none"),
+  IR_by_group_all_no_bc$umap + theme(legend.position="none"),
+  align = 'vh',
+  # labels = c("A", "B", "C"),
+  hjust = -1,
+  nrow = 1
+)
+
+all_genes_juncs_by_group_umap_no_bc <- plot_grid(prow_umap_all_genes_no_bc, legend, ncol = 1, rel_heights = c(1, .3))
+ggsave(file.path(fig_output_path,
+                paste0("UMAP_all_by_group_all_juncs_or_genes_no_bc.png")),
+        device = "png",
+        width = 15, height = 6,
+        dpi = 300, bg="white")
+
+        
+###################################################
+# Combining figure rows
+
+# Combine all 3 PCA fig rows
+# plot_grid(all_genes_juncs_by_group_pca_no_bc, all_genes_juncs_by_group_pca,sigil_by_group_pca, sigil_by_main_pca, ncol = 1)
+plot_grid(legend_pca,prow_pca_all_genes_no_bc, prow_pca_all_genes_bc,prow_pca_sigil, ncol = 1, rel_heights = c( .35, 1, 1, 1))
+        # labels = c("All genes or junctions", "Sigil genes or junctions", "Sigil genes or junctions"), label_x = 0)
+        # labels = c("All genes or junctions", "Sigil genes or junctions", "Sigil genes or junctions")
+
+ggsave(file.path(fig_output_path,
+                paste0("PCA_all_figrows.png")),
+        device = "png",
+        width = 15, height = 20,
+        dpi = 300, bg="white")
+
+
+# Combine all 3 UMAP fig rows
+# plot_grid(all_genes_juncs_by_group_umap_no_bc, all_genes_juncs_by_group_umap,sigil_by_group_umap, sigil_by_main_umap, ncol = 1)
+plot_grid(legend_umap,prow_umap_all_genes_no_bc, prow_umap_all_genes_bc,prow_umap_sigil, ncol = 1, rel_heights = c( .35, 1, 1, 1))
+ggsave(file.path(fig_output_path,
+                paste0("UMAP_all_figrows.png")),
+        device = "png",
+        width = 15, height = 20,
+        dpi = 300, bg="white")
