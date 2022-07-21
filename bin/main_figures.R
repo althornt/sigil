@@ -219,7 +219,9 @@ df_counts %>%
     theme(legend.position = "none", axis.text.x = element_text(size=10), axis.title.y = element_text(size=12), axis.text.y = element_text(size=10)) +
     labs(x = "", y = "Marker count per set") +
     scale_color_manual(values=c("Gene"="orange","Splice"="skyblue","IR"="darkgreen"))
-    # +
+
+
+
 #     coord_cartesian(clip = "off")+
 #     geom_text_repel(aes(label = setlabel), size = 3.5,
 #         xlim = c(NA, Inf), ylim = c(NA, Inf),
@@ -591,14 +593,14 @@ print("~~~~~~~~~~~")
 # ggsave(paste0(fig_output_path,"rGREAT_GO_MF_BP_all_splice_ref.png"), 
 #             width=70, height=35, unit="cm", dpi=300)
 
-# # Format IR table to add the needed bed columns
-# df_IR_set <- df_IR_set %>%
-#   rowwise() %>%
-#     mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
-#     mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
-#     mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
-#     mutate(strand = strsplit(event, ":")[[1]][3]) %>%
-#     as.data.frame() 
+# Format IR table to add the needed bed columns
+df_IR_set <- df_IR_set %>%
+  rowwise() %>%
+    mutate(chrom = paste0("chr",strsplit(event, ":")[[1]][1])) %>%
+    mutate(start = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][1] )) %>%
+    mutate(end = as.numeric(strsplit(strsplit(event, ":")[[1]][2], "-")[[1]][2] ))    %>%
+    mutate(strand = strsplit(event, ":")[[1]][3]) %>%
+    as.data.frame() 
 
 # # Run Great on IR sigil junctions
 # job_IR = submitGreatJob(makeGRangesFromDataFrame(df_IR_set),
@@ -1054,6 +1056,48 @@ df_splice_ref_z_plot <- df_splice_ref_z %>%
 # # Count number of positive and negative IR z-scores
 # table(sign(df_IR_ref_z_plot$IR_z))
 
+
+# ##############################
+# # chr marker distribution 
+# ################################
+
+splice_set_chr_dist <- df_splice_set %>%
+  select(event, chrom) %>%
+  distinct() %>%
+  count(chrom) %>%
+  mutate(percent_chr = n/sum(n)) %>%
+  mutate(type = "Splice")
+
+IR_set_chr_dist <- df_IR_set %>%
+  select(event, chrom) %>%
+  distinct() %>%
+  count(chrom) %>%
+  mutate(percent_chr = n/sum(n)) %>%
+  mutate(type = "Intron Retention")
+
+df_splice_IR_chrom_perc <- rbind(splice_set_chr_dist,IR_set_chr_dist ) 
+df_splice_IR_chrom_perc$chrom <- sub("chr", "", df_splice_IR_chrom_perc$chrom)
+
+# Force sorting 
+chrOrder <-c((1:22),"X","Y")
+# df_splice_IR_chrom_perc$chrom <- factor(df_splice_IR_chrom_perc$chrom, chrOrder, ordered=TRUE)
+print(unique(df_splice_IR_chrom_perc$chrom))
+
+df_splice_IR_chrom_perc <- transform(df_splice_IR_chrom_perc, chrom = factor(chrom, levels = chrOrder))
+print(unique(df_splice_IR_chrom_perc$chrom))
+
+
+chr_PS <- ggplot(df_splice_IR_chrom_perc, aes(x=chrom, y=percent_chr, fill=type)) +
+  geom_bar(position="dodge", stat='identity') +
+  theme_classic() +
+  theme(legend.title = element_blank(), legend.position = "top") +
+          labs(y= "Percent of sigil markers", x= "Chromosome") +
+          scale_fill_manual(values=c("Splice"="skyblue","Intron Retention"="darkgreen"))
+
+ggsave(paste0(fig_output_path,"chr_marker_percent.png"), width=20, height=8, unit="cm")
+
+
+quit()
 
 # ##############################
 # # sample PCA 

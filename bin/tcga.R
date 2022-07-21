@@ -175,9 +175,6 @@ print(length(unique(df_splice_set_byevent$overlapping)))
 #     cat( i )
 # }
 
-unique(colnames(df_splice_set_byevent))
-
-
 ###########################
 # Merging metadata 
 ###############################
@@ -221,14 +218,14 @@ colnames(df_meta)
 df_meta <- df_meta %>%
     filter(File.Name %in% colnames(df_LUAD_spliceset)) %>%
     # distinct() %>%
-    select(c("Tumor.Type", "File.Name", "MSI.MANTIS.Score", "Mutation.Count", 
-                "Person.Neoplasm.Cancer.Status", "Ragnum.Hypoxia.Score", 
-                "Sex", "Sample.Type.x", "Cancer.Type", "Neoplasm.Disease.Stage.American.Joint.Committee.on.Cancer.Code")) %>%
+    # select(c("Tumor.Type", "File.Name", "MSI.MANTIS.Score", "Mutation.Count", 
+    #             "Person.Neoplasm.Cancer.Status", "Ragnum.Hypoxia.Score", 
+    #             "Sex", "Sample.Type.x", "Cancer.Type", "Neoplasm.Disease.Stage.American.Joint.Committee.on.Cancer.Code")) %>%
     column_to_rownames("File.Name") %>%
     rename(LUAD.Sample.Type = Sample.Type.x) %>%
     arrange(rownames(.))
 
-
+sort(colnames(df_meta))
 head(df_meta)
 # quit()
 dim(df_meta)
@@ -246,24 +243,13 @@ df_enr_all_sets <- read.csv(file = "/mnt/tcga/GSVA_TCGA_LUAD_output.tsv", string
 
 head(colnames(df_enr_all_sets))
 
-# colnames(df_enr_all_sets) <- str_replace(colnames(df_enr_all_sets), ".", "-")
-# colnames(df_enr_all_sets) <- gsub(".", "-", colnames(df_enr_all_sets))
-
-#     %>%
-#     # select( intersect(colnames(.),rownames(df_meta))) %>%
-#     select(sort(names(.)))
-
 df_enr_group_sets <- read.csv(file = "/mnt/tcga/GSVA_TCGA_LUAD_output_group_set.tsv", stringsAsFactors = FALSE) %>%
     tibble::column_to_rownames("name") %>%
     select( intersect(colnames(.),rownames(df_meta))) %>%
     select(sort(names(.)))
 
-# head(df_enr_all_sets)
-
 head(colnames(df_enr_all_sets))
 head(rownames(df_meta))
-# quit()
-
 ################################################
 # Counts matching sign of delta 
 ################################################
@@ -296,85 +282,84 @@ cat(length(unique(matches$event)), "\n")
 # volcano plot 
 ################################################
 
-head(df_mesa_tumor_vs_norm)
+# head(df_mesa_tumor_vs_norm)
 
-print(length(unique(df_splice_set$event)))
-print(length(unique(matches$event)))
+# print(length(unique(df_splice_set$event)))
+# print(length(unique(matches$event)))
+
+# df_mesa_tumor_vs_norm <- df_mesa_tumor_vs_norm %>%
+#     mutate(sigil = ifelse(event %in% unlist(df_splice_set$event), 
+#         "Junction in a sigil splice set", "Junction not in a sigil splice set")) %>%
+#     mutate(sigil_and_delta_match = ifelse(event %in% matches$event, 
+#         "Junction in a sigil splice set with matching delta direction", "Junction not in a sigil splice set with matching delta direction"))
+
+# print(length(df_mesa_tumor_vs_norm$sigil))
+# print(length(df_mesa_tumor_vs_norm$sigil_and_delta_match))
+
+# # Plot coloring all sigil 
+# p <- ggplot(data=df_mesa_tumor_vs_norm, aes(x=delta, y=-log10(corrected), color=sigil )) +
+#         geom_point(alpha = .2  ) +
+#         # theme_minimal() + geom_vline(xintercept=c(-0.2, 0.2), col="red") +
+#         # geom_hline(yintercept=-log10(0.05), col="red") +
+#         xlim(-1.0, 1.0) +
+#         theme_classic()+
+#         # +
+#         # geom_text(
+#         # label= df_css$gglabel,
+#         # vjust="inward",hjust="inward",
+#         # # nudge_x = 0.05, nudge_y = 0.05,
+#         # check_overlap =F, col = "darkgreen", size = 2
+#         # ) +
+#         scale_color_manual(name = "",
+#         values = c("Junction in a sigil splice set" = "red",
+#                     "Junction not in a sigil splice set" = "black"),
+#         labels = c("Junction in a sigil splice set",
+#                     "Junction not in a sigil splice set"))+
+#         theme(legend.position="bottom") +
+# #   theme(
+# #     legend.position="bottom", 
+# #     legend.justification = "left", 
+# #     legend.margin = margin(0, 0, 0, 0),
+# #     legend.spacing.x = unit(0, "pt")
+# #   )+
+#           guides(color = guide_legend(nrow = 3)) +
+#         ylab("-log10(corrected p-value")
 
 
-df_mesa_tumor_vs_norm <- df_mesa_tumor_vs_norm %>%
-    mutate(sigil = ifelse(event %in% unlist(df_splice_set$event), 
-        "Junction in a sigil splice set", "Junction not in a sigil splice set")) %>%
-    mutate(sigil_and_delta_match = ifelse(event %in% matches$event, 
-        "Junction in a sigil splice set with matching delta direction", "Junction not in a sigil splice set with matching delta direction"))
+# ggsave(file.path(fig_output_path,
+#                 paste("LUAD_volcano_all_sigil_juncs.png", sep = '.')),
+#         device = "png",
+#         width = 5, height = 4,
+#         dpi = 300)
 
-print(length(df_mesa_tumor_vs_norm$sigil))
-print(length(df_mesa_tumor_vs_norm$sigil_and_delta_match))
+# # Plot coloring all sigil sig and matched
+# p <- ggplot(data=df_mesa_tumor_vs_norm, aes(x=delta, y=-log10(corrected), color=sigil_and_delta_match )) +
+#         geom_point(alpha = .2  ) +
+#         # theme_minimal() + geom_vline(xintercept=c(-0.2, 0.2), col="red") +
+#         # geom_hline(yintercept=-log10(0.05), col="red") +
+#         xlim(-1.0, 1.0) +
+#         theme_classic()+
+#         # +
+#         # geom_text(
+#         # label= df_css$gglabel,
+#         # vjust="inward",hjust="inward",
+#         # # nudge_x = 0.05, nudge_y = 0.05,
+#         # check_overlap =F, col = "darkgreen", size = 2
+#         # ) +
+#         scale_color_manual(name = "",
+#         values = c("Junction in a sigil splice set with matching delta direction" = "red",
+#                     "Junction not in a sigil splice set with matching delta direction" = "black"),
+#         labels = c("Junction in a sigil splice set with matching delta direction",
+#                     "Junction not in a sigil splice set with matching delta direction"))+
+#         theme(legend.position="bottom") +
+#         guides(color = guide_legend(nrow = 3)) +
+#         ylab("-log10(corrected p-value)") 
 
-# Plot coloring all sigil 
-p <- ggplot(data=df_mesa_tumor_vs_norm, aes(x=delta, y=-log10(corrected), color=sigil )) +
-        geom_point(alpha = .2  ) +
-        # theme_minimal() + geom_vline(xintercept=c(-0.2, 0.2), col="red") +
-        # geom_hline(yintercept=-log10(0.05), col="red") +
-        xlim(-1.0, 1.0) +
-        theme_classic()+
-        # +
-        # geom_text(
-        # label= df_css$gglabel,
-        # vjust="inward",hjust="inward",
-        # # nudge_x = 0.05, nudge_y = 0.05,
-        # check_overlap =F, col = "darkgreen", size = 2
-        # ) +
-        scale_color_manual(name = "",
-        values = c("Junction in a sigil splice set" = "red",
-                    "Junction not in a sigil splice set" = "black"),
-        labels = c("Junction in a sigil splice set",
-                    "Junction not in a sigil splice set"))+
-        theme(legend.position="bottom") +
-#   theme(
-#     legend.position="bottom", 
-#     legend.justification = "left", 
-#     legend.margin = margin(0, 0, 0, 0),
-#     legend.spacing.x = unit(0, "pt")
-#   )+
-          guides(color = guide_legend(nrow = 3)) +
-        ylab("-log10(corrected p-value")
-
-
-ggsave(file.path(fig_output_path,
-                paste("LUAD_volcano_all_sigil_juncs.png", sep = '.')),
-        device = "png",
-        width = 5, height = 4,
-        dpi = 300)
-
-# Plot coloring all sigil sig and matched
-p <- ggplot(data=df_mesa_tumor_vs_norm, aes(x=delta, y=-log10(corrected), color=sigil_and_delta_match )) +
-        geom_point(alpha = .2  ) +
-        # theme_minimal() + geom_vline(xintercept=c(-0.2, 0.2), col="red") +
-        # geom_hline(yintercept=-log10(0.05), col="red") +
-        xlim(-1.0, 1.0) +
-        theme_classic()+
-        # +
-        # geom_text(
-        # label= df_css$gglabel,
-        # vjust="inward",hjust="inward",
-        # # nudge_x = 0.05, nudge_y = 0.05,
-        # check_overlap =F, col = "darkgreen", size = 2
-        # ) +
-        scale_color_manual(name = "",
-        values = c("Junction in a sigil splice set with matching delta direction" = "red",
-                    "Junction not in a sigil splice set with matching delta direction" = "black"),
-        labels = c("Junction in a sigil splice set with matching delta direction",
-                    "Junction not in a sigil splice set with matching delta direction"))+
-        theme(legend.position="bottom") +
-        guides(color = guide_legend(nrow = 3)) +
-        ylab("-log10(corrected p-value)") 
-
-ggsave(file.path(fig_output_path,
-                paste("LUAD_volcano_sigil_sig_delta_match.png", sep = '.')),
-        device = "png",
-        width = 5, height = 4,
-        dpi = 300)
+# ggsave(file.path(fig_output_path,
+#                 paste("LUAD_volcano_sigil_sig_delta_match.png", sep = '.')),
+#         device = "png",
+#         width = 5, height = 4,
+#         dpi = 300)
 
 
 # ################################################
@@ -452,49 +437,54 @@ ggsave(file.path(fig_output_path,
 # draw(ht, legend_grouping = "original",heatmap_legend_side="bottom", annotation_legend_side="bottom")
 # dev.off()
 
-# ###################################################
-# # PCA tumor vs normal + sigil set
-# ####################################################
+###################################################
+# PCA tumor vs normal + sigil set
+####################################################
 
-# df_LUAD_spliceset_clean <- df_LUAD_spliceset[which(rowMeans(!is.na(df_LUAD_spliceset)) > 0.5), ]  %>%
-#     select(intersect(colnames(df_LUAD_spliceset),rownames(df_meta))) %>%
-#     mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x)) %>%
-#     select(sort(names(.))) 
+df_LUAD_spliceset_clean <- df_LUAD_spliceset[which(rowMeans(!is.na(df_LUAD_spliceset)) > 0.5), ]  %>%
+    select(intersect(colnames(df_LUAD_spliceset),rownames(df_meta))) %>%
+    mutate_if(is.numeric, function(x) ifelse(is.na(x), median(x, na.rm = T), x)) %>%
+    select(sort(names(.))) 
 
-# print(dim(df_LUAD_spliceset_clean))
+print(dim(df_LUAD_spliceset_clean))
 
-# prcomp.out <- prcomp(as.data.frame(t(df_LUAD_spliceset_clean)),
-#                    center = TRUE,
-#                    scale. = TRUE)$x
-  
-# # print(head(prcomp.out ))
-# print(dim(prcomp.out ))
+prcomp.out <- prcomp(as.data.frame(t(df_LUAD_spliceset_clean)),
+                   center = TRUE,
+                   scale. = TRUE)
 
-# # Merge PCA results with metadata
-# df_PCA <- data.frame(x = prcomp.out[,1],  y = prcomp.out[,2])
-# rownames(df_PCA) <- colnames(df_LUAD_spliceset_clean)
-# pca.out.merge = cbind(df_PCA, df_meta)
-# print(dim(pca.out.merge ))
+var_explained <- prcomp.out$sdev^2/sum(prcomp.out$sdev^2)
 
-# # # Make color palette
-# # n <- length(unique(df_bam_id[["Sample.Type"]]))
-# # qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
-# # pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+# print(head(prcomp.out ))
+print(dim(prcomp.out ))
 
-# # Plot PCA all s
-# plt <- ggplot(pca.out.merge, aes(x, y, color = LUAD.Sample.Type)) +
-#     geom_point(size = 2) +
-#     theme_classic() +
-#     theme(legend.position="top",legend.title = element_blank()) +
-#     # scale_color_manual(values=pal) +
-#     labs(title= "", sep = ' ')
+# Merge PCA results with metadata
+df_PCA <- data.frame(x = prcomp.out$x[,1],  y = prcomp.out$x[,2])
+rownames(df_PCA) <- colnames(df_LUAD_spliceset_clean)
+pca.out.merge = cbind(df_PCA, df_meta)
+print(dim(pca.out.merge ))
 
-# # Save plot
-# ggsave(file.path(fig_output_path,
-#                 paste("LUAD_spliceset_PCA.png", sep = '.')),
-#         device = "png",
-#         width = 5, height = 4,
-#         dpi = 300)
+# # Make color palette
+# n <- length(unique(df_bam_id[["Sample.Type"]]))
+# qual_col_pals = brewer.pal.info[brewer.pal.info$category == 'qual',]
+# pal = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+
+# Plot PCA all s
+plt <- ggplot(pca.out.merge, aes(x, y, color = LUAD.Sample.Type)) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="top",legend.title = element_blank()) +
+    # scale_color_manual(values=pal) +
+    labs(title= "", sep = ' ', x="PC1", y="PC2"
+        #   x=paste0("PC1: ",round(var_explained[1]*100,1),"%"),
+        #   y=paste0("PC2: ",round(var_explained[2]*100,1),"%")
+          ) 
+
+# Save plot
+ggsave(file.path(fig_output_path,
+                paste("LUAD_spliceset_PCA.png", sep = '.')),
+        device = "png",
+        width = 5, height = 4,
+        dpi = 300)
 
 # ############################################################################
 # ################################################
@@ -834,64 +824,138 @@ ls_map_set_type <- list(
 
 
 
-##############
-# GSVA 
-#############
-# check sample orders match
-head(colnames(df_enr_all_sets))
-head(rownames(df_meta))
+############################
+# GSVA heatmap
+###########################
+# # check sample orders match
+# head(colnames(df_enr_all_sets))
+# head(rownames(df_meta))
 
+# df_enr_all_sets_scaled = t(scale(t(df_enr_all_sets)))
+# df_enr_group_sets_scaled = t(scale(t(df_enr_group_sets)))
 
+# dim(df_enr_all_sets_scaled)
+# dim(df_meta)
 
-df_enr_all_sets_scaled = t(scale(t(df_enr_all_sets)))
-df_enr_group_sets_scaled = t(scale(t(df_enr_group_sets)))
-
-dim(df_enr_all_sets_scaled)
-dim(df_meta)
-
-ha <- HeatmapAnnotation(
-    df = df_meta %>% select(c("LUAD.Sample.Type")) , 
-    col = list(LUAD.Sample.Type = c("Primary Tumor" ="#F8766D", 
-                            "Solid Tissue Normal"= "#619CFF",
-                             "Recurrent Tumor"="#00BA38"    )
-                # Neoplasm.Disease.Stage.American.Joint.Committee.on.Cancer.Code = c(
-                #                     "NA" = "gray" ,
-                #                     "STAGE IB" = "black" ,
-                #                     "STAGE I" = "black" ,
-                #                     "STAGE IA" = "black" ,
-                #                     "STAGE II" = "yellow" ,
-                #                     "STAGE IIA" = "yellow" ,
-                #                     "STAGE IIB" = "yellow" ,
-                #                     "STAGE IIIA" = "orange" ,
-                #                     "STAGE IIIB" = "orange" ,
-                #                     "STAGE IV" = "red" 
+# ha <- HeatmapAnnotation(
+#     # df = df_meta %>% select(c("LUAD.Sample.Type", "Tumor.Type")) , 
+#     df = df_meta %>% select(c("LUAD.Sample.Type")) , 
+#     col = list(LUAD.Sample.Type = c("Primary Tumor" ="#F8766D", 
+#                             "Solid Tissue Normal"= "#619CFF",
+#                              "Recurrent Tumor"="#00BA38"    )
+#                 # Neoplasm.Disease.Stage.American.Joint.Committee.on.Cancer.Code = c(
+#                 #                     "NA" = "gray" ,
+#                 #                     "STAGE IB" = "black" ,
+#                 #                     "STAGE I" = "black" ,
+#                 #                     "STAGE IA" = "black" ,
+#                 #                     "STAGE II" = "yellow" ,
+#                 #                     "STAGE IIA" = "yellow" ,
+#                 #                     "STAGE IIB" = "yellow" ,
+#                 #                     "STAGE IIIA" = "orange" ,
+#                 #                     "STAGE IIIB" = "orange" ,
+#                 #                     "STAGE IV" = "red" 
             
-                )            )
+#                 )            )
 
-ht <- ComplexHeatmap::Heatmap(df_enr_all_sets_scaled,
-                    name = "Z-Score enrichment score",
-                # cluster_columns = FALSE,
-                                # row_title = "UP", row_title_rot = 0,
-                                # column_order =order(colnames(df_enr_median_heat_UP)),
-                                # row_order = order(rownames(df_enr_median_heat_UP)), 
-                                show_row_names= TRUE,
-                                show_column_names = FALSE,
-                                # row_names_gp = grid::gpar(fontsize =8),
-                                # column_names_gp = grid::gpar(fontsize =7),
-                                # show_heatmap_legend = FALSE
-                                top_annotation=ha,
-                                # show_row_dend = TRUE,
-                                # heatmap_legend_param = list(
-                                # legend_direction = "horizontal", 
-                                # legend_height = unit(1, "cm"),
-                                # legend_gp = gpar(fontsize = 5)
-                                )
-# combined gene and splice heatmaps
-png(file=paste0(fig_output_path,"GSVA_heatmap.png"),
-    width = 50,
-    height    = 50,
-    units     = "cm",
-    res       = 1200)
+# ht <- ComplexHeatmap::Heatmap(df_enr_all_sets_scaled,
+#                     name = "Z-Score enrichment score",
+#                 # cluster_columns = FALSE,
+#                                 # row_title = "UP", row_title_rot = 0,
+#                                 # column_order =order(colnames(df_enr_median_heat_UP)),
+#                                 # row_order = order(rownames(df_enr_median_heat_UP)), 
+#                                 show_row_names= TRUE,
+#                                 show_column_names = FALSE,
+#                                 # row_names_gp = grid::gpar(fontsize =8),
+#                                 # column_names_gp = grid::gpar(fontsize =7),
+#                                 # show_heatmap_legend = FALSE
+#                                 top_annotation=ha,
+#                                 # show_row_dend = TRUE,
+#                                 # heatmap_legend_param = list(
+#                                 # legend_direction = "horizontal", 
+#                                 # legend_height = unit(1, "cm"),
+#                                 # legend_gp = gpar(fontsize = 5)
+#                                 )
+# # combined gene and splice heatmaps
+# png(file=paste0(fig_output_path,"GSVA_heatmap.png"),
+#     width = 60,
+#     height    = 50,
+#     units     = "cm",
+#     res       = 1200)
 
-draw(ht, legend_grouping = "original",heatmap_legend_side="bottom", annotation_legend_side="bottom")
-dev.off()
+# draw(ht, legend_grouping = "original",heatmap_legend_side="bottom", annotation_legend_side="bottom")
+# dev.off()
+
+##########################
+# PCA of GSVA res
+##########################
+
+print(dim(df_enr_all_sets))
+prcomp.out <- prcomp(as.data.frame(t(df_enr_all_sets)),
+                   center = TRUE,
+                   scale. = TRUE)
+  
+# print(head(prcomp.out ))
+print(dim(prcomp.out ))
+
+# Merge PCA results with metadata
+df_PCA <- data.frame(x = prcomp.out$x[,1],  y = prcomp.out$x[,2])
+rownames(df_PCA) <- colnames(df_enr_all_sets)
+pca.out.merge = cbind(df_PCA, df_meta)
+
+print(dim(pca.out.merge ))
+
+# Plot PCA all s
+plt <- ggplot(pca.out.merge, aes(x, y, color = LUAD.Sample.Type)) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="top",legend.title = element_blank()) +
+    # scale_color_manual(values=pal) +
+    labs(title= "", sep = ' ', x="PC1",y= "PC2")
+
+# Save plot
+ggsave(file.path(fig_output_path,
+                paste("LUAD_GSVA_PCA.png", sep = '.')),
+        device = "png",
+        width = 5, height = 4,
+        dpi = 300)
+
+
+##########################
+# PCA of GSVA res
+##########################
+umap.out <- umap(as.data.frame(prcomp.out$x), n_neighbors = 5, learning_rate = 0.5, 
+                            init = "random", min_dist = 1, spread = 5)
+umap.out<- data.frame(x = umap.out[,1],  y = umap.out[,2])
+rownames(umap.out) <- colnames(df_enr_all_sets)
+
+# Merge UMAP results with metadata
+umap.out.merge = cbind(umap.out, df_meta)
+
+# Plot UMAP
+plt_umap <- ggplot(umap.out.merge, aes(x, y, color = LUAD.Sample.Type)) +
+    geom_point(size = 2) +
+    theme_classic() +
+    theme(legend.position="top",legend.title = element_blank())+
+    # guides(color=guide_legend(nrow=3,byrow=TRUE)) +
+#   scale_color_manual(values=pal) +
+    # scale_color_viridis_d() +
+    # scale_color_viridis_d(option="C")+
+    # scale_colour_brewer(palette = "Set2") +
+        # scale_color_manual(values=c("#006400",
+        # "#9A6324",
+        #     "#ff0000",
+        #     "#ffd700",
+        #     "#00ff00",
+        #     "#00ffff",
+        #     "#ff00ff",
+        #     "#ffb6c1"))+
+    labs(title= "", sep = ' ', 
+        x="UMAP1",
+        y="UMAP2") 
+
+# Save plot
+ggsave(file.path(fig_output_path,
+                paste0("LUAD_GSVA_UMAP.png")),
+        device = "png",
+        width = 5, height = 4,
+        dpi = 300)
